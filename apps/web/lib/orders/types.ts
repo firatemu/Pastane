@@ -1,0 +1,38 @@
+export type Review = { id: string; status: 'PENDING' | 'APPROVED' | 'REJECTED'; rating: number; comment?: string | null };
+export type OrderItem = {
+  id: string;
+  productId: string;
+  productNameSnapshot: string;
+  skuSnapshot?: string | null;
+  quantity: number;
+  unitPriceSnapshot: string;
+  customNote?: string | null;
+  product?: { id: string; slug: string; name: string };
+  options?: Array<{ optionNameSnapshot: string; priceModifierSnapshot: string }>;
+  review?: Review | null;
+};
+export type Payment = { id: string; status: string; amount?: string; providerStatus?: string | null; processingResult?: string | null; failureReason?: string | null; createdAt?: string; processedAt?: string | null };
+export type AddressSnapshot = { title?: string; city?: string; district?: string; neighborhood?: string | null; fullAddress?: string; building?: string | null; floor?: string | null; apartment?: string | null; directions?: string | null };
+export type Delivery = { id: string; status: string; failedReason?: string | null; pickedUpAt?: string | null; deliveredAt?: string | null; failedAt?: string | null; courier?: { user?: { firstName: string; lastName: string; phone: string } } | null };
+export type StockReservation = { id: string; status: string; quantity: number; expiresAt: string; confirmedAt?: string | null; releasedAt?: string | null };
+export type Order = {
+  id: string;
+  orderNumber: string;
+  deliveryType: 'HOME_DELIVERY' | 'PICKUP';
+  status: string;
+  subtotal: string;
+  deliveryFee: string;
+  serviceFee?: string;
+  loyaltyDiscount?: string;
+  loyaltyPointsUsed?: number;
+  grandTotal: string;
+  note?: string | null;
+  addressSnapshot?: AddressSnapshot | null;
+  pickupStore?: { name: string; city?: string; district?: string; address: string; phone?: string | null } | null;
+  delivery?: Delivery | null;
+  stockReservations?: StockReservation[];
+  items: OrderItem[];
+  payments?: Payment[];
+  statusHistory?: Array<{ id: string; status: string; note?: string | null; createdAt: string }>;
+  createdAt: string;
+};

@@ -1,0 +1,12 @@
+---
+description: Next.js web, admin, and courier rules
+alwaysApply: false
+---
+# Frontend Next.js Rules
+- Use the App Router for all Next.js applications.
+- Use Tailwind CSS and shared UI primitives; use shadcn/ui patterns consistently where adopted.
+- Design mobile-first, responsive layouts with clear empty, loading, error, and success states.
+- Keep data fetching patterns consistent; isolate API clients and avoid duplicating request logic.
+- Customer web prioritizes visual quality, discovery, conversion, and SEO.
+- Admin prioritizes operational clarity, dense information, and safe workflows.
+- Courier prioritizes speed, legibility, large touch targets, and minimal interaction cost.

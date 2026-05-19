@@ -1,0 +1,11 @@
+---
+description: API response and error contract rules
+alwaysApply: false
+---
+# API Response Rules
+- Successful responses must use `{ success: true, data, meta? }`.
+- Error responses must use `{ success: false, statusCode, message, errorCode, errors }`.
+- Paginated responses must expose `page`, `limit`, `total`, and `totalPages` in `meta`.
+- Error codes must be uppercase `SNAKE_CASE` and come from the documented taxonomy.
+- Validation failures must return structured field-level errors without leaking internals.
+- Preserve contract consistency across all clients and modules.

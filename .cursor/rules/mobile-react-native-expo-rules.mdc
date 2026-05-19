@@ -1,0 +1,16 @@
+---
+description: React Native + Expo mobile application rules
+alwaysApply: false
+---
+# Mobile React Native + Expo Rules
+- Use React Native + Expo as the official mobile stack for apps/mobile.
+- Keep the mobile app connected to the same backend API and shared contracts used by web, admin, and courier clients.
+- Prefer a feature-oriented architecture with clear presentation, domain/use-case, API-client, and shared UI boundaries.
+- Use TypeScript strictly; avoid untyped navigation params, API responses, and persisted state.
+- Use Expo-compatible libraries by default and document any native-module exception before introducing it.
+- Centralize API clients, auth/session handling, serialization, retries, and standard API error mapping.
+- Keep token handling secure; never persist raw secrets in source control and avoid exposing sensitive auth data unnecessarily.
+- Design mobile-first with responsive layouts, accessible touch targets, safe-area handling, and clear loading/empty/error states.
+- Keep push notification handling, deep links, and device-token lifecycle in a dedicated integration layer.
+- Do not mirror web-only assumptions into mobile flows without checking mobile UX needs.
+- Do not implement mobile features before the approved mobile phase/batch.

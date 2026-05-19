@@ -1,0 +1,2 @@
+import { requirePermission } from '../../../lib/auth/guards'; import { requireAdminSession } from '../../../lib/auth/session'; import { DeliveryZonesManager } from '../../../components/catalog/delivery-zones-manager';
+export default async function DeliveryZonesPage(){const session=await requireAdminSession(); requirePermission(session,['settings.update']); return <DeliveryZonesManager permissions={session.permissions}/>}

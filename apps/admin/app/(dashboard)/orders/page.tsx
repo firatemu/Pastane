@@ -1,0 +1,1 @@
+import { requirePermission } from '../../../lib/auth/guards'; import { requireAdminSession } from '../../../lib/auth/session'; import { OrdersTable } from '../../../components/operations/orders-table'; export default async function OrdersPage(){const s=await requireAdminSession(); requirePermission(s,['orders.viewAll']); return <OrdersTable/>}

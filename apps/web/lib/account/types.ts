@@ -1,0 +1,23 @@
+export type Profile = { id: string; firstName: string; lastName: string; phone: string; email: string | null; status: string; isPhoneVerified?: boolean; role: { name: string } };
+export type Address = {
+  id: string;
+  title: string;
+  city: string;
+  district: string;
+  neighborhood?: string | null;
+  fullAddress: string;
+  building?: string | null;
+  floor?: string | null;
+  apartment?: string | null;
+  directions?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  mapAddress?: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type LoyaltyAccount = { id: string; userId: string; points: number; qrCode: string; movements?: LoyaltyMovement[] };
+export type LoyaltyMovement = { id: string; type: 'EARN' | 'REDEEM' | 'ADJUSTMENT'; points: number; balanceAfter: number; note?: string | null; createdAt: string };
+export type Notification = { id: string; type: string; title: string; body: string; metadata?: unknown; readAt?: string | null; createdAt: string };
+export type CustomerReview = { id: string; rating: number; comment?: string | null; status: 'PENDING' | 'APPROVED' | 'REJECTED'; createdAt: string; product?: { id: string; name: string; slug: string } };

@@ -1,0 +1,14 @@
+---
+description: NestJS backend implementation rules
+alwaysApply: false
+---
+# Backend NestJS Rules
+- Use one module per business domain with standard module/controller/service/dto organization.
+- Validate every inbound DTO with `class-validator` and transform inputs deliberately.
+- Use Prisma only through approved services; never scatter ad-hoc database access across controllers.
+- Wrap order, payment, stock, loyalty, and courier assignment mutations in transactions when atomicity matters.
+- Use centralized exception filters, shared error codes, guards, decorators, and response interceptors.
+- Use role guards for broad access and permission guards for sensitive actions; enforce ownership checks in services.
+- Offload slow or retryable work to queues instead of blocking requests.
+- Document endpoints with Swagger/OpenAPI and keep contracts aligned with DTOs.
+- Keep modules loosely coupled and avoid circular dependencies.

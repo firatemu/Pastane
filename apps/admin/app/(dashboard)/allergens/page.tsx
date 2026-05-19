@@ -1,0 +1,2 @@
+import { requirePermission } from '../../../lib/auth/guards'; import { requireAdminSession } from '../../../lib/auth/session'; import { AllergensManager } from '../../../components/catalog/allergens-manager';
+export default async function AllergensPage(){const session=await requireAdminSession(); requirePermission(session,['allergens.view','permissions.manage']); return <AllergensManager permissions={session.permissions}/>}

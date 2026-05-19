@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["NEXT_DIST_DIR"],
+  "tasks": {
+    "dev": { "cache": false, "persistent": true },
+    "dev:host": { "cache": false, "persistent": true },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", ".next-ci/**", "build/**"] },
+    "lint": { "dependsOn": ["^lint"] },
+    "typecheck": { "dependsOn": ["^typecheck"] },
+    "test": { "dependsOn": ["^test"], "outputs": ["coverage/**"] }
+  }
+}

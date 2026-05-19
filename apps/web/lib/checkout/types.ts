@@ -1,0 +1,4 @@
+export type Address = { id: string; title: string; city: string; district: string; fullAddress: string; isDefault: boolean };
+export type Store = { id: string; name: string; city: string; district: string; address: string; phone?: string | null };
+export type Order = { id: string; orderNumber: string; deliveryType: 'HOME_DELIVERY' | 'PICKUP'; status: string; subtotal: string; deliveryFee: string; serviceFee?: string; loyaltyDiscount?: string; loyaltyPointsUsed?: number; grandTotal: string };
+export type Payment = { id: string; orderId: string; status: string; amount?: string; providerToken?: string | null; providerStatus?: string | null; processingResult?: string | null; failureReason?: string | null; createdAt?: string; processedAt?: string | null };

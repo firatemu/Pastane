@@ -1,0 +1,28 @@
+{
+  "name": "@pastane/database",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"No tests yet\"",
+    "prisma:generate": "prisma generate --schema=schema.prisma",
+    "prisma:migrate:dev": "bash scripts/prisma-with-root-env.sh migrate dev",
+    "prisma:migrate:deploy": "bash scripts/prisma-with-root-env.sh migrate deploy",
+    "prisma:seed": "prisma db seed --schema=schema.prisma"
+  },
+  "prisma": { "seed": "tsx prisma/seed.ts" },
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "bcryptjs": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "dotenv": "^16.4.7",
+    "prisma": "^6.8.2",
+    "tsx": "^4.19.4"
+  }
+}

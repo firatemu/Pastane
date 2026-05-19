@@ -1,0 +1,2 @@
+import { requirePermission } from '../../../lib/auth/guards'; import { requireAdminSession } from '../../../lib/auth/session'; import { ProductsManager } from '../../../components/catalog/products-manager';
+export default async function ProductsPage(){const session=await requireAdminSession(); requirePermission(session,['products.view']); return <ProductsManager permissions={session.permissions}/>}

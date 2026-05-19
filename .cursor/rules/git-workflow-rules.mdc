@@ -1,0 +1,10 @@
+---
+description: Git collaboration rules
+alwaysApply: true
+---
+# Git Workflow Rules
+- Use short-lived feature branches such as `codex/phase-01-foundation` or `feat/order-flow`.
+- Prefer Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
+- Keep commits scoped and reviewable; do not mix unrelated changes.
+- Use explicit phase completion commits such as `chore: complete phase 01 foundation`.
+- Never rewrite shared history or force-push without explicit approval.

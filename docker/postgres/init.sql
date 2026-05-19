@@ -1,0 +1,2 @@
+-- Phase 0 intentionally keeps the database empty.
+-- Prisma migrations are consolidated and introduced in Phase 1.

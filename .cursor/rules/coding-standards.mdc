@@ -1,0 +1,13 @@
+---
+description: Cross-repository coding standards
+alwaysApply: true
+---
+# Coding Standards
+- Use strict TypeScript settings everywhere TypeScript is used.
+- Prefer `kebab-case` folders, `kebab-case` file names, `PascalCase` classes/components, `camelCase` variables/functions, and `SCREAMING_SNAKE_CASE` constants.
+- Keep files focused, names explicit, and functions small enough to test in isolation.
+- Reuse shared types, constants, utilities, and UI primitives instead of duplicating logic.
+- Use DTOs for request validation and public contracts; do not pass raw request objects into services.
+- Keep controllers thin, services responsible for business orchestration, and infrastructure concerns isolated.
+- Do not duplicate business rules across apps; centralize them in the backend or shared packages as appropriate.
+- Prefer explicitness over cleverness. Document non-obvious tradeoffs.

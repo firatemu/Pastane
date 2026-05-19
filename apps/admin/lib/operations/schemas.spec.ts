@@ -1,0 +1,1 @@
+import { describe,expect,it } from 'vitest'; import { rejectReviewSchema } from './schemas'; describe('operation schemas',()=>{it('requires reject reason',()=>{expect(rejectReviewSchema.safeParse({reason:'x'}).success).toBe(false)})})

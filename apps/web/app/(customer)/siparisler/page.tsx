@@ -1,0 +1,2 @@
+import { OrderHistoryClient } from '../../../components/orders/order-history-client';
+export default function OrdersPage(): React.JSX.Element { return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8"><div className="mb-6"><p className="text-sm font-medium text-amber-700">Siparişlerim</p><h1 className="text-3xl font-semibold">Geçmiş ve aktif siparişler</h1></div><OrderHistoryClient /></main>; }

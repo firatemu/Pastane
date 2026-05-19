@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-[#fffaf3] text-stone-900 antialiased;
+}
+
+a {
+  @apply transition-colors;
+}

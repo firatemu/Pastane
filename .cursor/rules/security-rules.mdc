@@ -1,0 +1,12 @@
+---
+description: Application security rules
+alwaysApply: true
+---
+# Security Rules
+- Use short-lived JWT access tokens and hash stored refresh tokens.
+- Rate-limit auth and OTP endpoints; track OTP attempts and expiry.
+- Validate uploads by MIME type, size, and content; store metadata safely.
+- Use parameterized ORM queries, least-privilege access, and ownership checks to prevent injection and broken access control.
+- Escape untrusted content and follow XSS-safe rendering practices.
+- Store secrets in environment variables or secret managers, never in source control.
+- Do not log tokens, passwords, card data, OTP codes, or other sensitive values.

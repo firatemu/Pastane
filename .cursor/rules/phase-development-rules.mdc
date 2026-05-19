@@ -1,0 +1,12 @@
+---
+description: Phase discipline and stopping rules
+alwaysApply: true
+---
+# Phase Development Rules
+- Never implement future phases early.
+- Determine the active phase from documentation or the user instruction before changing code.
+- Complete one phase fully before moving to the next.
+- Before declaring a phase complete, run the relevant build, typecheck, lint, and test commands.
+- Stop after phase completion, report results, and wait for the next instruction.
+- Never continue with unresolved errors, skipped verification, or failing checks.
+- If phase scope is unclear, state the ambiguity and ask before expanding scope.

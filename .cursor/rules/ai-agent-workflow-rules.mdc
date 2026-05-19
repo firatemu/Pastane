@@ -1,0 +1,23 @@
+---
+description: Mandatory AI agent execution protocol
+alwaysApply: true
+---
+# AI Agent Workflow Rules
+Before coding, always:
+1. Read the relevant docs.
+2. Understand the current phase.
+3. List the files to modify.
+4. Explain the implementation plan.
+5. Implement only the current phase.
+6. Run checks.
+7. Fix all errors.
+8. Report changes.
+9. Stop.
+
+Never:
+- implement unrelated features,
+- skip build checks,
+- leave type errors unresolved,
+- bypass failed tests,
+- change architecture randomly,
+- expand scope merely because implementation is convenient.

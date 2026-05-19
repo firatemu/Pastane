@@ -1,0 +1,117 @@
+name: pastane-dev
+# App services mount host source + use polling so Next/Nest pick up edits without rebuilding images.
+# After dependency or root workspace file changes, rebuild: docker compose ... build api (etc.).
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pastane_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: ["5432:5432"]
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: pastane_redis_dev
+    restart: unless-stopped
+    # Default avoids `requirepass` with no value when Compose runs without a populated `.env`.
+    command: redis-server --requirepass ${REDIS_PASSWORD:-change_me}
+    ports: ["6379:6379"]
+    volumes: ["redis_dev_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_me}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  minio:
+    image: minio/minio:latest
+    container_name: pastane_minio_dev
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio_dev_data:/data"]
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile.dev
+    container_name: pastane_api_dev
+    restart: unless-stopped
+    env_file: ["../.env"]
+    ports: ["3003:3003"]
+    volumes:
+      # Prisma şeması host ile senkron; `apps/api` mount edilmez (imajdaki node_modules çözümlemesi bozulur).
+      - ../packages/database:/app/packages/database
+    environment:
+      PUBLIC_API_URL: http://localhost:3003
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  web:
+    env_file: ["../.env"]
+    environment:
+      WEB_API_URL: http://api:3003
+      RUNNING_IN_DOCKER: "1"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile.dev
+    container_name: pastane_web_dev
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    volumes:
+      - ../apps/web:/app/apps/web
+      - ../tsconfig.base.json:/app/tsconfig.base.json:ro
+    depends_on: ["api"]
+  admin:
+    env_file: ["../.env"]
+    environment:
+      ADMIN_API_URL: http://api:3003
+      RUNNING_IN_DOCKER: "1"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    build:
+      context: ..
+      dockerfile: apps/admin/Dockerfile.dev
+    container_name: pastane_admin_dev
+    restart: unless-stopped
+    ports: ["3001:3001"]
+    volumes:
+      - ../apps/admin:/app/apps/admin
+      - ../tsconfig.base.json:/app/tsconfig.base.json:ro
+    depends_on: ["api"]
+  courier:
+    env_file: ["../.env"]
+    environment:
+      COURIER_API_URL: http://api:3003
+      RUNNING_IN_DOCKER: "1"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    build:
+      context: ..
+      dockerfile: apps/courier/Dockerfile.dev
+    container_name: pastane_courier_dev
+    restart: unless-stopped
+    ports: ["3002:3002"]
+    volumes:
+      - ../apps/courier:/app/apps/courier
+      - ../tsconfig.base.json:/app/tsconfig.base.json:ro
+    depends_on: ["api"]
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  minio_dev_data:

@@ -1,0 +1,1 @@
+import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator'; export class CreateOptionDto { @IsString() name!:string; @IsOptional() @IsNumber() @Min(0) priceModifier?:number; @IsOptional() @IsBoolean() isActive?:boolean; @IsOptional() @IsInt() @Min(0) sortOrder?:number; }

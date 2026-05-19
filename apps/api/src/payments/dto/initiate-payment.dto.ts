@@ -1,0 +1,1 @@
+import { IsString, IsUUID, Length } from 'class-validator'; export class InitiatePaymentDto { @IsUUID() orderId!:string; @IsString() cardHolderName!:string; @IsString() cardNumber!:string; @IsString() @Length(2,2) expireMonth!:string; @IsString() @Length(2,4) expireYear!:string; @IsString() @Length(3,4) cvc!:string; }

@@ -1,0 +1,11 @@
+---
+description: Queue and background processing rules
+alwaysApply: false
+---
+# Queue and Jobs Rules
+- Use BullMQ with Redis for asynchronous, retryable, or slow work.
+- Notifications must be queued; do not send push, SMS, or email inline in request handlers.
+- Use payment timeout and stock reservation timeout jobs for stale pending flows.
+- Use explicit retry policies with backoff based on job criticality.
+- Retain failed jobs for inspection and support a dead-letter/retry workflow.
+- Keep job payloads typed, minimal, idempotent, and traceable.

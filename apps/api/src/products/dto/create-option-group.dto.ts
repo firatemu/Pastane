@@ -1,0 +1,1 @@
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator'; export class CreateOptionGroupDto { @IsString() name!:string; @IsOptional() @IsBoolean() isRequired?:boolean; @IsOptional() @IsBoolean() isMultiple?:boolean; @IsOptional() @IsInt() @Min(0) sortOrder?:number; }

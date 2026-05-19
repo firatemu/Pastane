@@ -1,0 +1,1 @@
+export function PageSection({title,description,children}:Readonly<{title:string;description?:string;children:React.ReactNode}>):React.JSX.Element{return <section className="space-y-4"><div><h1 className="text-3xl font-semibold tracking-tight">{title}</h1>{description?<p className="mt-2 text-sm text-stone-600">{description}</p>:null}</div>{children}</section>}

@@ -1,0 +1,1 @@
+import { requirePermission } from '../../../lib/auth/guards'; import { requireAdminSession } from '../../../lib/auth/session'; import { ReviewsManager } from '../../../components/operations/reviews-manager'; export default async function ReviewsPage(){const s=await requireAdminSession(); requirePermission(s,['reviews.moderate']); return <ReviewsManager/>}

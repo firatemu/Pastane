@@ -1,0 +1,1 @@
+import { IsInt, IsOptional, IsString, Matches, Min } from 'class-validator'; export class UpdateStockEntryDto { @IsOptional() @IsInt() @Min(0) quantity?:number; @IsOptional() @IsString() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) availableFrom?:string; @IsOptional() @IsString() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) availableTo?:string; }

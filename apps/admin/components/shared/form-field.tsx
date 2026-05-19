@@ -1,0 +1,1 @@
+export function Field({label,error,children}:Readonly<{label:string;error?:string|undefined;children:React.ReactNode}>):React.JSX.Element{return <label className="block space-y-2 text-sm font-medium"><span>{label}</span>{children}{error?<span className="block text-xs text-red-700">{error}</span>:null}</label>}

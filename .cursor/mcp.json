@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+    "git": {
+      "command": "bash",
+      "args": ["scripts/mcp/git.sh"]
+    },
+    "postgres": {
+      "command": "bash",
+      "args": ["scripts/mcp/postgres.sh"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "stitch": {
+      "command": "bash",
+      "args": ["scripts/mcp/stitch.sh"]
+    },
+    "shadcn": {
+      "command": "bash",
+      "args": ["scripts/mcp/shadcn.sh"]
+    }
+  }
+}

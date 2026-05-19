@@ -1,0 +1,43 @@
+{
+  "name": "pastane-platform",
+  "private": true,
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:web-apps": "turbo run dev --filter=@pastane/web --filter=@pastane/admin --filter=@pastane/courier",
+    "dev:web-apps-host": "bash -lc 'pnpm --filter @pastane/web dev & pnpm --filter @pastane/admin dev:host & pnpm --filter @pastane/courier dev:host & wait'",
+    "build": "pnpm prisma:generate && turbo run build",
+    "build:ci": "pnpm prisma:generate && NEXT_DIST_DIR=.next-ci turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "pnpm prisma:generate && turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build:ci",
+    "docker:dev:up": "docker compose --env-file .env -f docker/docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker compose --env-file .env -f docker/docker-compose.dev.yml down",
+    "docker:dev:logs": "docker compose --env-file .env -f docker/docker-compose.dev.yml logs -f",
+    "docker:prod:up": "docker compose --env-file .env.prod -f docker/docker-compose.prod.yml up -d",
+    "docker:prod:config": "bash -c 'cp -n .env.prod.example .env.prod 2>/dev/null || true; docker compose --env-file .env.prod -f docker/docker-compose.prod.yml config'",
+    "docker:prod:build": "bash -c 'cp -n .env.prod.example .env.prod 2>/dev/null || true; docker compose --env-file .env.prod -f docker/docker-compose.prod.yml build'",
+    "deploy:help": "echo 'See scripts/deploy-prod.sh, scripts/rollback-prod.sh, scripts/backup-prod.sh, scripts/restore-prod.sh'",
+    "repo:status": "bash scripts/repo-status.sh",
+    "verify:structure": "bash scripts/verify-structure.sh",
+    "fix:next-perms": "bash scripts/fix-next-perms.sh",
+    "prisma:generate": "pnpm --filter @pastane/database prisma:generate",
+    "build:web": "pnpm prisma:generate && turbo run build --filter=@pastane/web",
+    "build:web:clean": "bash scripts/web-build-clean.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.26.0",
+    "eslint": "^9.26.0",
+    "globals": "^16.1.0",
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.1"
+  }
+}

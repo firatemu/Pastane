@@ -1,0 +1,13 @@
+---
+description: Prisma and PostgreSQL rules
+alwaysApply: false
+---
+# Prisma Database Rules
+- Change schema through migrations; never edit production data structure manually.
+- Use `Decimal` for money and monetary calculations; never use floating-point persistence for currency.
+- Use explicit relations, readable names, mapped table names, and consistent timestamps.
+- Prefer soft-delete fields for recoverable business records unless a documented rule requires hard deletion.
+- Use transactions for order creation, stock reservation/finalization, payment finalization, loyalty movements, and courier assignment.
+- Protect stock and payment flows from race conditions using transactions plus rechecks/locking or optimistic concurrency.
+- Keep seeds deterministic, environment-aware, and safe: production seeds may include only required master/system data.
+- Add constraints where the database can enforce truth, while still validating at the application layer.

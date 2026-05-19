@@ -1,0 +1,2 @@
+import { describe,expect,it } from 'vitest'; import { productSchema,stockSchema } from './schemas';
+describe('catalog schemas',()=>{it('rejects discount above price',()=>{expect(productSchema.safeParse({name:'x',price:10,discountedPrice:11,categoryId:'00000000-0000-4000-8000-000000000000',status:'ACTIVE',allergenIds:[]}).success).toBe(false)});it('requires paired stock windows',()=>{expect(stockSchema.safeParse({productId:'00000000-0000-4000-8000-000000000000',date:'2026-05-18',quantity:1,availableFrom:'08:00'}).success).toBe(false)})})

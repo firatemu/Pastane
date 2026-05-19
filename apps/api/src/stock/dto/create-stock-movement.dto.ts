@@ -1,0 +1,1 @@
+import { StockMovementType } from '@prisma/client'; import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator'; export class CreateStockMovementDto { @IsEnum(StockMovementType) type!:StockMovementType; @IsInt() @Min(1) quantity!:number; @IsOptional() @IsString() note?:string; }

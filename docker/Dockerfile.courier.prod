@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+## Production courier panel. Build from repository root:
+##   docker build -f docker/Dockerfile.courier.prod -t pastane/pastane-courier:1.0.0 ..
+FROM node:22-alpine AS builder
+WORKDIR /app
+RUN corepack enable
+ARG VERSION=0.0.0
+LABEL org.opencontainers.image.version="${VERSION}"
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.base.json eslint.config.mjs ./
+COPY packages/tr-api-errors packages/tr-api-errors
+COPY apps/courier/package.json apps/courier/package.json
+RUN pnpm install --frozen-lockfile --filter @pastane/courier...
+COPY apps/courier apps/courier
+RUN mkdir -p apps/courier/public
+RUN pnpm --filter @pastane/tr-api-errors build && pnpm --filter @pastane/courier build
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3002
+ENV HOSTNAME=0.0.0.0
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+COPY --from=builder /app/apps/courier/public ./apps/courier/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/courier/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/courier/.next/static ./apps/courier/.next/static
+USER nextjs
+EXPOSE 3002
+ARG VERSION=0.0.0
+LABEL org.opencontainers.image.version="${VERSION}"
+CMD ["node", "apps/courier/server.js"]

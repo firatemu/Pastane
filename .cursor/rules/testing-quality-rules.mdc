@@ -1,0 +1,10 @@
+---
+description: Verification and test expectations
+alwaysApply: true
+---
+# Testing and Quality Rules
+- Before phase completion, run lint, typecheck, build, and relevant tests.
+- Add unit tests for pure rules, integration tests for persistence boundaries, and E2E tests for critical flows.
+- Prioritize E2E coverage for auth, payment callbacks, stock reservation/finalization, order lifecycle, loyalty, and authorization.
+- Test transaction rollback and concurrency-sensitive paths explicitly.
+- Never ignore failing tests, suppress type errors casually, or merge unverifiable changes.

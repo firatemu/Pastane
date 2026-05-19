@@ -1,0 +1,12 @@
+---
+description: Global project context and architecture guardrails
+alwaysApply: true
+---
+# Project Overview
+- This repository is a single-tenant bakery and pastry commerce + operations platform, not a SaaS product.
+- Keep one shared backend API for customer web, admin, courier, and mobile clients.
+- Preserve the monorepo layout: `apps/api`, `apps/web`, `apps/admin`, `apps/courier`, `apps/mobile`, plus shared `packages/*`.
+- Use NestJS for the API, Next.js for web/admin/courier, React Native + Expo for mobile, Prisma + PostgreSQL for persistence, Redis + BullMQ for queues, and Docker Compose for environments.
+- Model the business as a bakery operation: products, categories, allergens, stock windows, cart, orders, payments, couriers, stores, loyalty, reviews, notifications, campaigns, settings, reports, and audit.
+- Prefer modular, type-safe, documented decisions that remain understandable to future AI agents and human developers.
+- Never turn single-tenant assumptions into hidden multi-tenant abstractions unless a future phase explicitly requires it.

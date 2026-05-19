@@ -1,0 +1,11 @@
+---
+description: Product design rules
+alwaysApply: false
+---
+# UI and UX Rules
+- Customer-facing UI should feel warm, appetizing, trustworthy, and premium without sacrificing speed.
+- Use a bakery/pastry visual language: soft neutrals, warm accents, strong product imagery, and generous spacing.
+- Admin UI should optimize for operational simplicity, clarity, and low error rate.
+- Courier UI should be mobile-first, high-contrast, and reducible to a few decisive actions.
+- Respect accessibility basics: semantic structure, keyboard access, contrast, focus states, and readable typography.
+- Use a consistent spacing scale and responsive breakpoints across web surfaces.

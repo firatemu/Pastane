@@ -1,0 +1,1 @@
+import { IsIn, IsOptional, IsString } from 'class-validator'; export class PaymentCallbackDto { @IsString() conversationId!:string; @IsString() providerPaymentId!:string; @IsIn(['SUCCESS','FAILED']) status!: 'SUCCESS'|'FAILED'; @IsOptional() @IsString() token?:string; }

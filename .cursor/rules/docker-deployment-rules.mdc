@@ -1,0 +1,12 @@
+---
+description: Docker, infrastructure, and deployment rules
+alwaysApply: false
+---
+# Docker Deployment Rules
+- Maintain separate development and production Compose files.
+- In production, expose only Nginx publicly; keep PostgreSQL, Redis, MinIO, and app services internal.
+- Use Nginx as reverse proxy for web, admin, courier, API, and public storage routes.
+- MinIO public object access may be exposed through a storage domain; the MinIO console must not be public.
+- Protect PostgreSQL and Redis with credentials and no direct public ports in production.
+- Target Ubuntu 24.04 LTS and preserve healthchecks, restart policies, backups, and SSL renewal.
+- Never commit real secrets or production environment files.

@@ -1,0 +1,1 @@
+import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator'; export class CreateDeliveryZoneDto { @IsString() name!:string; @IsOptional() @IsNumber() @Min(0) minimumOrderPrice?:number; @IsNumber() @Min(0) deliveryFee!:number; @IsOptional() @IsInt() @Min(1) estimatedMinutes?:number; @IsOptional() @IsBoolean() isActive?:boolean; }

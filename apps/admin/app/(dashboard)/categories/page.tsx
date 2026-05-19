@@ -1,0 +1,2 @@
+import { requirePermission } from '../../../lib/auth/guards'; import { requireAdminSession } from '../../../lib/auth/session'; import { CategoriesManager } from '../../../components/catalog/categories-manager';
+export default async function CategoriesPage(){const session=await requireAdminSession(); requirePermission(session,['categories.view']); return <CategoriesManager permissions={session.permissions}/>}
