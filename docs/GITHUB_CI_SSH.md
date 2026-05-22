@@ -27,3 +27,20 @@ ssh ... 'cd /var/www/pastane-app/app && ./deploy.sh'
 4. **Host nginx** terminating TLS and proxying to `127.0.0.1:3000/3001/3002/3003` (and MinIO `:9000` if `storage.*` is used).
 
 The workflow does **not** run lint/test in CI; validation is `./deploy.sh` on the VPS (compose config, build, migrate deploy).
+
+## Local developer — push + SSH deploy
+
+Script: [`scripts/deploy-vps.sh`](../scripts/deploy-vps.sh)
+
+1. One-time: copy [`scripts/deploy-vps.env.example`](../scripts/deploy-vps.env.example) to `scripts/deploy-vps.env.local`, set `VPS_HOST` (and optionally `VPS_USER`, `VPS_PORT`, `VPS_APP_DIR`, `VPS_SSH_IDENTITY`). Git ignores `scripts/deploy-vps.env.local` (see root `.gitignore`).
+2. Ensure your SSH key can log in as `deploy@VPS_HOST` (agent or `VPS_SSH_IDENTITY`).
+3. Run from repo root:
+
+```bash
+./scripts/deploy-vps.sh --dry-run --skip-checks   # commands only
+./scripts/deploy-vps.sh                             # typecheck, push main, then remote ./deploy.sh
+./scripts/deploy-vps.sh --push-only               # only push (let GitHub Actions deploy)
+./scripts/deploy-vps.sh --remote-only             # only SSH deploy (after code is already on origin)
+```
+
+Uncommitted changes abort the script unless you pass `--allow-dirty`.

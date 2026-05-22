@@ -23,6 +23,9 @@ uploads/
 !.env.prod.example
 !.env.production.example
 
+# Local VPS deploy overrides (see scripts/deploy-vps.env.example)
+scripts/deploy-vps.env.local
+
 # logs
 *.log
 
