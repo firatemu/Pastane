@@ -73,6 +73,8 @@ Script: [`scripts/deploy-vps.sh`](../scripts/deploy-vps.sh)
 ```bash
 ./scripts/deploy-vps.sh --dry-run --skip-checks   # commands only
 ./scripts/deploy-vps.sh                             # typecheck, push main, then remote ./deploy.sh
+pnpm push:vps                                       # same intent: push current main then VPS deploy.sh
+pnpm push:vps:fast                                  # skips typecheck
 ./scripts/deploy-vps.sh --push-only               # only push (let GitHub Actions deploy)
 ./scripts/deploy-vps.sh --remote-only             # only SSH deploy (after code is already on origin)
 ```

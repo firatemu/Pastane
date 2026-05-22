@@ -28,6 +28,17 @@ Deploy helper: [`deploy.sh`](../deploy.sh) — syncs `main` to **`origin/main`**
 
 ## Routine deploy on VPS
 
+From your dev machine (**`main`**, temiz çalışma ağacı, `scripts/deploy-vps.env.local` içinde **`VPS_HOST`**):
+
+```bash
+pnpm push:vps           # typecheck → git push → SSH ile sunucuda ./deploy.sh
+pnpm push:vps:fast      # typecheck atlanır (önce `pnpm typecheck` çalıştırdıysanız)
+```
+
+Şablon: [`scripts/deploy-vps.env.example`](../scripts/deploy-vps.env.example).
+
+Sunucuda doğrudan:
+
 ```bash
 cd /var/www/pastane-app/app
 ./deploy.sh

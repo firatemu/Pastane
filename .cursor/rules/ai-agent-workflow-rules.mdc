@@ -21,3 +21,7 @@ Never:
 - bypass failed tests,
 - change architecture randomly,
 - expand scope merely because implementation is convenient.
+
+Production VPS (only when user explicitly asks to publish / deploy):
+
+- Use `pnpm push:vps` from repo root **on branch `main`**, committed clean tree (`scripts/deploy-vps.env.local` must define `VPS_HOST`). Honour user rules about **git commits**: do **not** create commits unless the user asked — then run checks and `pnpm push:vps` **after** the tree is pushed-ready.

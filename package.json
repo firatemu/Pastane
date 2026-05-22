@@ -25,6 +25,8 @@
     "docker:prod:config": "bash -c 'cp -n .env.production.example .env.production 2>/dev/null || true; docker compose --env-file .env.production -f docker/docker-compose.prod.yml config'",
     "docker:prod:build": "bash -c 'cp -n .env.production.example .env.production 2>/dev/null || true; docker compose --env-file .env.production -f docker/docker-compose.prod.yml build'",
     "deploy:help": "echo 'See scripts/deploy-prod.sh, scripts/rollback-prod.sh, scripts/backup-prod.sh, scripts/restore-prod.sh'",
+    "push:vps": "bash scripts/push-vps.sh",
+    "push:vps:fast": "bash scripts/push-vps.sh --skip-checks",
     "repo:status": "bash scripts/repo-status.sh",
     "verify:structure": "bash scripts/verify-structure.sh",
     "fix:next-perms": "bash scripts/fix-next-perms.sh",
