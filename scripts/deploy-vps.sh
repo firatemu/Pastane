@@ -110,9 +110,10 @@ REMOTE_CMD="$(printf 'cd %q && ./deploy.sh' "$VPS_APP_DIR")"
 HOST_DISP="${VPS_HOST:-YOUR_VPS_HOST}"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  printf '[dry-run]'
-  printf ' %q' "${SSH_BASE[@]}" "${VPS_USER}@${HOST_DISP}" "$REMOTE_CMD"
-  printf '\n'
+  ssh_id=""
+  [[ -n "${VPS_SSH_IDENTITY:-}" ]] && ssh_id=" -i ${VPS_SSH_IDENTITY}"
+  echo "[dry-run] ssh (-o BatchMode=yes -o StrictHostKeyChecking=accept-new) -p ${VPS_PORT}${ssh_id} ${VPS_USER}@${HOST_DISP}"
+  echo "[dry-run]   remote: cd ${VPS_APP_DIR} && ./deploy.sh"
   exit 0
 fi
 
