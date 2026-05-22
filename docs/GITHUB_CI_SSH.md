@@ -10,10 +10,11 @@ Trigger: push to `main`, or manual **workflow_dispatch**.
 |--------|---------|--------|
 | `VPS_HOST` | `76.13.14.43` | Public IPv4 of the VPS |
 | `VPS_USER` | `deploy` | Non-root UNIX user that can run `docker` commands |
-| `VPS_PORT` | `22` | SSH listener port |
+| `VPS_PORT` | `22` | SSH listener port (**optional**: if omitted in GitHub, the workflow uses port `22`) |
 | `VPS_SSH_KEY` | *(full PEM private key)* | Key for `deploy@VPS`; **never** committed to Git |
 
-Deploy step:
+Secrets must live under **Repository → Settings → Secrets and variables → Actions** (exact names above). Empty secrets produce errors like **`Bad port ''`** or **`Verify deploy secrets`** failing in CI.
+
 
 ```bash
 ssh ... 'cd /var/www/pastane-app/app && ./deploy.sh'
