@@ -62,6 +62,19 @@ VPS_PORT="${VPS_PORT:-22}"
 VPS_APP_DIR="${VPS_APP_DIR:-/var/www/pastane-app/app}"
 BRANCH="${VPS_DEPLOY_BRANCH:-main}"
 
+# Require VPS before push/typecheck when we will SSH (avoids push-then-fail).
+if [[ "$PUSH_ONLY" -eq 0 && "$DRY_RUN" -eq 0 && -z "$VPS_HOST" ]]; then
+  echo 'error: VPS_HOST is not set — cannot run remote ./deploy.sh after push.' >&2
+  if [[ ! -f "$LOCAL_ENV" ]]; then
+    echo "  Create ${LOCAL_ENV} from scripts/deploy-vps.env.example and set VPS_HOST (and optional VPS_*)." >&2
+  else
+    echo "  ${LOCAL_ENV} exists but VPS_HOST is empty; uncomment/set VPS_HOST in that file." >&2
+  fi
+  echo '  Or run: VPS_HOST=your.ip ./scripts/deploy-vps.sh …' >&2
+  echo '  Or push only (GitHub Actions deploy): ./scripts/deploy-vps.sh --push-only' >&2
+  exit 1
+fi
+
 run() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     printf '[dry-run]'
@@ -94,11 +107,6 @@ fi
 if [[ "$PUSH_ONLY" -eq 1 ]]; then
   echo "${DRY_RUN:+(dry-run) }Push step done; exiting (--push-only)."
   exit 0
-fi
-
-if [[ -z "$VPS_HOST" && "$DRY_RUN" -eq 0 ]]; then
-  echo 'error: VPS_HOST is not set. Export it or create scripts/deploy-vps.env.local (see scripts/deploy-vps.env.example).' >&2
-  exit 1
 fi
 
 SSH_BASE=(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -p "$VPS_PORT")
