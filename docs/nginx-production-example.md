@@ -83,7 +83,7 @@ courier.azem.cloud
 storage.azem.cloud
 ```
 
-Point them to the VPS public IP in DNS. For local simulation, map them to `127.0.0.1` in `/etc/hosts`.
+Point them to the VPS public IP `76.13.14.43` in DNS. For local simulation, map them to `127.0.0.1` in `/etc/hosts`.
 
 ## Full example file
 

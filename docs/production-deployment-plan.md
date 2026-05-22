@@ -131,9 +131,11 @@ The production domain set is now:
 | `courier.azem.cloud` | Courier |
 | `storage.azem.cloud` | MinIO public object access |
 
+VPS public IP: `76.13.14.43`.
+
 Use [azem-cloud-vps-deployment.md](azem-cloud-vps-deployment.md) for the VPS runbook.
 
-1. Obtain DNS A/AAAA records for web, API, admin, courier, and storage.  
+1. Obtain DNS A records for web, API, admin, courier, and storage pointing to `76.13.14.43`.
 2. Issue **Let’s Encrypt** certificates; switch Nginx from `pastane.conf` HTTP bootstrap to `pastane.ssl.conf.example`.
 3. Keep production URLs in `.env.prod`: **`WEB_URL`**, **`API_URL`**, **`ADMIN_URL`**, **`COURIER_URL`**, **`NEXT_PUBLIC_SITE_URL`**, **`MINIO_PUBLIC_URL`**, payment callback URLs per Iyzico docs.
 4. Enable **`SWAGGER_ENABLED=false`** in production.  

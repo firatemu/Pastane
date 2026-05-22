@@ -4,24 +4,39 @@ This runbook prepares the Pastane platform for production on `azem.cloud`.
 
 ## DNS
 
-Create A records pointing to the VPS public IP:
+Create A records pointing to the VPS public IP `76.13.14.43`:
 
-- `azem.cloud`
-- `www.azem.cloud`
-- `api.azem.cloud`
-- `admin.azem.cloud`
-- `courier.azem.cloud`
-- `storage.azem.cloud`
+| Host | Type | Value |
+|------|------|-------|
+| `azem.cloud` | A | `76.13.14.43` |
+| `www.azem.cloud` | A | `76.13.14.43` |
+| `api.azem.cloud` | A | `76.13.14.43` |
+| `admin.azem.cloud` | A | `76.13.14.43` |
+| `courier.azem.cloud` | A | `76.13.14.43` |
+| `storage.azem.cloud` | A | `76.13.14.43` |
 
 Wait until every hostname resolves to the VPS:
 
 ```bash
 dig +short azem.cloud
+dig +short www.azem.cloud
 dig +short api.azem.cloud
 dig +short admin.azem.cloud
 dig +short courier.azem.cloud
 dig +short storage.azem.cloud
 ```
+
+Every command should return `76.13.14.43` before issuing certificates.
+
+## SSH
+
+Connect to the VPS:
+
+```bash
+ssh azem@76.13.14.43
+```
+
+If the VPS uses a different deploy user, replace `azem` in every `/home/azem/...` path in this runbook.
 
 ## VPS Base Setup
 
