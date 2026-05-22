@@ -6,6 +6,19 @@ import { computeProductAvailability } from '../products/product-availability.uti
 import type { AddToCartDto } from './dto/add-to-cart.dto';
 import type { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
+/** Product relation shape for cart line JSON (gallery for storefront). */
+const cartProductInclude = {
+  include: {
+    images: {
+      where: { deletedAt: null },
+      orderBy: [
+        { isPrimary: 'desc' as const },
+        { sortOrder: 'asc' as const },
+      ],
+    },
+  },
+};
+
 @Injectable()
 export class CartService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -27,7 +40,7 @@ export class CartService {
         customNote: dto.customNote,
         options: { create: (dto.optionIds ?? []).map((optionId) => ({ optionId })) },
       },
-      include: { options: true, product: true },
+      include: { options: true, product: cartProductInclude },
     });
   }
 
@@ -44,7 +57,7 @@ export class CartService {
         customNote: dto.customNote,
         ...(dto.optionIds ? { options: { create: dto.optionIds.map((optionId) => ({ optionId })) } } : {}),
       },
-      include: { options: true, product: true },
+      include: { options: true, product: cartProductInclude },
     });
   }
 
@@ -60,7 +73,7 @@ export class CartService {
   }
 
   private include() {
-    return { items: { include: { product: true, options: { include: { option: true } } } } } as const;
+    return { items: { include: { product: cartProductInclude, options: { include: { option: true } } } } };
   }
 
   private async findItem(userId: string, id: string) {
