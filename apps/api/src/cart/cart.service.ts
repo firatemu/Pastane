@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { AppException } from '../common/exceptions/app.exception';
@@ -73,7 +74,12 @@ export class CartService {
   }
 
   private include() {
-    return { items: { include: { product: cartProductInclude, options: { include: { option: true } } } } };
+    return {
+      items: {
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] as Prisma.CartItemOrderByWithRelationInput[],
+        include: { product: cartProductInclude, options: { include: { option: true } } },
+      },
+    };
   }
 
   private async findItem(userId: string, id: string) {
