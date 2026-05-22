@@ -4,6 +4,24 @@ Workflow: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
 
 Trigger: push to `main`, or manual **workflow_dispatch**.
 
+## GitHub’a secret ekleme (CI “Missing … secrets” ise)
+
+Workflow **Secrets** bekler; repoda eklenmezse job burada çıkar:
+
+1. Aç: **github.com › [organizasyon/]Pastane › Settings › Secrets and variables › Actions › Repository secrets**  
+   Direkt link şablonu: `https://github.com/YOUR_OWNER/Pastane/settings/secrets/actions`
+2. Fork kullanıyorsanız **`YOUR_OWNER`** sizin **fork’unuzdur** — secret’lar üst repodan aktarılmaz.
+3. **New repository secret** ile şu **isimleri birebir** oluşturun (büyük/küçük harf dahil):
+
+| Name | Typical value |
+|------|----------------|
+| `VPS_HOST` | Sunucu IP (örn. `76.13.14.43`) |
+| `VPS_USER` | Örn. `deploy` |
+| `VPS_SSH_KEY` | `deploy` ile giriş yapan anahtarın **private PEM** içeriği (BEGIN/END dahil blok) |
+
+4. Opsiyonel: **`VPS_PORT`** = `22`; yoksa workflow **22** kullanır.
+5. **Variables** ile karıştırmayın: private key için **Secrets** kullanın (`VPS_SSH_KEY`).
+
 ## Required secrets
 
 | Secret | Example | Notes |
