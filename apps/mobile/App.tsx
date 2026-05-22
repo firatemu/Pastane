@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
   heroContent: { padding: spacing.xl },
   heroCopy: { color: 'rgba(255,255,255,0.9)', fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, lineHeight: 20, marginBottom: spacing.lg, marginTop: spacing.sm, maxWidth: 260 },
   heroImage: { borderRadius: radii.xl },
-  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(33,26,20,0.42)' },
+  heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(33,26,20,0.42)' },
   heroTitle: { color: colors.surface, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 34, lineHeight: 39, marginTop: spacing.sm, maxWidth: 300 },
   input: { backgroundColor: colors.surfaceLow, borderRadius: radii.md, color: colors.text, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, marginBottom: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: 14 },
   loading: { alignItems: 'center', backgroundColor: colors.background, flex: 1, justifyContent: 'center' },

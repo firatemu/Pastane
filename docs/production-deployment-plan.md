@@ -51,8 +51,9 @@ Map these to `127.0.0.1` (or the staging server IP). Use **mkcert** or short-liv
 
 ## Internal Docker networking (rationale)
 
-- **PostgreSQL, Redis, and MinIO** must not be bound to the public Internet. In production Compose they use **`expose`** (or internal ports) on a private Docker network only.
-- **Ingress** is **Nginx** on **80/443** on `pastane_edge`. Nginx is also on **`pastane_internal`** so it can proxy to **MinIO** for `storage.*` hosts without publishing MinIO to the WAN. Application containers (**api**, **web**, **admin**, **courier**) are only **exposed** on the Docker network, not as host port mappings.
+- **PostgreSQL, Redis** must not be reachable from the WAN. Compose keeps them on **`pastane_internal`** with **no host port publishes**.
+- **MinIO**: S3 listens on **`127.0.0.1:9000`** on the VPS so **Host Nginx** can proxy `storage.*` safely; optional console port **9001** stays internal-only.
+- **Ingress** is **Host Nginx on the VPS** (public **80/443**). **web**, **admin**, **courier**, and **api** bind **`127.0.0.1`** only (`3000`, `3001`, `3002`, `3003`). See [`deploy/nginx/pastane-app`](../deploy/nginx/pastane-app) and [azem-cloud-vps-deployment.md](azem-cloud-vps-deployment.md).
 - An **`internal: true`** Docker network prevents accidental outbound egress from data services where Compose supports it; operators still verify with **`ufw`**, **`ss -tlnp`**, and cloud security groups.
 
 See also [production-risk-review.md](production-risk-review.md).

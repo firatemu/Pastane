@@ -20,3 +20,10 @@ Tek kiracılı pastane operasyonları için monorepo: **NestJS** API, **Next.js*
 | `pnpm fix:next-perms` | Docker sonrası root sahipli `apps/*/.next` için `chown` (sudo) |
 
 Paket düzeni: `apps/api`, `apps/web`, `apps/admin`, `apps/courier`, `packages/*`.
+
+## Production (VPS — Host Nginx)
+
+- Compose: [`docker/docker-compose.prod.yml`](docker/docker-compose.prod.yml) — **`api`/`web`/`admin`/`courier`/`minio`(S3)** publish **loopback ports** for Host Nginx; **PostgreSQL ve Redis WAN’a açılmaz**.
+- Ingress: VPS üzerinde **Host Nginx** ([`deploy/nginx/pastane-app`](deploy/nginx/pastane-app)). Docker içinde **`nginx` servisi yoktur**.
+- Operasyon özeti: [`docs/OPERATIONS.md`](docs/OPERATIONS.md) · azem.cloud runbook: [`docs/azem-cloud-vps-deployment.md`](docs/azem-cloud-vps-deployment.md) · GitHub Actions SSH: [`docs/GITHUB_CI_SSH.md`](docs/GITHUB_CI_SSH.md).
+- Yerel doğrulama: `pnpm check` · üretim imajları: `pnpm docker:prod:config`, `pnpm docker:prod:build` (köke `.env.production`; secret’leri commit etmeyin).

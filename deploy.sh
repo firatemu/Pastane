@@ -44,7 +44,7 @@ echo "Service status:"
 docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
 
 echo "Recent logs:"
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" logs --tail=80 api web admin courier nginx
+docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" logs --tail=80 api web admin courier
 
 echo "Pruning unused Docker images..."
 docker image prune -f

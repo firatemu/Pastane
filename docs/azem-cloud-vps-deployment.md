@@ -1,13 +1,19 @@
-# azem.cloud VPS Deployment Runbook
+# azem.cloud VPS deployment runbook (Host Nginx + Docker)
 
-This runbook prepares the Pastane platform for production on `azem.cloud`.
+This runbook prepares the Pastane platform for production on **azem.cloud** using:
+
+- **Docker Compose** (`docker/docker-compose.prod.yml`) — API, PostgreSQL, Redis, MinIO, Next.js surfaces.
+- **Host Nginx on the VPS** — public **80/443** termination and reverse proxy to **loopback-bound** Docker ports (**not** Docker’s `nginx` image).
+
+Operational overview: [`OPERATIONS.md`](OPERATIONS.md)  
+GitHub Actions SSH: [`GITHUB_CI_SSH.md`](GITHUB_CI_SSH.md)
 
 ## DNS
 
 Create A records pointing to the VPS public IP `76.13.14.43`:
 
 | Host | Type | Value |
-|------|------|-------|
+|------|------|--------|
 | `azem.cloud` | A | `76.13.14.43` |
 | `www.azem.cloud` | A | `76.13.14.43` |
 | `api.azem.cloud` | A | `76.13.14.43` |
@@ -15,48 +21,43 @@ Create A records pointing to the VPS public IP `76.13.14.43`:
 | `courier.azem.cloud` | A | `76.13.14.43` |
 | `storage.azem.cloud` | A | `76.13.14.43` |
 
-Wait until every hostname resolves to the VPS:
-
 ```bash
 dig +short azem.cloud
-dig +short www.azem.cloud
 dig +short api.azem.cloud
 dig +short admin.azem.cloud
 dig +short courier.azem.cloud
 dig +short storage.azem.cloud
 ```
 
-Every command should return `76.13.14.43` before issuing certificates.
+Resolve to `76.13.14.43` **before** requesting certificates.
 
 ## SSH
 
-Connect to the VPS:
+Replace with your deployment user:
 
 ```bash
-ssh azem@76.13.14.43
+ssh deploy@76.13.14.43
 ```
 
-If the VPS uses a different deploy user, replace `azem` in every `/home/azem/...` path in this runbook.
+## VPS base setup
 
-## VPS Base Setup
-
-Use Ubuntu 24.04 LTS with Docker Engine and Compose V2.
+Ubuntu 24.04 LTS with Docker Engine **and** Host Nginx for TLS + proxying:
 
 ```bash
 sudo apt update
-sudo apt install -y ca-certificates curl git ufw certbot
+sudo apt install -y ca-certificates curl git ufw nginx certbot python3-certbot-nginx
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc >/dev/null
 sudo chmod a+r /etc/apt/keyrings/docker.asc
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker "$USER"
+sudo usermod -aG docker deploy
 ```
 
-Log out and back in after adding the Docker group.
+Log out/in after Docker group membership.
 
-## Firewall
+### Firewall
 
 ```bash
 sudo ufw allow OpenSSH
@@ -66,89 +67,89 @@ sudo ufw --force enable
 sudo ufw status verbose
 ```
 
-Do not expose PostgreSQL, Redis, MinIO, API, admin, courier, or web ports directly.
+**Do not** publish PostgreSQL, Redis, or MinIO (`9001` console) on `0.0.0.0`. Loopback binds from Compose are fine for nginx on the **same host**. See Compose `127.0.0.1:…` port mappings.
 
-## Deploy User Directory
+## Deploy directory & clone
 
 ```bash
 sudo mkdir -p /var/www/pastane-app
 sudo chown -R deploy:deploy /var/www/pastane-app
 cd /var/www/pastane-app
+
+# If `app` is not a repo:
+# mv app app-backup-$(date +%Y%m%d-%H%M%S)
 git clone git@github.com:firatemu/Pastane.git app
 cd app
 ```
 
-## Production Env
+## `.env.production`
 
 ```bash
 cp .env.production.example .env.production
 chmod 600 .env.production
+nano .env.production
 ```
 
-Edit `.env.production` and replace every placeholder secret:
+Replace placeholders (`POSTGRES_*`, `DATABASE_URL`, `REDIS_PASSWORD`, JWT secrets, MinIO keys, etc.).  
+[`deploy.sh`](../deploy.sh) **refuses** to run if `.env.production` still contains `change_me` or `placeholder`.
 
-- `POSTGRES_PASSWORD`
-- `DATABASE_URL`
-- `REDIS_PASSWORD`
-- `JWT_SECRET`
-- `JWT_REFRESH_SECRET`
-- `MINIO_ACCESS_KEY`
-- `MINIO_SECRET_KEY`
-- payment, SMS, SMTP, and FCM values when available
-
-Generate strong values:
-
-```bash
-openssl rand -base64 48
-```
-
-Keep these public URL values for `azem.cloud`:
+Public URLs (example):
 
 ```env
 API_URL=https://api.azem.cloud
 PUBLIC_API_URL=https://api.azem.cloud
+NEXT_PUBLIC_API_URL=https://api.azem.cloud
 WEB_URL=https://azem.cloud
 ADMIN_URL=https://admin.azem.cloud
 COURIER_URL=https://courier.azem.cloud
 MINIO_PUBLIC_URL=https://storage.azem.cloud
 MINIO_PUBLIC_DOMAIN=https://storage.azem.cloud
 NEXT_PUBLIC_SITE_URL=https://azem.cloud
+CORS_ORIGINS=https://azem.cloud,https://www.azem.cloud,https://admin.azem.cloud,https://courier.azem.cloud
 ```
 
-## First HTTP Boot
+## TLS before enabling HTTPS vhosts
 
-Start the stack on HTTP so Let's Encrypt can validate ACME challenges:
+The checked-in Host Nginx file [`deploy/nginx/pastane-app`](../deploy/nginx/pastane-app) expects certs at `/etc/letsencrypt/live/azem.cloud/`.
+
+**Option A — certbot standalone** (works when nothing listens on `:80`): stop nginx briefly, obtain cert for all hosts, restart nginx:
 
 ```bash
+sudo systemctl stop nginx
+sudo certbot certonly --standalone \
+  -d azem.cloud -d www.azem.cloud \
+  -d api.azem.cloud -d admin.azem.cloud -d courier.azem.cloud -d storage.azem.cloud
+sudo systemctl start nginx
+```
+
+**Option B** — staged HTTP-only nginx for HTTP-01 (`/.well-known/…`) via `sudo certbot --nginx` once a minimal `:80` vhost exists. See [`deploy/nginx/README.md`](../deploy/nginx/README.md).
+
+## Host Nginx config
+
+Install the HTTPS vhosts (adjust filename if desired):
+
+```bash
+sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+sudo install -o root -m 0644 /var/www/pastane-app/app/deploy/nginx/pastane-app \
+  /etc/nginx/sites-available/pastane-app.conf
+sudo ln -sf /etc/nginx/sites-available/pastane-app.conf /etc/nginx/sites-enabled/pastane-app.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+## First stack bring-up (`deploy.sh`)
+
+```bash
+cd /var/www/pastane-app/app
+chmod +x deploy.sh backup-db.sh
 ./deploy.sh
-curl -fsS -H 'Host: api.azem.cloud' http://127.0.0.1/health
 ```
 
-## Certificates
+This runs **`prisma migrate deploy`** (never `migrate dev`).
 
-Issue one certificate covering all public hostnames:
-
-```bash
-sudo certbot certonly --webroot \
-  -w /home/$USER/apps/Pastane/docker/nginx/certbot-webroot \
-  -d azem.cloud \
-  -d www.azem.cloud \
-  -d api.azem.cloud \
-  -d admin.azem.cloud \
-  -d courier.azem.cloud \
-  -d storage.azem.cloud
-```
-
-Switch Nginx to HTTPS:
+## Smoke checks
 
 ```bash
-cp docker/nginx/conf.d/pastane.ssl.conf.example docker/nginx/conf.d/pastane.conf
-docker compose --env-file .env.production -f docker/docker-compose.prod.yml restart nginx
-```
-
-## Smoke Tests
-
-```bash
+curl -fsS http://127.0.0.1:3003/health
 curl -fsS https://api.azem.cloud/health
 curl -I https://azem.cloud
 curl -I https://admin.azem.cloud
@@ -156,50 +157,31 @@ curl -I https://courier.azem.cloud
 curl -I https://storage.azem.cloud
 ```
 
-Then verify in browser:
+## Certbot renewal + reload Host Nginx
 
-- customer storefront loads at `https://azem.cloud`
-- admin login loads at `https://admin.azem.cloud`
-- courier login loads at `https://courier.azem.cloud`
-- customer login, catalog, cart, and order creation work
+```bash
+sudo certbot renew --dry-run
+```
 
-## Renewals
-
-Certbot installs a systemd renewal timer. Add this deploy hook so Nginx reloads after renewal:
+Deploy hook reloads nginx after renewal:
 
 ```bash
 sudo mkdir -p /etc/letsencrypt/renewal-hooks/deploy
-sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-nginx >/dev/null <<'EOF'
+sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-host-nginx >/dev/null <<'EOF'
 #!/usr/bin/env bash
-docker compose --env-file /var/www/pastane-app/app/.env.production -f /var/www/pastane-app/app/docker/docker-compose.prod.yml restart nginx
+systemctl reload nginx
 EOF
-sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-nginx
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-host-nginx
 ```
 
-## Backups
+## Backups & updates
 
-Run a backup after first successful deployment:
-
-```bash
-./backup-db.sh
-```
-
-Add a nightly cron:
-
-```bash
-crontab -e
-```
-
-```cron
-0 3 * * * /var/www/pastane-app/app/backup-db.sh >> /var/log/pastane-backup.log 2>&1
-```
-
-## Update Flow
+See [`OPERATIONS.md`](OPERATIONS.md) and upstream [`production-deployment-plan.md`](production-deployment-plan.md).
 
 ```bash
 cd /var/www/pastane-app/app
-git pull --ff-only origin main
 ./backup-db.sh
+git pull --ff-only origin main
 ./deploy.sh
 curl -fsS https://api.azem.cloud/health
 ```

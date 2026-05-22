@@ -1,8 +1,9 @@
-# Pastane reverse proxy — HTTPS configuration for azem.cloud.
-# Usage on the VPS after certificates exist:
-#   cp docker/nginx/conf.d/pastane.ssl.conf.example docker/nginx/conf.d/pastane.conf
-#   docker compose --env-file .env.production -f docker/docker-compose.prod.yml restart nginx
-
+# Pastane reverse proxy — HTTPS configuration (Docker-internal upstreams).
+#
+# Intended for LOCAL/SIMULATION when every service runs INSIDE Compose and nginx
+# is part of Compose. Production on azem.cloud uses Host Nginx + loopback binds;
+# see deploy/nginx/pastane-app and docs/azem-cloud-vps-deployment.md.
+#
 upstream pastane_web {
   server web:3000;
 }
