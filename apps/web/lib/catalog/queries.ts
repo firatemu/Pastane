@@ -4,7 +4,16 @@ import { messageFromCustomerApiPayload, type ParsedCustomerApiPayload } from '..
 import type { Campaign, Category, HomeBanner, PaginatedDeliveryZones, PaginatedProducts, PaginatedReviews, PaginatedStores, Product } from './types';
 
 export async function getCategories(): Promise<Category[]> {
-  return apiFetch<Category[]>('/api/v1/categories');
+  try {
+    return await apiFetch<Category[]>('/api/v1/categories');
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[getCategories] request failed; falling back to []', { baseUrl: getWebApiBaseUrl(), message });
+      return [];
+    }
+    throw err;
+  }
 }
 
 export async function getCategoryBySlug(slug: string): Promise<Category> {
@@ -16,14 +25,27 @@ export async function getCategoryBySlug(slug: string): Promise<Category> {
 }
 
 export async function getProducts(params: Record<string, string | number | undefined> = {}): Promise<PaginatedProducts> {
+  const page = Number(params.page ?? 1);
+  const limit = Number(params.limit ?? 100);
+  const empty: PaginatedProducts = { items: [], meta: { page, limit, total: 0, totalPages: 0 } };
+
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value !== undefined) search.set(key, String(value));
-  const response = await storefrontApiFetch(`/api/v1/products${search.size ? `?${search.toString()}` : ''}`);
-  const payload = (await response.json()) as ParsedCustomerApiPayload & { data?: Product[]; meta?: PaginatedProducts['meta'] };
-  if (!response.ok || payload.success === false || !payload.data || !payload.meta) {
-    throw new Error(messageFromCustomerApiPayload(response.status, payload, 'Ürün listesi yüklenemedi. Lütfen tekrar deneyin.'));
+  try {
+    const response = await storefrontApiFetch(`/api/v1/products${search.size ? `?${search.toString()}` : ''}`);
+    const payload = (await response.json()) as ParsedCustomerApiPayload & { data?: Product[]; meta?: PaginatedProducts['meta'] };
+    if (!response.ok || payload.success === false || !payload.data || !payload.meta) {
+      throw new Error(messageFromCustomerApiPayload(response.status, payload, 'Ürün listesi yüklenemedi. Lütfen tekrar deneyin.'));
+    }
+    return { items: payload.data, meta: payload.meta };
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[getProducts] request failed; falling back to empty list', { baseUrl: getWebApiBaseUrl(), message });
+      return empty;
+    }
+    throw err;
   }
-  return { items: payload.data, meta: payload.meta };
 }
 
 export async function getProductBySlug(slug: string): Promise<Product> {

@@ -33,7 +33,11 @@
     "fix:frontend-cache": "bash scripts/fix-frontend-next-cache.sh",
     "prisma:generate": "pnpm --filter @pastane/database prisma:generate",
     "build:web": "pnpm prisma:generate && turbo run build --filter=@pastane/web",
-    "build:web:clean": "bash scripts/web-build-clean.sh"
+    "build:web:clean": "bash scripts/web-build-clean.sh",
+    "mobile:start": "pnpm --filter @pastane/mobile start",
+    "mobile:android": "pnpm --filter @pastane/mobile android",
+    "mobile:typecheck": "pnpm --filter @pastane/mobile typecheck",
+    "mobile:build:android": "pnpm --filter @pastane/mobile build:android"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",

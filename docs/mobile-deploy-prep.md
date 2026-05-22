@@ -36,8 +36,10 @@
 
 Expected mobile env values:
 
-- `EXPO_PUBLIC_API_URL`
-- `EXPO_PUBLIC_WEB_URL`
+- `EXPO_PUBLIC_API_URL` — base URL only (no `/api/v1`), e.g. `https://api.azem.cloud`
+- `EXPO_PUBLIC_WEB_URL` — storefront, e.g. `https://azem.cloud`
+
+Implementation lives in `apps/mobile` (Expo Router + EAS). See [`apps/mobile/README.md`](../apps/mobile/README.md).
 
 For local device testing, `localhost` will not work from a phone/emulator unless mapped correctly:
 
@@ -45,9 +47,15 @@ For local device testing, `localhost` will not work from a phone/emulator unless
 - iOS simulator: `http://localhost:3003`
 - Physical device: host machine LAN IP, for example `http://192.168.x.x:3003`
 
+## Mobile production / Play Store
+
+- Prod mobile = EAS build with `EXPO_PUBLIC_API_URL=https://api.azem.cloud` (see `apps/mobile/eas.json` `production` profile).
+- Android release artifact: **`eas build --platform android --profile production`** → download **`.aab`** from Expo dashboard.
+- VPS deploy (`pnpm push:vps`) updates API/web/admin/courier only; rebuild mobile AAB after API changes that affect clients.
+
 ## Production Deploy Checklist
 
-- Fill `.env.prod` from `.env.prod.example` with real secrets.
+- Fill **`.env.production`** on the VPS from `.env.production.example` with real secrets (not `.env.prod`).
 - Set production domains:
   - `DOMAIN_WEB`
   - `DOMAIN_API`

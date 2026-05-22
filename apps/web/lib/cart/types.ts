@@ -12,8 +12,8 @@ export type CartItem = {
     slug: string;
     price: string;
     discountedPrice?: string | null;
-    images: ProductImage[];
+    images?: ProductImage[];
   };
-  options: CartOption[];
+  options?: CartOption[];
 };
 export type Cart = { id: string; items: CartItem[] };

@@ -13,6 +13,8 @@
 #   --remote-only    SSH ./deploy.sh only (code must already be on origin).
 #   --skip-checks    Skip pnpm typecheck before push.
 #   --allow-dirty    Allow deploying with uncommitted local changes (default: refuse).
+#   --with-local-prod After VPS ./deploy.sh succeeds, rebuild THIS machine's prod stack via
+#                    docker/docker-compose.prod.yml + root .env.production (same as pnpm docker:prod:up + build).
 #
 set -euo pipefail
 
@@ -25,6 +27,7 @@ PUSH_ONLY=0
 REMOTE_ONLY=0
 SKIP_CHECKS=0
 ALLOW_DIRTY=0
+WITH_LOCAL_PROD=0
 
 LOCAL_ENV="$SCRIPT_DIR/deploy-vps.env.local"
 if [[ -f "$LOCAL_ENV" ]]; then
@@ -46,6 +49,7 @@ for arg in "$@"; do
     --remote-only) REMOTE_ONLY=1 ;;
     --skip-checks) SKIP_CHECKS=1 ;;
     --allow-dirty) ALLOW_DIRTY=1 ;;
+    --with-local-prod) WITH_LOCAL_PROD=1 ;;
     -h|--help) usage ;;
     *) echo "unknown option: $arg" >&2; usage ;;
   esac
@@ -96,6 +100,26 @@ run() {
   fi
 }
 
+run_local_prod_stack() {
+  local env_file="$ROOT/.env.production"
+  local compose_file="$ROOT/docker/docker-compose.prod.yml"
+  if [[ ! -f "$compose_file" ]]; then
+    echo "warning: ${compose_file} not found — skipping local prod Docker rebuild (--with-local-prod)." >&2
+    return 0
+  fi
+  if [[ ! -f "$env_file" ]]; then
+    echo "warning: ${env_file} not found — skipping local prod Docker rebuild (--with-local-prod)." >&2
+    echo '  Tip: cp .env.production.example .env.production && edit values, or use push-vps --skip-local-prod.' >&2
+    return 0
+  fi
+  if ! command -v docker >/dev/null 2>&1; then
+    echo 'warning: docker not available in PATH — skipping local prod Docker rebuild (--with-local-prod).' >&2
+    return 0
+  fi
+  echo 'Rebuilding local Docker prod stack (docker/docker-compose.prod.yml, .env.production) …'
+  docker compose --env-file "$env_file" -f "$compose_file" up -d --build
+}
+
 dirty_lines="$(git status --porcelain 2>/dev/null | grep -v '^??' || true)"
 if [[ -n "$dirty_lines" && "$ALLOW_DIRTY" -eq 0 ]]; then
   echo 'error: working tree has uncommitted changes. Commit/stash first or pass --allow-dirty' >&2
@@ -133,10 +157,19 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   [[ -n "${VPS_SSH_IDENTITY:-}" ]] && ssh_id=" -i ${VPS_SSH_IDENTITY}"
   echo "[dry-run] ssh (-o BatchMode=yes -o StrictHostKeyChecking=accept-new) -p ${VPS_PORT}${ssh_id} ${VPS_USER}@${HOST_DISP}"
   echo "[dry-run]   remote: cd ${VPS_APP_DIR} && ./deploy.sh"
+  if [[ "$WITH_LOCAL_PROD" -eq 1 && "$PUSH_ONLY" -eq 0 ]]; then
+    echo "[dry-run] local prod: docker compose --env-file ${ROOT}/.env.production -f ${ROOT}/docker/docker-compose.prod.yml up -d --build"
+  fi
   exit 0
 fi
 
 "${SSH_BASE[@]}" "${VPS_USER}@${VPS_HOST}" "$REMOTE_CMD"
 
 echo 'VPS deploy command finished.'
+
+if [[ "$WITH_LOCAL_PROD" -eq 1 && "$PUSH_ONLY" -eq 0 ]]; then
+  run_local_prod_stack
+  echo 'Local prod Docker stack updated.'
+fi
+
 exit 0

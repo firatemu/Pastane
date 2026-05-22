@@ -13,7 +13,7 @@ function cartQuantity(cart: Cart | null): number {
 
 function cartTotal(cart: Cart | null): string {
   const total = cart?.items.reduce((sum, item) => {
-    const optionTotal = item.options.reduce((optionSum, { option }) => optionSum + Number(option.priceModifier), 0);
+    const optionTotal = (item.options ?? []).reduce((optionSum, { option }) => optionSum + Number(option.priceModifier), 0);
     return sum + (Number(item.unitPrice) + optionTotal) * item.quantity;
   }, 0) ?? 0;
   return total.toFixed(2);
