@@ -70,15 +70,20 @@ proxy_set_header Upgrade $http_upgrade;
 proxy_set_header Connection "upgrade";
 ```
 
-## Staging with `/etc/hosts`
+## azem.cloud hosts
 
-Map to the Nginx host IP (often `127.0.0.1` for local staging):
+Production routing is prepared for these hosts:
 
 ```
-127.0.0.1 staging.local api.staging.local admin.staging.local courier.staging.local storage.staging.local
+azem.cloud
+www.azem.cloud
+api.azem.cloud
+admin.azem.cloud
+courier.azem.cloud
+storage.azem.cloud
 ```
 
-Use **HTTPS** on these names so **`Secure`** cookies (Next.js `NODE_ENV === 'production'`) behave like production.
+Point them to the VPS public IP in DNS. For local simulation, map them to `127.0.0.1` in `/etc/hosts`.
 
 ## Full example file
 
@@ -93,16 +98,12 @@ A **worked** `server` / `upstream` example lives in [docker/nginx/conf.d/pastane
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 ```
 
-## Future production domain mapping (comment pattern)
+## Production domain mapping
 
-When DNS exists, typical mapping (illustrative—**not** configured yet in this project):
-
-| Public host              | Upstream   |
-|--------------------------|------------|
-| `pastane.com`            | `web:3000` |
-| `api.pastane.com`        | `api:3003` |
-| `admin.pastane.com`      | `admin:3001` |
-| `courier.pastane.com`    | `courier:3002` |
-| `storage.pastane.com`    | `minio:9000` |
-
-Replace with your real domain policy when assigned.
+| Public host | Upstream |
+|-------------|----------|
+| `azem.cloud`, `www.azem.cloud` | `web:3000` |
+| `api.azem.cloud` | `api:3003` |
+| `admin.azem.cloud` | `admin:3001` |
+| `courier.azem.cloud` | `courier:3002` |
+| `storage.azem.cloud` | `minio:9000` |

@@ -1,7 +1,7 @@
-# Pastane reverse proxy — HTTP bootstrap for azem.cloud.
-# After certificates are issued, switch to pastane.ssl.conf.example.
-#
-# Upstreams use Docker Compose service names (pastane_edge network).
+# Pastane reverse proxy — HTTPS configuration for azem.cloud.
+# Usage on the VPS after certificates exist:
+#   cp docker/nginx/conf.d/pastane.ssl.conf.example docker/nginx/conf.d/pastane.conf
+#   docker compose --env-file .env.prod -f docker/docker-compose.prod.yml restart nginx
 
 upstream pastane_web {
   server web:3000;
@@ -21,11 +21,22 @@ upstream pastane_minio_s3 {
 
 server {
   listen 80;
-  server_name azem.cloud www.azem.cloud;
+  server_name azem.cloud www.azem.cloud api.azem.cloud admin.azem.cloud courier.azem.cloud storage.azem.cloud;
 
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
   }
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}
+
+server {
+  listen 443 ssl http2;
+  server_name azem.cloud www.azem.cloud;
+  ssl_certificate /etc/letsencrypt/live/azem.cloud/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/azem.cloud/privkey.pem;
 
   location / {
     proxy_pass http://pastane_web;
@@ -39,12 +50,10 @@ server {
 }
 
 server {
-  listen 80;
+  listen 443 ssl http2;
   server_name api.azem.cloud;
-
-  location /.well-known/acme-challenge/ {
-    root /var/www/certbot;
-  }
+  ssl_certificate /etc/letsencrypt/live/azem.cloud/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/azem.cloud/privkey.pem;
 
   location / {
     limit_req zone=pastane_api burst=20 nodelay;
@@ -56,6 +65,7 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-Host $host;
   }
+
   location /api/v1/auth/ {
     limit_req zone=pastane_auth burst=5 nodelay;
     proxy_pass http://pastane_api;
@@ -69,12 +79,10 @@ server {
 }
 
 server {
-  listen 80;
+  listen 443 ssl http2;
   server_name admin.azem.cloud;
-
-  location /.well-known/acme-challenge/ {
-    root /var/www/certbot;
-  }
+  ssl_certificate /etc/letsencrypt/live/azem.cloud/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/azem.cloud/privkey.pem;
 
   location / {
     proxy_pass http://pastane_admin;
@@ -88,12 +96,10 @@ server {
 }
 
 server {
-  listen 80;
+  listen 443 ssl http2;
   server_name courier.azem.cloud;
-
-  location /.well-known/acme-challenge/ {
-    root /var/www/certbot;
-  }
+  ssl_certificate /etc/letsencrypt/live/azem.cloud/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/azem.cloud/privkey.pem;
 
   location / {
     proxy_pass http://pastane_courier;
@@ -107,12 +113,10 @@ server {
 }
 
 server {
-  listen 80;
+  listen 443 ssl http2;
   server_name storage.azem.cloud;
-
-  location /.well-known/acme-challenge/ {
-    root /var/www/certbot;
-  }
+  ssl_certificate /etc/letsencrypt/live/azem.cloud/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/azem.cloud/privkey.pem;
 
   location / {
     proxy_pass http://pastane_minio_s3;
@@ -123,20 +127,5 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_buffering off;
     proxy_request_buffering off;
-  }
-}
-
-# Fallback for direct IP checks before DNS is ready (customer web only).
-server {
-  listen 80 default_server;
-  server_name _;
-  location / {
-    proxy_pass http://pastane_web;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Host $host;
   }
 }

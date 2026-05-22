@@ -1,8 +1,5 @@
-# Pastane reverse proxy — HTTP for local and staging-style hosts.
-# For production TLS, add ssl_certificate / listen 443 server blocks (see docs/nginx-production-example.md).
-#
-# /etc/hosts examples:
-#   127.0.0.1 staging.local api.staging.local admin.staging.local courier.staging.local storage.staging.local
+# Pastane reverse proxy — HTTP bootstrap for azem.cloud.
+# After certificates are issued, switch to pastane.ssl.conf.example.
 #
 # Upstreams use Docker Compose service names (pastane_edge network).
 
@@ -24,7 +21,12 @@ upstream pastane_minio_s3 {
 
 server {
   listen 80;
-  server_name staging.local;
+  server_name azem.cloud www.azem.cloud;
+
+  location /.well-known/acme-challenge/ {
+    root /var/www/certbot;
+  }
+
   location / {
     proxy_pass http://pastane_web;
     proxy_http_version 1.1;
@@ -38,7 +40,12 @@ server {
 
 server {
   listen 80;
-  server_name api.staging.local;
+  server_name api.azem.cloud;
+
+  location /.well-known/acme-challenge/ {
+    root /var/www/certbot;
+  }
+
   location / {
     limit_req zone=pastane_api burst=20 nodelay;
     proxy_pass http://pastane_api;
@@ -63,7 +70,12 @@ server {
 
 server {
   listen 80;
-  server_name admin.staging.local;
+  server_name admin.azem.cloud;
+
+  location /.well-known/acme-challenge/ {
+    root /var/www/certbot;
+  }
+
   location / {
     proxy_pass http://pastane_admin;
     proxy_http_version 1.1;
@@ -77,7 +89,12 @@ server {
 
 server {
   listen 80;
-  server_name courier.staging.local;
+  server_name courier.azem.cloud;
+
+  location /.well-known/acme-challenge/ {
+    root /var/www/certbot;
+  }
+
   location / {
     proxy_pass http://pastane_courier;
     proxy_http_version 1.1;
@@ -91,7 +108,12 @@ server {
 
 server {
   listen 80;
-  server_name storage.staging.local;
+  server_name storage.azem.cloud;
+
+  location /.well-known/acme-challenge/ {
+    root /var/www/certbot;
+  }
+
   location / {
     proxy_pass http://pastane_minio_s3;
     proxy_http_version 1.1;
@@ -104,10 +126,10 @@ server {
   }
 }
 
-# Convenience for developers hitting nginx without custom hosts (customer web only).
+# Fallback for direct IP checks before DNS is ready (customer web only).
 server {
   listen 80 default_server;
-  server_name localhost;
+  server_name _;
   location / {
     proxy_pass http://pastane_web;
     proxy_http_version 1.1;

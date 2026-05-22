@@ -26,4 +26,11 @@ echo "Using ENV_FILE=$ENV_FILE COMPOSE_FILE=$COMPOSE_FILE"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config >/dev/null
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build
 
-echo "Deploy finished. API health via Nginx: curl -fsS -H 'Host: api.staging.local' http://127.0.0.1/api/v1/health"
+API_HOST="$(grep -E '^DOMAIN_API=' "$ENV_FILE" | tail -n1 | cut -d= -f2-)"
+if [[ -z "$API_HOST" ]]; then
+  API_HOST="api.azem.cloud"
+fi
+
+echo "Deploy finished."
+echo "API health via Nginx before TLS: curl -fsS -H 'Host: ${API_HOST}' http://127.0.0.1/api/v1/health"
+echo "API health after TLS: curl -fsS https://${API_HOST}/api/v1/health"

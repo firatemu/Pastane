@@ -119,14 +119,26 @@ Minimal checks:
 
 Use [production-checklist.md](production-checklist.md) before declaring go-live.
 
-## Cutover when real domains arrive
+## azem.cloud cutover
+
+The production domain set is now:
+
+| Public host | Role |
+|-------------|------|
+| `azem.cloud` / `www.azem.cloud` | Customer web |
+| `api.azem.cloud` | API |
+| `admin.azem.cloud` | Admin |
+| `courier.azem.cloud` | Courier |
+| `storage.azem.cloud` | MinIO public object access |
+
+Use [azem-cloud-vps-deployment.md](azem-cloud-vps-deployment.md) for the VPS runbook.
 
 1. Obtain DNS A/AAAA records for web, API, admin, courier, and storage.  
-2. Issue **Let’s Encrypt** (or provider) certificates; update Nginx `server_name` and `ssl_certificate` paths.  
-3. Replace placeholder URLs in `.env.prod`: **`WEB_URL`**, **`API_URL`**, **`ADMIN_URL`**, **`COURIER_URL`**, **`NEXT_PUBLIC_SITE_URL`**, **`MINIO_PUBLIC_URL`**, payment callback URLs per Iyzico docs.  
+2. Issue **Let’s Encrypt** certificates; switch Nginx from `pastane.conf` HTTP bootstrap to `pastane.ssl.conf.example`.
+3. Keep production URLs in `.env.prod`: **`WEB_URL`**, **`API_URL`**, **`ADMIN_URL`**, **`COURIER_URL`**, **`NEXT_PUBLIC_SITE_URL`**, **`MINIO_PUBLIC_URL`**, payment callback URLs per Iyzico docs.
 4. Enable **`SWAGGER_ENABLED=false`** in production.  
 5. Verify **CORS** and **cookie** domains.  
 6. Run full smoke tests and backup job.  
 7. Monitor disk, logs, and health for 24–48 hours.
 
-**Current repository default:** no production domains are assigned; [.env.prod.example](../.env.prod.example) and Nginx examples use **localhost** and **staging.local** placeholders only.
+**Current repository default:** [.env.prod.example](../.env.prod.example) and [docker/nginx/conf.d/pastane.conf](../docker/nginx/conf.d/pastane.conf) are prepared for `azem.cloud` HTTP bootstrap. HTTPS cutover uses [docker/nginx/conf.d/pastane.ssl.conf.example](../docker/nginx/conf.d/pastane.ssl.conf.example).
