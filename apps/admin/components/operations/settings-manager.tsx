@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useForm, type Resolver, type UseFormRegisterReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { adminFetch } from '../../lib/api/catalog';
@@ -12,6 +12,11 @@ import type { SettingRow } from '../../lib/operations/types';
 import { PageSection } from '../shared/page-section';
 import { Field } from '../shared/form-field';
 import { ErrorState, LoadingState } from '../shared/async-state';
+import {
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminTextareaClass,
+} from '../shared/admin-form-controls';
 
 type SystemForm = z.infer<typeof systemSettingsSchema>;
 type KeyForm = z.infer<typeof settingKeyPatchSchema>;
@@ -97,71 +102,181 @@ export function SettingsManager({ permissions }: { permissions: string[] }): Rea
 
   if (loading) return <LoadingState label="Ayarlar yükleniyor…" />;
 
+  const canUpdate = can(permissions, ['settings.update']);
+
   return (
-    <PageSection title="Sistem ayarları" description="Bayraklar ve ham ayar kayıtları backend ile aynıdır.">
+    <PageSection
+      title="Sistem ayarları"
+      description="Sipariş, ödeme, sadakat ve bildirim davranışını belirleyen operasyon bayraklarını yönetin."
+    >
       {error ? <ErrorState message={error} /> : null}
-      {info ? <p className="mb-4 text-sm text-green-800">{info}</p> : null}
-
-      {can(permissions, ['settings.update']) ? (
-        <form className="mb-8 space-y-4 rounded-3xl border bg-white p-5" onSubmit={systemForm.handleSubmit(saveSystem)}>
-          <h2 className="font-semibold">Sistem bayrakları</h2>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...systemForm.register('otpActive')} />
-            OTP aktif
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...systemForm.register('deliveryActive')} />
-            Teslimat aktif
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...systemForm.register('pickupActive')} />
-            Gel-al aktif
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...systemForm.register('loyaltyActive')} />
-            Sadakat aktif
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...systemForm.register('paymentActive')} />
-            Ödeme aktif
-          </label>
-          <Field label="Minimum sipariş tutarı" error={systemForm.formState.errors.minimumOrderValue?.message}>
-            <input type="number" step="0.01" className="w-full max-w-xs rounded-2xl border px-3 py-2" {...systemForm.register('minimumOrderValue', { valueAsNumber: true })} />
-          </Field>
-          <button className="rounded-2xl bg-stone-900 px-4 py-2 text-white" type="submit">
-            Bayrakları kaydet
-          </button>
-        </form>
-      ) : (
-        <p className="mb-6 text-sm text-stone-600">Bayrakları değiştirmek için `settings.update` gerekir.</p>
-      )}
-
-      {can(permissions, ['settings.update']) ? (
-        <form className="mb-8 space-y-4 rounded-3xl border bg-white p-5" onSubmit={keyForm.handleSubmit(saveKey)}>
-          <h2 className="font-semibold">Tekil anahtar (JSON değer)</h2>
-          <Field label="Anahtar" error={keyForm.formState.errors.key?.message}>
-            <input className="w-full rounded-2xl border px-3 py-2 font-mono text-sm" {...keyForm.register('key')} />
-          </Field>
-          <Field label="Değer (JSON)" error={keyForm.formState.errors.valueJson?.message}>
-            <textarea className="w-full rounded-2xl border px-3 py-2 font-mono text-sm" rows={4} {...keyForm.register('valueJson')} />
-          </Field>
-          <button className="rounded-2xl bg-stone-900 px-4 py-2 text-white" type="submit">
-            Anahtarı güncelle
-          </button>
-        </form>
+      {info ? (
+        <div className="rounded-xl border border-tertiary/25 bg-tertiary-container px-4 py-3 text-sm font-medium text-tertiary">
+          {info}
+        </div>
       ) : null}
 
-      <div className="rounded-3xl border bg-white p-5">
-        <h2 className="font-semibold">Tüm ayar kayıtları</h2>
-        <ul className="mt-4 space-y-2 text-sm">
-          {rows.map((r) => (
-            <li key={r.id} className="rounded-2xl bg-stone-50 p-3">
-              <span className="font-mono font-medium">{r.key}</span>
-              <pre className="mt-1 overflow-x-auto text-xs text-stone-700">{JSON.stringify(r.value, null, 0)}</pre>
-            </li>
-          ))}
-        </ul>
+      <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
+        <div className="space-y-stack-md">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryTile
+              icon="toggle_on"
+              label="Aktif bayrak"
+              value={activeFlagCount(systemForm.getValues())}
+            />
+            <SummaryTile icon="settings" label="Kayıtlı anahtar" value={rows.length} />
+            <SummaryTile
+              icon="shopping_bag"
+              label="Minimum sipariş"
+              value={`₺${Number(systemForm.getValues('minimumOrderValue') ?? 0).toFixed(2)}`}
+            />
+            <SummaryTile
+              icon="lock"
+              label="Yönetim modu"
+              value={canUpdate ? 'Açık' : 'Salt okunur'}
+            />
+          </div>
+
+          <div className="rounded-card border border-outline-variant/35 bg-surface-container-lowest p-5 shadow-bakery">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[22px] text-chocolate">database</span>
+              <h2 className="font-display text-xl font-semibold text-on-surface">
+                Tüm ayar kayıtları
+              </h2>
+            </div>
+            <div className="space-y-2">
+              {rows.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-outline-variant/35 bg-surface-container-low px-3 py-3"
+                >
+                  <span className="font-mono text-sm font-semibold text-on-surface">{r.key}</span>
+                  <pre className="mt-1 overflow-x-auto text-xs text-on-surface-variant">
+                    {JSON.stringify(r.value, null, 0)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {canUpdate ? (
+          <div className="space-y-5">
+            <form
+              className="space-y-4 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-bakery"
+              onSubmit={systemForm.handleSubmit(saveSystem)}
+            >
+              <div className="flex items-center gap-2 border-b border-outline-variant/35 pb-3">
+                <span className="material-symbols-outlined text-[22px] text-chocolate">tune</span>
+                <h2 className="font-display text-xl font-semibold text-on-surface">
+                  Sistem bayrakları
+                </h2>
+              </div>
+              <div className="grid gap-2">
+                <ToggleField label="OTP aktif" register={systemForm.register('otpActive')} />
+                <ToggleField
+                  label="Teslimat aktif"
+                  register={systemForm.register('deliveryActive')}
+                />
+                <ToggleField label="Gel-al aktif" register={systemForm.register('pickupActive')} />
+                <ToggleField
+                  label="Sadakat aktif"
+                  register={systemForm.register('loyaltyActive')}
+                />
+                <ToggleField label="Ödeme aktif" register={systemForm.register('paymentActive')} />
+              </div>
+              <Field
+                label="Minimum sipariş tutarı"
+                error={systemForm.formState.errors.minimumOrderValue?.message}
+              >
+                <input
+                  type="number"
+                  step="0.01"
+                  className={adminInputClass}
+                  {...systemForm.register('minimumOrderValue', { valueAsNumber: true })}
+                />
+              </Field>
+              <button className={`${adminPrimaryButtonClass} w-full`} type="submit">
+                <span className="material-symbols-outlined text-[20px]">save</span>
+                Bayrakları kaydet
+              </button>
+            </form>
+
+            <form
+              className="space-y-4 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-bakery"
+              onSubmit={keyForm.handleSubmit(saveKey)}
+            >
+              <div className="flex items-center gap-2 border-b border-outline-variant/35 pb-3">
+                <span className="material-symbols-outlined text-[22px] text-chocolate">
+                  data_object
+                </span>
+                <h2 className="font-display text-xl font-semibold text-on-surface">
+                  Tekil anahtar
+                </h2>
+              </div>
+              <Field label="Anahtar" error={keyForm.formState.errors.key?.message}>
+                <input
+                  className={`${adminInputClass} font-mono text-sm`}
+                  {...keyForm.register('key')}
+                />
+              </Field>
+              <Field label="Değer (JSON)" error={keyForm.formState.errors.valueJson?.message}>
+                <textarea
+                  className={`${adminTextareaClass} font-mono text-sm`}
+                  rows={4}
+                  {...keyForm.register('valueJson')}
+                />
+              </Field>
+              <button className={`${adminPrimaryButtonClass} w-full`} type="submit">
+                <span className="material-symbols-outlined text-[20px]">save</span>
+                Anahtarı güncelle
+              </button>
+            </form>
+          </div>
+        ) : null}
       </div>
     </PageSection>
+  );
+}
+
+function activeFlagCount(values: SystemForm): number {
+  return [
+    values.otpActive,
+    values.deliveryActive,
+    values.pickupActive,
+    values.loyaltyActive,
+    values.paymentActive,
+  ].filter(Boolean).length;
+}
+
+function SummaryTile({
+  icon,
+  label,
+  value,
+}: Readonly<{ icon: string; label: string; value: string | number }>): React.JSX.Element {
+  return (
+    <div className="rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-on-surface-variant">{label}</span>
+        <span className="material-symbols-outlined text-[22px] text-secondary">{icon}</span>
+      </div>
+      <p className="mt-3 text-2xl font-semibold tracking-tight text-on-surface">{value}</p>
+    </div>
+  );
+}
+
+function ToggleField({
+  label,
+  register,
+}: Readonly<{ label: string; register: UseFormRegisterReturn }>): React.JSX.Element {
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/60 bg-surface-container-lowest p-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        className="h-5 w-5 rounded border-outline-variant/60 text-chocolate focus:ring-secondary/50"
+        {...register}
+      />
+    </label>
   );
 }

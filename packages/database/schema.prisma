@@ -27,14 +27,6 @@ enum ProductStatus {
   OUT_OF_STOCK
 }
 
-enum StockMovementType {
-  IN
-  OUT
-  ADJUSTMENT
-  RESERVATION
-  RELEASE
-}
-
 enum DeliveryType {
   HOME_DELIVERY
   PICKUP
@@ -59,13 +51,6 @@ enum PaymentStatus {
   FAILED
   REFUNDED
   TIMEOUT
-}
-
-enum StockReservationStatus {
-  ACTIVE
-  CONFIRMED
-  RELEASED
-  EXPIRED
 }
 
 enum CourierStatus {
@@ -251,10 +236,12 @@ model Product {
   category           Category             @relation(fields: [categoryId], references: [id])
   status             ProductStatus        @default(ACTIVE)
   preparationMinutes Int?
+  isPublished        Boolean              @default(true)
+  saleWindowStart    String?
+  saleWindowEnd      String?
   images             ProductImage[]
   allergens          ProductAllergen[]
   optionGroups       ProductOptionGroup[]
-  stockEntries       StockEntry[]
   cartItems          CartItem[]
   orderItems         OrderItem[]
   reviews            Review[]
@@ -338,35 +325,6 @@ model ProductOption {
   @@map("product_options")
 }
 
-model StockEntry {
-  id            String          @id @default(uuid())
-  productId     String
-  product       Product         @relation(fields: [productId], references: [id])
-  date          DateTime
-  quantity      Int
-  availableFrom String?
-  availableTo   String?
-  movements     StockMovement[]
-  reservations  StockReservation[]
-  deletedAt     DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  @@unique([productId, date, availableFrom, availableTo])
-  @@index([productId, date, deletedAt])
-  @@map("stock_entries")
-}
-
-model StockMovement {
-  id           String            @id @default(uuid())
-  stockEntryId String
-  stockEntry   StockEntry        @relation(fields: [stockEntryId], references: [id], onDelete: Cascade)
-  type         StockMovementType
-  quantity     Int
-  note         String?
-  createdAt    DateTime          @default(now())
-  @@map("stock_movements")
-}
-
 model Store {
   id           String    @id @default(uuid())
   name         String
@@ -443,7 +401,6 @@ model Order {
   statusHistory     OrderStatusHistory[]
   payments          Payment[]
   delivery          Delivery?
-  stockReservations StockReservation[]
   deletedAt         DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
@@ -513,27 +470,6 @@ model Payment {
   @@unique([conversationId])
   @@index([orderId, status])
   @@map("payments")
-}
-
-model StockReservation {
-  id           String                 @id @default(uuid())
-  orderId      String
-  order        Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItemId  String?
-  productId    String
-  stockEntryId String
-  stockEntry   StockEntry             @relation(fields: [stockEntryId], references: [id])
-  quantity     Int
-  status       StockReservationStatus @default(ACTIVE)
-  expiresAt    DateTime
-  confirmedAt  DateTime?
-  releasedAt   DateTime?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  @@index([orderId, status])
-  @@index([stockEntryId, status])
-  @@index([expiresAt, status])
-  @@map("stock_reservations")
 }
 
 model Courier {

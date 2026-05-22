@@ -27,8 +27,6 @@ import { PaymentsModule } from './payments/payments.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ProductsModule } from './products/products.module';
 import { RolesModule } from './roles/roles.module';
-import { StockModule } from './stock/stock.module';
-import { StockReservationsModule } from './stock-reservations/stock-reservations.module';
 import { StoresModule } from './stores/stores.module';
 import { UsersModule } from './users/users.module';
 import { CouriersModule } from './couriers/couriers.module';
@@ -44,8 +42,8 @@ import { AddressesModule } from './addresses/addresses.module';
       envFilePath: ['.env.local', '.env', '../.env', '../../.env'],
     }), PrismaModule, AuditModule, AuthModule, OtpModule, UsersModule,
     RolesModule, PermissionsModule, CategoriesModule, ProductsModule, AllergensModule, MediaModule,
-    StockModule, StoresModule, DeliveryZonesModule, CartModule, OrdersModule, PaymentsModule,
-    StockReservationsModule, CouriersModule, DeliveriesModule, AddressesModule, ReviewsModule, LoyaltyModule, NotificationsModule, CampaignsModule, BannersModule, SettingsModule, ReportsModule, JobsModule, HealthModule,
+    StoresModule, DeliveryZonesModule, CartModule, OrdersModule, PaymentsModule,
+    CouriersModule, DeliveriesModule, AddressesModule, ReviewsModule, LoyaltyModule, NotificationsModule, CampaignsModule, BannersModule, SettingsModule, ReportsModule, JobsModule, HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: RateLimitGuard },

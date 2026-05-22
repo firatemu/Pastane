@@ -43,22 +43,12 @@ function rewriteDatabaseUrlForHostSeed(): void {
 rewriteDatabaseUrlForHostSeed();
 
 const prisma = new PrismaClient();
-function istanbulSeedDay(value: Date): Date {
-  const localDate = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Istanbul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(value);
-  return new Date(`${localDate}T00:00:00.000+03:00`);
-}
 const permissions = [
   'users.view','users.create','users.update','users.delete','users.changeStatus',
   'roles.view','roles.create','roles.update','roles.delete','permissions.view','permissions.manage',
   'products.view','products.create','products.update','products.delete','products.manageImages','products.manageOptions','products.manageAllergens',
   'categories.view','categories.create','categories.update','categories.delete',
   'allergens.view','media.upload','media.delete',
-  'stock.view','stock.create','stock.update','stock.adjust','stock.viewMovements',
   'orders.view','orders.viewOwn','orders.viewAll','orders.create','orders.updateStatus','orders.cancel','orders.assignCourier',
   'payments.view','payments.initiate','payments.refund','payments.viewAll',
   'couriers.view','couriers.create','couriers.update','couriers.performance',
@@ -78,7 +68,7 @@ async function main(): Promise<void> {
   const roleDescriptions: Record<RoleType, string> = {
     ADMIN: 'Sistem yöneticisi',
     ORDER_OPERATOR: 'Sipariş operasyon kullanıcısı',
-    PRODUCT_MANAGER: 'Ürün ve stok yöneticisi',
+    PRODUCT_MANAGER: 'Ürün yöneticisi',
     COURIER: 'Kurye',
     CUSTOMER: 'Müşteri',
   };
@@ -95,8 +85,8 @@ async function main(): Promise<void> {
   const permissionByCode = new Map(permissionRows.map((permission) => [permission.code, permission]));
   const rolePermissions: Record<RoleType, string[]> = {
     ADMIN: permissions,
-    ORDER_OPERATOR: ['orders.viewAll','orders.updateStatus','orders.assignCourier','orders.cancel','couriers.view','stock.view','loyalty.scan','loyalty.redeem','reviews.view','notifications.send','reports.sales','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
-    PRODUCT_MANAGER: ['products.view','products.create','products.update','products.manageImages','products.manageOptions','products.manageAllergens','categories.view','categories.create','categories.update','stock.view','stock.create','stock.update','stock.adjust','stock.viewMovements','allergens.view','media.upload','media.delete','reports.products','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
+    ORDER_OPERATOR: ['orders.viewAll','orders.updateStatus','orders.assignCourier','orders.cancel','couriers.view','loyalty.scan','loyalty.redeem','reviews.view','notifications.send','reports.sales','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
+    PRODUCT_MANAGER: ['products.view','products.create','products.update','products.manageImages','products.manageOptions','products.manageAllergens','categories.view','categories.create','categories.update','allergens.view','media.upload','media.delete','reports.products','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
     COURIER: ['deliveries.viewOwn','deliveries.updateOwn','orders.viewOwn','notifications.viewOwn'],
     CUSTOMER: ['products.view','categories.view','cart.manageOwn','orders.create','orders.viewOwn','orders.cancel','payments.initiate','payments.view','addresses.manageOwn','loyalty.viewOwn','reviews.create','reviews.view','notifications.viewOwn'],
   };
@@ -169,7 +159,11 @@ async function main(): Promise<void> {
   ] as const;
   const productMap = new Map<string,{id:string}>();
   for (const [name,slug,category,price,preparationMinutes,allergens] of products) {
-    const product = await prisma.product.upsert({ where: { slug }, update: { name, deletedAt: null, status: ProductStatus.ACTIVE }, create: { name, slug, categoryId: categoryMap.get(category)!.id, price: new Prisma.Decimal(price), preparationMinutes } });
+    const product = await prisma.product.upsert({
+      where: { slug },
+      update: { name, deletedAt: null, status: ProductStatus.ACTIVE, isPublished: true },
+      create: { name, slug, categoryId: categoryMap.get(category)!.id, price: new Prisma.Decimal(price), preparationMinutes, isPublished: true },
+    });
     productMap.set(name, product);
     for (const allergenName of allergens) {
       const allergen = allergenRows.find((a) => a.name === allergenName)!;
@@ -192,21 +186,12 @@ async function main(): Promise<void> {
       if (!existing) await prisma.productOption.create({ data: { optionGroupId: group.id, name: optionName } });
     }
   }
-  const day = istanbulSeedDay(new Date());
-  /** Full-day windows (null/null → 00:00–24:00 Europe/Istanbul) so demo checkout works at any local time; narrow windows caused "Stok penceresi aktif değil" after seed hours. */
-  const stockedDemoProductNames = ['Susamlı Simit', 'Peynirli Poğaça', 'Beyaz Ekmek', 'Çikolatalı Yaş Pasta', 'Sütlaç'] as const;
-  const stockedDemoProductIds = stockedDemoProductNames.map((n) => productMap.get(n)!.id);
-  await prisma.stockEntry.deleteMany({ where: { productId: { in: stockedDemoProductIds }, date: day } });
-  const stocks = [
-    ['Susamlı Simit', null, null, 180],
-    ['Peynirli Poğaça', null, null, 100],
-    ['Beyaz Ekmek', null, null, 270],
-    ['Çikolatalı Yaş Pasta', null, null, 10],
-    ['Sütlaç', null, null, 30],
-  ] as const;
-  for (const [productName, availableFrom, availableTo, quantity] of stocks) {
-    const productId = productMap.get(productName)!.id;
-    await prisma.stockEntry.create({ data: { productId, date: day, availableFrom, availableTo, quantity } });
+  const simit = productMap.get('Susamlı Simit');
+  if (simit) {
+    await prisma.product.update({
+      where: { id: simit.id },
+      data: { saleWindowStart: '08:00', saleWindowEnd: '12:00' },
+    });
   }
   const zones = [['Yenişehir','150.00','30.00',30],['Mezitli','200.00','40.00',40],['Akdeniz','200.00','45.00',45]] as const;
   for (const [name,minimumOrderPrice,deliveryFee,estimatedMinutes] of zones) {

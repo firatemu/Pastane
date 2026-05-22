@@ -11,6 +11,9 @@ import { paymentStatusLabel } from '../../lib/orders/status';
 import { formatTry } from '../shared/price';
 
 function latestPayment(payments: Payment[]): Payment | null { return payments[0] ?? null; }
+function cartEstimate(cart: Cart): string {
+  return cart.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0).toFixed(2);
+}
 const devPaymentDefaults = process.env.NODE_ENV === 'production' ? { cardHolderName: '', cardNumber: '', expireMonth: '', expireYear: '', cvc: '' } : { cardHolderName: 'Demo Müşteri', cardNumber: '5528790000000008', expireMonth: '12', expireYear: '30', cvc: '123' };
 
 export function CheckoutForm(): React.JSX.Element {
@@ -185,55 +188,152 @@ export function CheckoutForm(): React.JSX.Element {
         : resumePaymentOnly
           ? 'Ödemeyi başlat'
           : 'Siparişi oluştur ve ödemeyi başlat';
-  if (!cart) return <p className="rounded-2xl bg-white p-4">Ödeme sayfası yükleniyor…</p>;
+  if (!cart) return <p className="stitch-panel rounded-3xl p-4">Ödeme sayfası yükleniyor...</p>;
   const resumeOrderId = searchParams.get('orderId');
   if (!cart.items.length && !order) {
-    if (resumeOrderId) return <p className="rounded-2xl bg-white p-4">Sipariş ve özet yükleniyor…</p>;
-    return <div className="rounded-[2rem] border border-dashed border-amber-300 bg-white p-8 text-center"><h1 className="text-2xl font-semibold">Sepetiniz boş</h1><p className="mt-2 text-stone-600">Ödemeye geçmeden önce ürün ekleyin.</p><a className="mt-5 inline-block rounded-full bg-stone-900 px-5 py-3 text-white" href="/">Ürünlere dön</a></div>;
+    if (resumeOrderId) return <p className="stitch-panel rounded-3xl p-4">Sipariş ve özet yükleniyor...</p>;
+    return <div className="stitch-panel rounded-3xl p-10 text-center"><h1 className="font-display text-3xl font-semibold text-primary">Sepetiniz boş</h1><p className="mt-2 text-muted">Ödemeye geçmeden önce ürün ekleyin.</p><a className="stitch-button mt-5" href="/">Ürünlere dön</a></div>;
   }
-  return <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-    <form className="space-y-5 rounded-[2rem] border border-amber-200/70 bg-white p-5 shadow-sm" onSubmit={handleSubmit(submit)}>
-      <div><h1 className="text-2xl font-semibold">Ödeme</h1><p className="mt-1 text-sm text-stone-600">Teslimat ve ödeme bilgilerinizi tek adımda tamamlayın.</p>{process.env.NODE_ENV !== 'production' ? <p className="mt-2 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-900">Geliştirme modunda ödeme test bilgileri otomatik gelir; backend ödeme başarılı gibi tamamlar.</p> : null}</div>
-      <fieldset className="grid gap-3 sm:grid-cols-2"><label className={`rounded-2xl border p-4 ${deliveryType === 'HOME_DELIVERY' ? 'border-amber-500 bg-amber-50' : ''}`}><input type="radio" value="HOME_DELIVERY" {...register('deliveryType')} /> <span className="ml-2">Adrese teslim</span></label><label className={`rounded-2xl border p-4 ${deliveryType === 'PICKUP' ? 'border-amber-500 bg-amber-50' : ''}`}><input type="radio" value="PICKUP" {...register('deliveryType')} /> <span className="ml-2">Mağazadan teslim</span></label></fieldset>
-      {deliveryType === 'HOME_DELIVERY' ? <label className="block space-y-2"><span className="font-medium">Adres</span><select className="w-full rounded-2xl border px-4 py-3" {...register('addressId')}><option value="">Adres seçin</option>{addresses.map(a => <option key={a.id} value={a.id}>{a.title} — {a.district}</option>)}</select>{errors.addressId ? <span className="text-sm text-red-700">{errors.addressId.message}</span> : null}</label> : <label className="block space-y-2"><span className="font-medium">Mağaza</span><select className="w-full rounded-2xl border px-4 py-3" {...register('pickupStoreId')}><option value="">Mağaza seçin</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name} — {s.district}</option>)}</select>{errors.pickupStoreId ? <span className="text-sm text-red-700">{errors.pickupStoreId.message}</span> : null}</label>}
-      <label className="block space-y-2"><span className="font-medium">Sipariş notu</span><textarea className="min-h-24 w-full rounded-2xl border px-4 py-3" {...register('note')} /></label>
-      <div className="grid gap-4 sm:grid-cols-2"><label className="space-y-2"><span className="font-medium">Kart sahibi</span><input className="w-full rounded-2xl border px-4 py-3" autoComplete="cc-name" {...register('cardHolderName')} />{errors.cardHolderName ? <span className="text-sm text-red-700">{errors.cardHolderName.message}</span> : null}</label><label className="space-y-2"><span className="font-medium">Kart numarası</span><input className="w-full rounded-2xl border px-4 py-3" inputMode="numeric" maxLength={16} autoComplete="cc-number" {...regCard} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 16); regCard.onChange(e); }} />{errors.cardNumber ? <span className="text-sm text-red-700">{errors.cardNumber.message}</span> : null}</label></div>
-      <div className="grid grid-cols-3 gap-3">
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Ay</span>
-          <input className="w-full rounded-2xl border px-4 py-3" inputMode="numeric" maxLength={2} placeholder="01" title="Son kullanma ayı (01–12)" autoComplete="cc-exp-month" {...regMonth} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 2); regMonth.onChange(e); }} />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Yıl</span>
-          <input className="w-full rounded-2xl border px-4 py-3" inputMode="numeric" maxLength={2} placeholder="28" title="Son kullanma yılı (2 hane)" autoComplete="cc-exp-year" {...regYear} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 2); regYear.onChange(e); }} />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Güvenlik (CVC)</span>
-          <input className="w-full rounded-2xl border px-4 py-3" inputMode="numeric" maxLength={3} placeholder="•••" title="Kart güvenlik kodu (3 rakam)" autoComplete="cc-csc" {...regCvc} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 3); regCvc.onChange(e); }} />
-        </label>
-      </div>
-      <p className="text-xs text-stone-500">Kart numarası 16 hane; son kullanma yılı kart üzerindeki son iki hanedir; güvenlik kodu 3 rakamdır.</p>
-      {(errors.expireMonth ?? errors.expireYear ?? errors.cvc) ? (
-        <p className="text-sm text-red-700">
-          {[errors.expireMonth?.message, errors.expireYear?.message, errors.cvc?.message].filter(Boolean).join(' ')}
+  return <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <form className="space-y-6" onSubmit={handleSubmit(submit)}>
+      {process.env.NODE_ENV !== 'production' ? (
+        <p className="rounded-2xl border border-honey/60 bg-honey/20 px-4 py-3 text-xs font-medium text-secondary">
+          Geliştirme modunda ödeme test bilgileri otomatik gelir; backend ödeme başarılı gibi tamamlar.
         </p>
       ) : null}
-      <div className="space-y-3 border-t border-amber-100 pt-4">
-        <p className="text-sm font-medium text-stone-700">İyzico ile ödeme</p>
-        <p className="text-xs text-stone-500">Kart bilgisi girmeden iyzico güvenli ödeme formunda tamamlayın; form yüklendikten sonra işlemi orada bitirin.</p>
-        <div ref={iyRef} id="iyzipay-checkout-form" className="responsive min-h-[40px]" />
-        <button
-          className="w-full rounded-2xl border-2 border-amber-600 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-950 disabled:opacity-60"
-          disabled={iyLocked}
-          type="button"
-          onClick={() => void payWithIyzico()}
-        >
-          {iyBusy ? 'iyzico formu yükleniyor…' : 'İyzico ile ödeme al'}
-        </button>
-      </div>
-      {error ? <p className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">{error}</p> : null}
-      <button className="w-full rounded-2xl bg-stone-900 px-5 py-4 font-medium text-white disabled:opacity-60" disabled={submitLocked} type="submit">{submitLabel}</button>
+
+      <section className="stitch-panel rounded-3xl p-6">
+        <div className="mb-5 flex items-start gap-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">1</span>
+          <div>
+            <h2 className="font-display text-2xl font-semibold text-primary">Teslimat yöntemi</h2>
+            <p className="mt-1 text-sm text-muted">Adrese teslim veya mağazadan teslim alma seçimini yapın.</p>
+          </div>
+        </div>
+        <fieldset className="grid gap-3 sm:grid-cols-2">
+          <label className={`cursor-pointer rounded-2xl border p-4 transition ${deliveryType === 'HOME_DELIVERY' ? 'border-primary bg-primary-fixed' : 'border-outline-soft/60 bg-white hover:border-primary'}`}>
+            <input className="sr-only" type="radio" value="HOME_DELIVERY" {...register('deliveryType')} />
+            <span className="block font-semibold text-primary">Adrese teslim</span>
+            <span className="mt-1 block text-sm text-muted">Kayıtlı adresinize kurye teslimatı.</span>
+          </label>
+          <label className={`cursor-pointer rounded-2xl border p-4 transition ${deliveryType === 'PICKUP' ? 'border-primary bg-primary-fixed' : 'border-outline-soft/60 bg-white hover:border-primary'}`}>
+            <input className="sr-only" type="radio" value="PICKUP" {...register('deliveryType')} />
+            <span className="block font-semibold text-primary">Mağazadan teslim</span>
+            <span className="mt-1 block text-sm text-muted">Siparişinizi seçili mağazadan alın.</span>
+          </label>
+        </fieldset>
+
+        <div className="mt-5">
+          {deliveryType === 'HOME_DELIVERY' ? (
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-ink">Teslimat adresi</span>
+              <select className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" {...register('addressId')}>
+                <option value="">Adres seçin</option>
+                {addresses.map(a => <option key={a.id} value={a.id}>{a.title} - {a.district}</option>)}
+              </select>
+              {errors.addressId ? <span className="text-sm text-red-700">{errors.addressId.message}</span> : null}
+            </label>
+          ) : (
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-ink">Teslim alınacak mağaza</span>
+              <select className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" {...register('pickupStoreId')}>
+                <option value="">Mağaza seçin</option>
+                {stores.map(s => <option key={s.id} value={s.id}>{s.name} - {s.district}</option>)}
+              </select>
+              {errors.pickupStoreId ? <span className="text-sm text-red-700">{errors.pickupStoreId.message}</span> : null}
+            </label>
+          )}
+        </div>
+
+        <label className="mt-5 block space-y-2">
+          <span className="text-sm font-semibold text-ink">Sipariş notu</span>
+          <textarea className="min-h-24 w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" placeholder="Teslimat saati, kapı kodu veya ürün notu" {...register('note')} />
+        </label>
+      </section>
+
+      <section className="stitch-panel rounded-3xl p-6">
+        <div className="mb-5 flex items-start gap-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">2</span>
+          <div>
+            <h2 className="font-display text-2xl font-semibold text-primary">Ödeme yöntemi</h2>
+            <p className="mt-1 text-sm text-muted">Kartla hızlı ödeme yapın veya iyzico güvenli ödeme formunu başlatın.</p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-outline-soft/50 bg-surface-low p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-secondary">Kart bilgileri</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-ink">Kart sahibi</span>
+              <input className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" autoComplete="cc-name" {...register('cardHolderName')} />
+              {errors.cardHolderName ? <span className="text-sm text-red-700">{errors.cardHolderName.message}</span> : null}
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-ink">Kart numarası</span>
+              <input className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" inputMode="numeric" maxLength={16} autoComplete="cc-number" {...regCard} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 16); regCard.onChange(e); }} />
+              {errors.cardNumber ? <span className="text-sm text-red-700">{errors.cardNumber.message}</span> : null}
+            </label>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-ink">Ay</span>
+              <input className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" inputMode="numeric" maxLength={2} placeholder="01" title="Son kullanma ayı (01-12)" autoComplete="cc-exp-month" {...regMonth} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 2); regMonth.onChange(e); }} />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-ink">Yıl</span>
+              <input className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" inputMode="numeric" maxLength={2} placeholder="28" title="Son kullanma yılı (2 hane)" autoComplete="cc-exp-year" {...regYear} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 2); regYear.onChange(e); }} />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-ink">CVC</span>
+              <input className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary" inputMode="numeric" maxLength={3} placeholder="123" title="Kart güvenlik kodu (3 rakam)" autoComplete="cc-csc" {...regCvc} onChange={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 3); regCvc.onChange(e); }} />
+            </label>
+          </div>
+          {(errors.expireMonth ?? errors.expireYear ?? errors.cvc) ? (
+            <p className="mt-3 text-sm text-red-700">
+              {[errors.expireMonth?.message, errors.expireYear?.message, errors.cvc?.message].filter(Boolean).join(' ')}
+            </p>
+          ) : null}
+          <button className="stitch-button mt-5 w-full disabled:opacity-60" disabled={submitLocked} type="submit">{submitLabel}</button>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-outline-soft/50 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-secondary">iyzico güvenli ödeme</p>
+              <p className="mt-1 text-sm text-muted">Kart bilgisini iyzico formunda tamamlamak için başlatın.</p>
+            </div>
+            <button
+              className="rounded-full border border-primary px-5 py-3 text-sm font-semibold text-primary hover:bg-primary hover:text-white disabled:opacity-60"
+              disabled={iyLocked}
+              type="button"
+              onClick={() => void payWithIyzico()}
+            >
+              {iyBusy ? 'Yükleniyor...' : 'iyzico ile öde'}
+            </button>
+          </div>
+          <div ref={iyRef} id="iyzipay-checkout-form" className="responsive mt-4 min-h-[40px]" />
+        </div>
+
+        {error ? <p className="mt-5 rounded-2xl bg-red-50 p-4 text-sm text-red-700">{error}</p> : null}
+      </section>
     </form>
-    <aside className="rounded-[2rem] bg-stone-900 p-5 text-white"><h2 className="text-lg font-semibold">Kesin toplam</h2>{order ? <dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>Ara toplam</dt><dd>{formatTry(order.subtotal)}</dd></div><div className="flex justify-between"><dt>Teslimat</dt><dd>{formatTry(order.deliveryFee)}</dd></div>{order.serviceFee ? <div className="flex justify-between"><dt>Servis</dt><dd>{formatTry(order.serviceFee)}</dd></div> : null}{order.loyaltyDiscount && Number(order.loyaltyDiscount) > 0 ? <div className="flex justify-between text-emerald-300"><dt>Puan indirimi{order.loyaltyPointsUsed ? ` (${order.loyaltyPointsUsed} puan)` : ''}</dt><dd>-{formatTry(order.loyaltyDiscount)}</dd></div> : null}<div className="flex justify-between border-t border-white/20 pt-3 text-base font-semibold"><dt>Genel toplam</dt><dd>{formatTry(order.grandTotal)}</dd></div></dl> : <p className="mt-4 text-sm text-stone-300">Kesin toplam sipariş oluşturulduktan sonra sunucudan alınır.</p>}{payment ? <div className="mt-5 rounded-2xl bg-amber-300 p-4 text-stone-950"><p className="font-semibold">{paymentStatusLabel(payment.status)}</p>{payment.status === 'SUCCESS' ? <p className="mt-1 text-sm">Siparişiniz {order?.orderNumber} numarasıyla onaylandı. Ödeme tamamlandı.</p> : <p className="mt-1 text-sm">Siparişiniz {order?.orderNumber} numarasıyla oluşturuldu. Ödeme sağlayıcı akışı başlatıldı.</p>}{payment.processingResult ? <p className="mt-1 text-xs">İşlem sonucu: {payment.processingResult}</p> : null}</div> : null}</aside>
+
+    <aside className="h-fit space-y-5 lg:sticky lg:top-28">
+      <section className="rounded-3xl bg-primary p-6 text-white shadow-ambient">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-gold">Sipariş özeti</p>
+        <h2 className="mt-2 font-display text-3xl font-semibold">Kesin toplam</h2>
+        <div className="mt-6 space-y-3">
+          {cart.items.map((item) => (
+            <div className="flex justify-between gap-4 text-sm text-white/75" key={item.id}>
+              <span>{item.quantity} x {item.product.name}</span>
+              <span className="font-semibold text-white">{formatTry((Number(item.unitPrice) * item.quantity).toFixed(2))}</span>
+            </div>
+          ))}
+        </div>
+        {order ? <dl className="mt-6 space-y-3 border-t border-white/15 pt-5 text-sm"><div className="flex justify-between"><dt>Ara toplam</dt><dd>{formatTry(order.subtotal)}</dd></div><div className="flex justify-between"><dt>Teslimat</dt><dd>{formatTry(order.deliveryFee)}</dd></div>{order.serviceFee ? <div className="flex justify-between"><dt>Servis</dt><dd>{formatTry(order.serviceFee)}</dd></div> : null}{order.loyaltyDiscount && Number(order.loyaltyDiscount) > 0 ? <div className="flex justify-between text-emerald-200"><dt>Puan indirimi{order.loyaltyPointsUsed ? ` (${order.loyaltyPointsUsed} puan)` : ''}</dt><dd>-{formatTry(order.loyaltyDiscount)}</dd></div> : null}<div className="flex justify-between border-t border-white/20 pt-4 text-lg font-semibold"><dt>Genel toplam</dt><dd>{formatTry(order.grandTotal)}</dd></div></dl> : <div className="mt-6 border-t border-white/15 pt-5"><div className="flex justify-between text-lg font-semibold"><span>Sepet toplamı</span><span>{formatTry(cartEstimate(cart))}</span></div><p className="mt-2 text-xs leading-5 text-white/60">Kesin toplam sipariş oluşturulduktan sonra teslimat ücretiyle hesaplanır.</p></div>}
+      </section>
+
+      {payment ? <section className="rounded-3xl border border-outline-soft/40 bg-honey/40 p-5 text-primary"><p className="font-semibold">{paymentStatusLabel(payment.status)}</p>{payment.status === 'SUCCESS' ? <p className="mt-1 text-sm">Siparişiniz {order?.orderNumber} numarasıyla onaylandı. Ödeme tamamlandı.</p> : <p className="mt-1 text-sm">Siparişiniz {order?.orderNumber} numarasıyla oluşturuldu. Ödeme sağlayıcı akışı başlatıldı.</p>}{payment.processingResult ? <p className="mt-1 text-xs">İşlem sonucu: {payment.processingResult}</p> : null}</section> : null}
+    </aside>
   </div>;
 }

@@ -1,7 +1,7 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Order, Payment, Prisma, StockReservation } from '@prisma/client';
-import { DeliveryType, OrderStatus, PaymentStatus, StockReservationStatus } from '@prisma/client';
+import type { Order, Payment, Prisma } from '@prisma/client';
+import { DeliveryType, OrderStatus, PaymentStatus } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { AppException } from '../common/exceptions/app.exception';
@@ -121,21 +121,13 @@ export class PaymentsService {
     args: {
       payment: Pick<Payment, 'id' | 'amount' | 'orderId'>;
       order: Order;
-      reservations: StockReservation[];
       now: Date;
       providerStatus: string;
       auditAction: string;
       processingResult: string;
     },
   ) {
-    const { payment, order, reservations, now, providerStatus, auditAction, processingResult } = args;
-    for (const reservation of reservations) {
-      await tx.stockEntry.update({ where: { id: reservation.stockEntryId }, data: { quantity: { decrement: reservation.quantity } } });
-    }
-    await tx.stockReservation.updateMany({
-      where: { orderId: order.id, status: StockReservationStatus.ACTIVE },
-      data: { status: StockReservationStatus.CONFIRMED, confirmedAt: now },
-    });
+    const { payment, order, now, providerStatus, auditAction, processingResult } = args;
     if (order.status !== OrderStatus.PAYMENT_PENDING) {
       throw new AppException(
         ERROR_CODES.ORDER_STATUS_TRANSITION_INVALID,
@@ -175,11 +167,6 @@ export class PaymentsService {
 
     await this.assertNoOtherPendingPayment(order.id, idempotencyKey);
 
-    const reservations = await this.prisma.stockReservation.findMany({
-      where: { orderId: order.id, status: StockReservationStatus.ACTIVE, expiresAt: { gt: new Date() } },
-    });
-    if (!reservations.length) throw new AppException(ERROR_CODES.STOCK_RESERVATION_EXPIRED, 'Reservation expired', HttpStatus.BAD_REQUEST);
-
     const providerResponse = await this.provider.initiate(dto, randomUUID());
     if (this.isPaymentDevAutoSuccessEnabled()) {
       return this.prisma.$transaction(async (tx) => {
@@ -194,14 +181,12 @@ export class PaymentsService {
           throw new AppException(ERROR_CODES.PAYMENT_AMOUNT_MISMATCH, 'Amount mismatch', HttpStatus.CONFLICT);
         }
         const now = new Date();
-        const res = await tx.stockReservation.findMany({ where: { orderId: o.id, status: StockReservationStatus.ACTIVE } });
-        if (o.status !== OrderStatus.PAYMENT_PENDING || !res.length || res.some((r) => r.expiresAt <= now)) {
-          throw new AppException(ERROR_CODES.STOCK_RESERVATION_EXPIRED, 'Reservation inactive or expired', HttpStatus.BAD_REQUEST);
+        if (o.status !== OrderStatus.PAYMENT_PENDING) {
+          throw new AppException(ERROR_CODES.ORDER_STATUS_TRANSITION_INVALID, 'Order not payable', HttpStatus.BAD_REQUEST);
         }
         return this.applySuccessfulPaymentInTx(tx, {
           payment,
           order: o,
-          reservations: res,
           now,
           providerStatus: 'DEV',
           auditAction: 'payment.dev.auto_success',
@@ -244,19 +229,14 @@ export class PaymentsService {
         });
       }
 
-      const reservations = await tx.stockReservation.findMany({ where: { orderId: order.id, status: StockReservationStatus.ACTIVE } });
-      if (order.status !== OrderStatus.PAYMENT_PENDING || !reservations.length || reservations.some((reservation) => reservation.expiresAt <= now)) {
+      if (order.status !== OrderStatus.PAYMENT_PENDING) {
         return tx.payment.update({
           where: { id: payment.id },
-          data: { status: PaymentStatus.FAILED, processedAt: now, processingResult: 'RESERVATION_INVALID', failureReason: 'Reservation inactive or expired' },
+          data: { status: PaymentStatus.FAILED, processedAt: now, processingResult: 'ORDER_INVALID', failureReason: 'Order not payable' },
         });
       }
 
       if (dto.status === 'FAILED') {
-        await tx.stockReservation.updateMany({
-          where: { orderId: order.id, status: StockReservationStatus.ACTIVE },
-          data: { status: StockReservationStatus.RELEASED, releasedAt: now },
-        });
         this.statuses.assert(order.status, OrderStatus.CANCELLED);
         await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.CANCELLED } });
         await tx.orderStatusHistory.create({ data: { orderId: order.id, status: OrderStatus.CANCELLED } });
@@ -271,7 +251,6 @@ export class PaymentsService {
       return this.applySuccessfulPaymentInTx(tx, {
         payment,
         order,
-        reservations,
         now,
         providerStatus: dto.status,
         auditAction: 'payment.callback.success',
@@ -304,11 +283,6 @@ export class PaymentsService {
     }
 
     await this.assertNoOtherPendingPayment(order.id, idempotencyKey);
-
-    const reservations = await this.prisma.stockReservation.findMany({
-      where: { orderId: order.id, status: StockReservationStatus.ACTIVE, expiresAt: { gt: new Date() } },
-    });
-    if (!reservations.length) throw new AppException(ERROR_CODES.STOCK_RESERVATION_EXPIRED, 'Reservation expired', HttpStatus.BAD_REQUEST);
 
     const { buyer, shippingAddress, billingAddress } = this.buildIyzicoBuyerAndAddresses(order);
     const grandStr = money.round(order.grandTotal).toFixed(2);
@@ -477,20 +451,15 @@ export class PaymentsService {
         return;
       }
 
-      const reservations = await tx.stockReservation.findMany({ where: { orderId: order.id, status: StockReservationStatus.ACTIVE } });
-      if (order.status !== OrderStatus.PAYMENT_PENDING || !reservations.length || reservations.some((reservation) => reservation.expiresAt <= now)) {
+      if (order.status !== OrderStatus.PAYMENT_PENDING) {
         await tx.payment.update({
           where: { id: payment.id },
-          data: { status: PaymentStatus.FAILED, processedAt: now, processingResult: 'RESERVATION_INVALID', failureReason: 'Reservation inactive or expired' },
+          data: { status: PaymentStatus.FAILED, processedAt: now, processingResult: 'ORDER_INVALID', failureReason: 'Order not payable' },
         });
         return;
       }
 
       if (dtoStatus === 'FAILED') {
-        await tx.stockReservation.updateMany({
-          where: { orderId: order.id, status: StockReservationStatus.ACTIVE },
-          data: { status: StockReservationStatus.RELEASED, releasedAt: now },
-        });
         this.statuses.assert(order.status, OrderStatus.CANCELLED);
         await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.CANCELLED } });
         await tx.orderStatusHistory.create({ data: { orderId: order.id, status: OrderStatus.CANCELLED } });
@@ -509,7 +478,6 @@ export class PaymentsService {
       await this.applySuccessfulPaymentInTx(tx, {
         payment,
         order,
-        reservations,
         now,
         providerStatus: retrieve.paymentStatus ?? dtoStatus,
         auditAction: 'payment.iyzico.checkout.success',
@@ -536,30 +504,11 @@ export class PaymentsService {
       if (!payment || payment.status !== PaymentStatus.PENDING) return null;
       const order = await tx.order.findUniqueOrThrow({ where: { id: payment.orderId } });
       if (order.status !== OrderStatus.PAYMENT_PENDING) return payment;
-      await tx.stockReservation.updateMany({
-        where: { orderId: order.id, status: StockReservationStatus.ACTIVE },
-        data: { status: StockReservationStatus.EXPIRED, releasedAt: new Date() },
-      });
       await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.CANCELLED } });
       await tx.orderStatusHistory.create({ data: { orderId: order.id, status: OrderStatus.CANCELLED } });
-      await this.audit.log({ actorId: null, action: 'payment.timeout', entityType: 'Payment', entityId: payment.id, newValues: { status: PaymentStatus.TIMEOUT } }, tx); await this.notifications.createOrderStatusNotification(tx, order.userId, order.orderNumber, OrderStatus.CANCELLED); return tx.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.TIMEOUT, processedAt: new Date(), processingResult: 'TIMEOUT' } });
-    });
-  }
-
-  async expireReservation(orderId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const active = await tx.stockReservation.count({ where: { orderId, status: StockReservationStatus.ACTIVE, expiresAt: { lte: new Date() } } });
-      if (!active) return null;
-      await tx.stockReservation.updateMany({
-        where: { orderId, status: StockReservationStatus.ACTIVE },
-        data: { status: StockReservationStatus.EXPIRED, releasedAt: new Date() },
-      });
-      const order = await tx.order.findUnique({ where: { id: orderId } });
-      if (order?.status === OrderStatus.PAYMENT_PENDING) {
-        await tx.order.update({ where: { id: orderId }, data: { status: OrderStatus.CANCELLED } });
-        await tx.orderStatusHistory.create({ data: { orderId, status: OrderStatus.CANCELLED } });
-      }
-      return true;
+      await this.audit.log({ actorId: null, action: 'payment.timeout', entityType: 'Payment', entityId: payment.id, newValues: { status: PaymentStatus.TIMEOUT } }, tx);
+      await this.notifications.createOrderStatusNotification(tx, order.userId, order.orderNumber, OrderStatus.CANCELLED);
+      return tx.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.TIMEOUT, processedAt: new Date(), processingResult: 'TIMEOUT' } });
     });
   }
 }

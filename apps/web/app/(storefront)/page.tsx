@@ -16,14 +16,14 @@ export const metadata: Metadata = {
 export default async function HomePage(): Promise<React.JSX.Element> {
   const [categories, products, banners, campaigns, stores, deliveryZones] = await Promise.all([
     getCategories(),
-    getProducts({ page: 1, limit: 6 }),
+    getProducts({ page: 1, limit: 100 }),
     getHomeBanners(),
     getActiveCampaigns(),
     getStores({ page: 1, limit: 3 }).catch(() => ({ items: [], meta: { page: 1, limit: 3, total: 0, totalPages: 0 } })),
     getDeliveryZones({ page: 1, limit: 3 }).catch(() => ({ items: [], meta: { page: 1, limit: 3, total: 0, totalPages: 0 } })),
   ]);
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="stitch-container">
       <script dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }} type="application/ld+json" />
       <HomeHero banners={banners} />
       <CategoryStrip categories={categories} />

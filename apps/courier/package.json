@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3002",
     "dev:host": "NEXT_DIST_DIR=.next-host next dev -p 3002",
-    "build": "next build",
+    "build": "NEXT_DIST_DIR=.next-ci next build",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

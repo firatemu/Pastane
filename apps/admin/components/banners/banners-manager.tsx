@@ -3,15 +3,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { ColumnDef } from '@tanstack/react-table';
 import { adminFetch } from '../../lib/api/catalog';
 import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-errors';
-import { bannerFormSchema, formatSchedule, toIsoDateInput, type AdminBanner, type BannerFormValues } from '../../lib/banners/schemas';
+import {
+  bannerFormSchema,
+  toIsoDateInput,
+  type AdminBanner,
+  type BannerFormValues,
+} from '../../lib/banners/schemas';
 import { can } from '../../lib/permissions/can';
-import { DataTable } from '../shared/data-table';
-import { Field } from '../shared/form-field';
-import { PageSection } from '../shared/page-section';
 import { ErrorState, LoadingState } from '../shared/async-state';
+import {
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSelectClass,
+} from '../shared/admin-form-controls';
+import { BannersStatsBar } from './banners-stats-bar';
+import { BannersList } from './banners-list';
+import { BannerDetailModal } from './banner-detail-modal';
+import { BannerFormSheet } from './banner-form-sheet';
 
 type UploadBannerResponse = {
   variant: string;
@@ -22,7 +32,6 @@ type UploadBannerResponse = {
   mime: string;
 };
 
-/** Zod 4 / nested FieldErrors: collect human-readable messages for the alert box. */
 function collectValidationMessages(errors: FieldErrors): string[] {
   const messages: string[] = [];
   const queue: unknown[] = [errors];
@@ -46,14 +55,24 @@ function collectValidationMessages(errors: FieldErrors): string[] {
 
 export function BannersManager({ permissions }: { permissions: string[] }): React.JSX.Element {
   const [rows, setRows] = useState<AdminBanner[]>([]);
+  const [selected, setSelected] = useState<AdminBanner | null>(null);
   const [editing, setEditing] = useState<AdminBanner | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const [formValidationHints, setFormValidationHints] = useState<string[]>([]);
-  const [desktopMeta, setDesktopMeta] = useState<{ bucket: string; objectKey: string } | null>(null);
+  const [desktopMeta, setDesktopMeta] = useState<{ bucket: string; objectKey: string } | null>(
+    null,
+  );
   const [mobileMeta, setMobileMeta] = useState<{ bucket: string; objectKey: string } | null>(null);
+
+  // Filters State
+  const [search, setSearch] = useState('');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'ALL' | 'IMAGE' | 'VIDEO'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PASSIVE'>('ALL');
+
   const form = useForm<BannerFormValues>({
     resolver: zodResolver(bannerFormSchema) as Resolver<BannerFormValues>,
     defaultValues: {
@@ -71,7 +90,10 @@ export function BannersManager({ permissions }: { permissions: string[] }): Reac
       mobileMediaUrl: '',
     },
   });
+
   const mediaType = form.watch('mediaType');
+  const desktopMediaUrl = form.watch('desktopMediaUrl');
+  const mobileMediaUrl = form.watch('mobileMediaUrl');
 
   async function load(): Promise<void> {
     try {
@@ -97,7 +119,10 @@ export function BannersManager({ permissions }: { permissions: string[] }): Reac
       body.set('file', file);
       body.set('variant', slot);
       body.set('expectKind', mediaType);
-      const res = await adminFetch<UploadBannerResponse>('/banners/upload', { method: 'POST', body });
+      const res = await adminFetch<UploadBannerResponse>('/banners/upload', {
+        method: 'POST',
+        body,
+      });
       if (res.detectedMediaType !== mediaType) {
         setUploadErr('Yüklenen dosya seçilen medya tipi ile uyuşmuyor.');
         return;
@@ -151,6 +176,7 @@ export function BannersManager({ permissions }: { permissions: string[] }): Reac
       setEditing(null);
       setDesktopMeta(null);
       setMobileMeta(null);
+      setFormOpen(false);
       form.reset({
         title: '',
         subtitle: '',
@@ -190,6 +216,9 @@ export function BannersManager({ permissions }: { permissions: string[] }): Reac
       setSaveError(null);
       await adminFetch(`/banners/${row.id}`, { method: 'DELETE' });
       await load();
+      if (selected?.id === row.id) {
+        setSelected(null);
+      }
     } catch (caught) {
       setSaveError(adminMessageFromUnknownError(caught, 'Silme işlemi başarısız oldu.'));
     }
@@ -203,16 +232,44 @@ export function BannersManager({ permissions }: { permissions: string[] }): Reac
     next.splice(to, 0, item);
     try {
       setSaveError(null);
-      await adminFetch('/banners/reorder', { method: 'PATCH', body: JSON.stringify({ ids: next.map((r) => r.id) }) });
+      await adminFetch('/banners/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids: next.map((r) => r.id) }),
+      });
       await load();
     } catch (caught) {
       setSaveError(adminMessageFromUnknownError(caught, 'Sıra güncellenemedi.'));
     }
   }
 
+  function startAdd(): void {
+    setEditing(null);
+    setDesktopMeta(null);
+    setMobileMeta(null);
+    setFormValidationHints([]);
+    setUploadErr(null);
+    form.reset({
+      title: '',
+      subtitle: '',
+      description: '',
+      mediaType: 'IMAGE',
+      buttonText: '',
+      buttonUrl: '',
+      sortOrder: 0,
+      isActive: true,
+      startsAt: '',
+      endsAt: '',
+      desktopMediaUrl: '',
+      mobileMediaUrl: '',
+    });
+    setFormOpen(true);
+  }
+
   function startEdit(row: AdminBanner): void {
     setDesktopMeta(null);
     setMobileMeta(null);
+    setFormValidationHints([]);
+    setUploadErr(null);
     setEditing(row);
     form.reset({
       title: row.title,
@@ -228,212 +285,169 @@ export function BannersManager({ permissions }: { permissions: string[] }): Reac
       desktopMediaUrl: row.desktopMediaUrl,
       mobileMediaUrl: row.mobileMediaUrl,
     });
+    setFormOpen(true);
   }
 
-  const columns = useMemo<ColumnDef<AdminBanner>[]>(
-    () => [
-      {
-        header: 'Önizleme',
-        cell: ({ row }) =>
-          row.original.mediaType === 'IMAGE' ? (
-            <img alt="" className="h-12 w-20 rounded-lg object-cover" src={row.original.desktopMediaUrl} />
-          ) : (
-            <video className="h-12 w-20 rounded-lg object-cover" muted playsInline src={row.original.desktopMediaUrl} />
-          ),
-      },
-      { header: 'Medya', accessorKey: 'mediaType' },
-      { header: 'Başlık', accessorKey: 'title' },
-      {
-        header: 'Aktif',
-        cell: ({ row }) => (row.original.isActive ? 'Evet' : 'Hayır'),
-      },
-      {
-        header: 'Zamanlama',
-        cell: ({ row }) => formatSchedule(row.original),
-      },
-      { header: 'Sıra', accessorKey: 'sortOrder' },
-      {
-        header: 'Sırayı değiştir',
-        cell: ({ row }) =>
-          can(permissions, ['banners.reorder']) ? (
-            <div className="flex gap-1">
-              <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => move(row.index, row.index - 1)}>
-                ↑
-              </button>
-              <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => move(row.index, row.index + 1)}>
-                ↓
-              </button>
-            </div>
-          ) : null,
-      },
-      {
-        header: 'Aksiyon',
-        cell: ({ row }) => (
-          <div className="flex flex-wrap gap-2">
-            {can(permissions, ['banners.update']) ? (
-              <button type="button" className="text-amber-700" onClick={() => void toggleActive(row.original)}>
-                {row.original.isActive ? 'Pasifleştir' : 'Aktifleştir'}
-              </button>
-            ) : null}
-            {can(permissions, ['banners.update']) ? (
-              <button type="button" className="text-amber-700" onClick={() => startEdit(row.original)}>
-                Düzenle
-              </button>
-            ) : null}
-            {can(permissions, ['banners.delete']) ? (
-              <button type="button" className="text-red-700" onClick={() => void remove(row.original)}>
-                Sil
-              </button>
-            ) : null}
-          </div>
-        ),
-      },
-    ],
-    [permissions, rows],
-  );
+  // Filtered rows
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const matchesSearch =
+        row.title.toLowerCase().includes(search.toLowerCase()) ||
+        (row.subtitle && row.subtitle.toLowerCase().includes(search.toLowerCase()));
+
+      const matchesMediaType = mediaTypeFilter === 'ALL' || row.mediaType === mediaTypeFilter;
+
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        (statusFilter === 'ACTIVE' && row.isActive) ||
+        (statusFilter === 'PASSIVE' && !row.isActive);
+
+      return matchesSearch && matchesMediaType && matchesStatus;
+    });
+  }, [rows, search, mediaTypeFilter, statusFilter]);
 
   const canSubmit = can(permissions, ['banners.create', 'banners.update']);
 
+  if (loading) {
+    return <LoadingState label="Bannerlar yükleniyor…" />;
+  }
+
+  if (listError) {
+    return <ErrorState message={listError} />;
+  }
+
   return (
-    <PageSection
-      title="Ana sayfa bannerları"
-      description="Masaüstü ve mobil görsel veya kısa video. Zamanlama ve sıra vitrinde doğrudan yansır."
-    >
-      {loading ? (
-        <LoadingState label="Bannerlar yükleniyor…" />
-      ) : listError ? (
-        <ErrorState message={listError} />
-      ) : (
-        <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
-          {saveError ? (
-            <div className="xl:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{saveError}</div>
-          ) : null}
-          <DataTable data={rows} columns={columns} />
-          {canSubmit ? (
-            <form
-              className="space-y-4 rounded-3xl border bg-white p-5"
-              onSubmit={form.handleSubmit(
-                async (values: BannerFormValues) => {
-                  await submit(values);
-                },
-                (errs) => {
-                  const msgs = collectValidationMessages(errs);
-                  setFormValidationHints(msgs.length > 0 ? msgs : ['Doğrulama başarısız. Zorunlu alanları ve dosya yüklemelerini kontrol edin.']);
-                },
-              )}
-            >
-              <h2 className="font-semibold">{editing ? 'Banner düzenle' : 'Yeni banner'}</h2>
-              {formValidationHints.length > 0 ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-                  <p className="font-medium">Kayıt için eksik veya hatalı alanlar:</p>
-                  <ul className="mt-1 list-inside list-disc">
-                    {formValidationHints.map((m) => (
-                      <li key={m}>{m}</li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 text-xs text-red-700">
-                    Masaüstü ve mobil dosyaların her ikisini de yüklemeniz gerekir (yükleme yapılmadan Kaydet çalışmaz).
-                  </p>
-                </div>
-              ) : null}
-              {uploadErr ? <p className="text-sm text-red-700">{uploadErr}</p> : null}
-              <Field label="Başlık" error={form.formState.errors.title?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...form.register('title')} />
-              </Field>
-              <Field label="Alt başlık" error={form.formState.errors.subtitle?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...form.register('subtitle')} />
-              </Field>
-              <Field label="Açıklama" error={form.formState.errors.description?.message}>
-                <textarea className="w-full rounded-2xl border px-3 py-2" rows={3} {...form.register('description')} />
-              </Field>
-              <Field label="Medya tipi" error={form.formState.errors.mediaType?.message}>
-                <select className="w-full rounded-2xl border px-3 py-2" {...form.register('mediaType')}>
-                  <option value="IMAGE">Görsel</option>
-                  <option value="VIDEO">Video</option>
-                </select>
-              </Field>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1 text-sm">
-                  Masaüstü dosya
-                  <input
-                    type="file"
-                    accept={mediaType === 'IMAGE' ? 'image/*' : 'video/mp4,video/webm'}
-                    onChange={(e) => void uploadSlot('desktop', e.target.files?.[0] ?? null)}
-                  />
-                </label>
-                <label className="grid gap-1 text-sm">
-                  Mobil dosya
-                  <input
-                    type="file"
-                    accept={mediaType === 'IMAGE' ? 'image/*' : 'video/mp4,video/webm'}
-                    onChange={(e) => void uploadSlot('mobile', e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
-              <input type="hidden" {...form.register('desktopMediaUrl')} />
-              <input type="hidden" {...form.register('mobileMediaUrl')} />
-              <p className="text-xs text-stone-500">
-                Yükleme sonrası alanlar otomatik dolar. Desteklenen görseller: JPEG, PNG, WebP, GIF (maks. 5MB). Video: MP4 veya WebM (maks. 20MB).
-              </p>
-              <Field label="Buton metni" error={form.formState.errors.buttonText?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...form.register('buttonText')} />
-              </Field>
-              <Field label="Buton bağlantısı" error={form.formState.errors.buttonUrl?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...form.register('buttonUrl')} />
-              </Field>
-              <Field label="Sıra" error={form.formState.errors.sortOrder?.message}>
-                <input type="number" className="w-full rounded-2xl border px-3 py-2" {...form.register('sortOrder', { valueAsNumber: true })} />
-              </Field>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" {...form.register('isActive')} />
-                Aktif
-              </label>
-              <Field label="Başlangıç (isteğe bağlı)" error={form.formState.errors.startsAt?.message}>
-                <input type="datetime-local" className="w-full rounded-2xl border px-3 py-2" {...form.register('startsAt')} />
-              </Field>
-              <Field label="Bitiş (isteğe bağlı)" error={form.formState.errors.endsAt?.message}>
-                <input type="datetime-local" className="w-full rounded-2xl border px-3 py-2" {...form.register('endsAt')} />
-              </Field>
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={form.formState.isSubmitting}
-                  className="rounded-2xl bg-stone-900 px-4 py-2 text-white disabled:opacity-50"
-                >
-                  {form.formState.isSubmitting ? 'Kaydediliyor…' : 'Kaydet'}
-                </button>
-                {editing ? (
-                  <button
-                    type="button"
-                    className="rounded-2xl border px-4 py-2"
-                    onClick={() => {
-                      setEditing(null);
-                      setDesktopMeta(null);
-                      setMobileMeta(null);
-                      form.reset({
-                        title: '',
-                        subtitle: '',
-                        description: '',
-                        mediaType: 'IMAGE',
-                        buttonText: '',
-                        buttonUrl: '',
-                        sortOrder: 0,
-                        isActive: true,
-                        startsAt: '',
-                        endsAt: '',
-                        desktopMediaUrl: '',
-                        mobileMediaUrl: '',
-                      });
-                    }}
-                  >
-                    İptal
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          ) : null}
+    <section className="space-y-stack-md">
+      <header>
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface">
+          Ana Sayfa Bannerları
+        </h1>
+        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-on-surface-variant">
+          Masaüstü ve mobil görsel veya kısa videolar. Zamanlama ve sıralama vitrinde doğrudan
+          yansır.
+        </p>
+      </header>
+
+      {/* Stats Bar */}
+      <BannersStatsBar banners={rows} />
+
+      {/* Save Error Alert */}
+      {saveError && (
+        <div className="rounded-2xl border border-error/20 bg-error-container/45 px-4 py-3 text-sm text-error font-medium">
+          {saveError}
         </div>
       )}
-    </PageSection>
+
+      {/* Horizontal Search & Filter Bar */}
+      <div className="flex flex-col gap-3 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery lg:flex-row lg:items-end lg:justify-between">
+        <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+            <span className="text-on-surface-variant">Ara</span>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3.5 top-2.5 text-[20px] text-outline">
+                search
+              </span>
+              <input
+                className={`${adminInputClass} pl-11`}
+                placeholder="Başlık veya alt başlığa göre ara..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </label>
+          <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+            <span className="text-on-surface-variant">Medya</span>
+            <select
+              className={adminSelectClass}
+              value={mediaTypeFilter}
+              onChange={(e) => setMediaTypeFilter(e.target.value as 'ALL' | 'IMAGE' | 'VIDEO')}
+            >
+              <option value="ALL">Hepsi</option>
+              <option value="IMAGE">Görsel</option>
+              <option value="VIDEO">Video</option>
+            </select>
+          </label>
+          <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+            <span className="text-on-surface-variant">Durum</span>
+            <select
+              className={adminSelectClass}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'PASSIVE')}
+            >
+              <option value="ALL">Hepsi</option>
+              <option value="ACTIVE">Aktif</option>
+              <option value="PASSIVE">Pasif</option>
+            </select>
+          </label>
+        </div>
+        {canSubmit && (
+          <button
+            type="button"
+            className={`${adminPrimaryButtonClass} shrink-0`}
+            onClick={startAdd}
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            Yeni banner
+          </button>
+        )}
+      </div>
+
+      {/* Interactive List Table */}
+      <BannersList
+        banners={filteredRows}
+        selectedId={selected?.id ?? null}
+        onSelect={setSelected}
+        onEdit={startEdit}
+        onToggleActive={toggleActive}
+        onRemove={remove}
+        onMove={move}
+        canEdit={can(permissions, ['banners.update'])}
+        canDelete={can(permissions, ['banners.delete'])}
+        canReorder={can(permissions, ['banners.reorder'])}
+      />
+
+      {/* Detail Overlay Modal */}
+      <BannerDetailModal
+        banner={selected}
+        permissions={permissions}
+        onEdit={() => {
+          if (selected) {
+            setSelected(null);
+            startEdit(selected);
+          }
+        }}
+        onClose={() => setSelected(null)}
+      />
+
+      {/* Slide-over Form Sheet */}
+      <BannerFormSheet
+        open={formOpen}
+        editing={editing}
+        form={form}
+        mediaType={mediaType}
+        desktopMediaUrl={desktopMediaUrl}
+        mobileMediaUrl={mobileMediaUrl}
+        uploadErr={uploadErr}
+        formValidationHints={formValidationHints}
+        uploadSlot={uploadSlot}
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
+        onSubmit={form.handleSubmit(
+          async (values: BannerFormValues) => {
+            await submit(values);
+          },
+          (errs) => {
+            const msgs = collectValidationMessages(errs);
+            setFormValidationHints(
+              msgs.length > 0
+                ? msgs
+                : ['Doğrulama başarısız. Zorunlu alanları ve dosya yüklemelerini kontrol edin.'],
+            );
+          },
+        )}
+      />
+    </section>
   );
 }

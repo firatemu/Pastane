@@ -43,13 +43,25 @@ export function getCookieNames(): { access: string; refresh: string } {
 }
 
 export async function refreshAdminSession(refreshToken: string): Promise<{ accessToken: string; refreshToken: string } | null> {
-  const response = await fetch(`${getAdminApiBaseUrl()}/api/v1/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getAdminApiBaseUrl()}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+      cache: 'no-store',
+    });
+  } catch {
+    return null;
+  }
   if (!response.ok) return null;
-  const payload = (await response.json()) as { data?: { accessToken: string; refreshToken: string } };
-  return payload.data ?? null;
+  let payload: unknown;
+  try {
+    const text = await response.text();
+    payload = text ? (JSON.parse(text) as unknown) : {};
+  } catch {
+    return null;
+  }
+  const data = payload as { data?: { accessToken: string; refreshToken: string } };
+  return data.data ?? null;
 }

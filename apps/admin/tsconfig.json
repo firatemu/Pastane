@@ -3,7 +3,9 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@pastane/tr-api-errors": ["../../packages/tr-api-errors/src/index.ts"]
+      "@pastane/tr-api-errors": [
+        "../../packages/tr-api-errors/src/index.ts"
+      ]
     },
     "jsx": "preserve",
     "lib": [
@@ -24,11 +26,12 @@
     "isolatedModules": true
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    ".next-ci/types/**/*.ts",
     ".next/types/**/*.ts",
-    ".next-ci/types/**/*.ts"
+    "next-env.d.ts",
+    ".next-docker/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

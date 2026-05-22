@@ -42,7 +42,7 @@ export function DeliveryActions({
     <div className="space-y-4">
       {delivery.status === 'ASSIGNED' ? (
         <button
-          className="min-h-14 w-full rounded-2xl bg-stone-900 px-4 py-3 font-medium text-white disabled:opacity-60"
+          className="min-h-14 w-full rounded-2xl bg-green-700 px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-green-800 disabled:opacity-60"
           disabled={busy}
           type="button"
           onClick={() => void mutate('pick-up')}
@@ -53,7 +53,7 @@ export function DeliveryActions({
       {delivery.status === 'PICKED_UP' || delivery.status === 'OUT_FOR_DELIVERY' ? (
         <div className="grid gap-3">
           <button
-            className="min-h-14 rounded-2xl bg-green-700 px-4 py-3 font-medium text-white disabled:opacity-60"
+            className="min-h-14 rounded-2xl bg-green-500 px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-green-600 disabled:opacity-60"
             disabled={busy}
             type="button"
             onClick={() => void mutate('deliver')}
@@ -61,7 +61,7 @@ export function DeliveryActions({
             Teslim edildi
           </button>
           <button
-            className="min-h-14 rounded-2xl border border-red-200 bg-white px-4 py-3 font-medium text-red-700 disabled:opacity-60"
+            className="min-h-14 rounded-2xl border border-red-200/50 bg-white px-4 py-3 font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:opacity-60"
             disabled={busy}
             type="button"
             onClick={() => setShowFailure(true)}

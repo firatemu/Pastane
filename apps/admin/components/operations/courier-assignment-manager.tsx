@@ -10,8 +10,13 @@ import { PageSection } from '../shared/page-section';
 import { PollingNote } from '../shared/polling-note';
 import { can } from '../../lib/permissions/can';
 import { ErrorState, LoadingState } from '../shared/async-state';
+import { adminPrimaryButtonClass, adminSelectClass } from '../shared/admin-form-controls';
 
-export function CourierAssignmentManager({ permissions }: { permissions: string[] }): React.JSX.Element {
+export function CourierAssignmentManager({
+  permissions,
+}: {
+  permissions: string[];
+}): React.JSX.Element {
   const [orders, setOrders] = useState<OrderListItem[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -72,7 +77,7 @@ export function CourierAssignmentManager({ permissions }: { permissions: string[
         header: 'Kurye',
         cell: ({ row }) => (
           <select
-            className="rounded-2xl border px-3 py-2"
+            className={adminSelectClass}
             value={selected[row.original.id] ?? ''}
             onChange={(e) => setSelected((v) => ({ ...v, [row.original.id]: e.target.value }))}
           >
@@ -92,9 +97,10 @@ export function CourierAssignmentManager({ permissions }: { permissions: string[
             <button
               type="button"
               disabled={busy === row.original.id}
-              className="text-amber-700 disabled:opacity-60"
+              className={`${adminPrimaryButtonClass} px-3 py-2 disabled:opacity-60`}
               onClick={() => void assign(row.original.id)}
             >
+              <span className="material-symbols-outlined text-[18px]">local_shipping</span>
               Ata
             </button>
           ) : null,
@@ -104,15 +110,51 @@ export function CourierAssignmentManager({ permissions }: { permissions: string[
   );
 
   return (
-    <PageSection title="Kurye Atama" description="Yalnızca hazır ve teslimat tipindeki siparişler listelenir.">
-      <PollingNote seconds={15} />
+    <PageSection
+      title="Kurye Atama"
+      description="Hazır durumdaki teslimat siparişlerini uygun aktif kuryelere atayın."
+    >
       {loading ? (
         <LoadingState label="Kurye atama kuyruğu yükleniyor…" />
       ) : error ? (
         <ErrorState message={error} />
       ) : (
-        <DataTable data={orders} columns={cols} />
+        <div className="space-y-stack-md">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SummaryTile icon="shopping_bag" label="Atanacak sipariş" value={orders.length} />
+            <SummaryTile icon="electric_bike" label="Aktif kurye" value={couriers.length} />
+            <SummaryTile icon="schedule" label="Yenileme" value="15 sn" />
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-on-surface">Atama kuyruğu</h2>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Yalnızca ev teslimatı, hazır ve henüz kurye atanmamış siparişler listelenir.
+              </p>
+            </div>
+            <PollingNote seconds={15} />
+          </div>
+
+          <DataTable data={orders} columns={cols} empty="Atanacak sipariş bulunamadı." />
+        </div>
       )}
     </PageSection>
+  );
+}
+
+function SummaryTile({
+  icon,
+  label,
+  value,
+}: Readonly<{ icon: string; label: string; value: string | number }>): React.JSX.Element {
+  return (
+    <div className="rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-on-surface-variant">{label}</span>
+        <span className="material-symbols-outlined text-[22px] text-secondary">{icon}</span>
+      </div>
+      <p className="mt-3 text-2xl font-semibold tracking-tight text-on-surface">{value}</p>
+    </div>
   );
 }

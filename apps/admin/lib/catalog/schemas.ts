@@ -28,13 +28,20 @@ export const productSchema = z
     price: z.coerce.number().positive('Geçerli bir fiyat girin.'),
     discountedPrice: z.union([z.coerce.number().positive('Geçerli bir fiyat girin.'), z.literal('')]).optional(),
     categoryId: z.string().uuid(uuidMsg),
-    status: z.enum(['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK']).default('ACTIVE'),
+    status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
+    isPublished: z.boolean().default(true),
+    saleWindowStart: z.string().optional(),
+    saleWindowEnd: z.string().optional(),
     preparationMinutes: z.union([z.coerce.number().int().positive('Pozitif bir tam sayı girin.'), z.literal('')]).optional(),
     allergenIds: z.array(z.string().uuid(uuidMsg)).default([]),
   })
   .refine((v) => v.discountedPrice === '' || v.discountedPrice === undefined || v.discountedPrice <= v.price, {
     path: ['discountedPrice'],
     message: 'İndirimli fiyat normal fiyatı aşamaz.',
+  })
+  .refine((v) => (!v.saleWindowStart && !v.saleWindowEnd) || (!!v.saleWindowStart && !!v.saleWindowEnd), {
+    message: 'Satış saati iki alanla birlikte girilmelidir.',
+    path: ['saleWindowEnd'],
   });
 
 export const optionGroupSchema = z.object({
@@ -68,35 +75,4 @@ export const zoneSchema = z.object({
   deliveryFee: z.coerce.number().min(0, 'Teslimat ücreti negatif olamaz.'),
   estimatedMinutes: z.union([z.coerce.number().int().positive('Tahmini süre pozitif olmalıdır.'), z.literal('')]).optional(),
   isActive: z.boolean().default(true),
-});
-
-export const stockSchema = z
-  .object({
-    productId: z.string().uuid(uuidMsg),
-    date: z.string().min(1, 'Tarih zorunludur.'),
-    quantity: z.coerce.number().int().min(0, 'Miktar negatif olamaz.'),
-    availableFrom: z.string().optional(),
-    availableTo: z.string().optional(),
-  })
-  .refine((v) => (!v.availableFrom && !v.availableTo) || (!!v.availableFrom && !!v.availableTo), {
-    message: 'Saat aralığı iki alanla birlikte girilmelidir.',
-    path: ['availableTo'],
-  });
-
-/** PATCH: boş saat = mevcut pencereyi değiştirme; ikisi doluysa birlikte güncellenir. */
-export const updateStockEntrySchema = z
-  .object({
-    quantity: z.coerce.number().int().min(0, 'Miktar negatif olamaz.'),
-    availableFrom: z.string().optional(),
-    availableTo: z.string().optional(),
-  })
-  .refine((v) => !v.availableFrom && !v.availableTo || (!!v.availableFrom && !!v.availableTo), {
-    message: 'Saat aralığı iki alanla birlikte girilmelidir.',
-    path: ['availableTo'],
-  });
-
-export const movementSchema = z.object({
-  type: z.enum(['IN', 'OUT', 'ADJUSTMENT']),
-  quantity: z.coerce.number().int().positive('Miktar pozitif bir tam sayı olmalıdır.'),
-  note: z.string().optional(),
 });

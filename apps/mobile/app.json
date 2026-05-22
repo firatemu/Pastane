@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Pasta-Hane",
+    "slug": "pasta-hane-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "pastahane",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#fff8f5"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

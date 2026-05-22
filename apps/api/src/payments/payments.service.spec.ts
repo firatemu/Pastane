@@ -1,5 +1,5 @@
 import type { ConfigService } from '@nestjs/config';
-import { DeliveryType, OrderStatus, PaymentStatus, StockReservationStatus, type Order, type StockReservation } from '@prisma/client';
+import { DeliveryType, OrderStatus, PaymentStatus, type Order } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { AppException } from '../common/exceptions/app.exception';
 import { ERROR_CODES } from '../common/constants/error-codes';
@@ -40,23 +40,6 @@ describe('PaymentsService initiate', () => {
     };
   }
 
-  function reservation(): StockReservation {
-    return {
-      id: 'res-1',
-      orderId: 'order-1',
-      orderItemId: null,
-      productId: 'product-1',
-      stockEntryId: 'se-1',
-      quantity: 1,
-      status: StockReservationStatus.ACTIVE,
-      expiresAt: new Date(Date.now() + 60_000),
-      confirmedAt: null,
-      releasedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-  }
-
   it('schedules payment timeout in production even if PAYMENT_DEV_AUTO_SUCCESS is true', async () => {
     const prev = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
@@ -67,7 +50,6 @@ describe('PaymentsService initiate', () => {
       const prismaMock = {
         order: { findFirst: jest.fn().mockResolvedValue(baseOrder()) },
         payment: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null), create: paymentCreate },
-        stockReservation: { findMany: jest.fn().mockResolvedValue([reservation()]) },
         $transaction: jest.fn(),
       };
       const prisma = prismaMock as unknown as PrismaService;
@@ -99,14 +81,8 @@ describe('PaymentsService initiate', () => {
       const config = { get: jest.fn((k: string) => (k === 'PAYMENT_DEV_AUTO_SUCCESS' ? 'true' : undefined)) } as unknown as ConfigService;
       const schedulePaymentTimeout = jest.fn();
       const orderRow = baseOrder();
-      const resRow = reservation();
       const createdPayment = { id: 'pay-1', orderId: 'order-1', amount: new Decimal('100') };
 
-      const stockEntry = { update: jest.fn() };
-      const stockReservation = {
-        findMany: jest.fn().mockResolvedValue([resRow]),
-        updateMany: jest.fn(),
-      };
       const order = { findUniqueOrThrow: jest.fn().mockResolvedValue(orderRow), update: jest.fn() };
       const orderStatusHistory = { create: jest.fn() };
       const payment = {
@@ -114,12 +90,11 @@ describe('PaymentsService initiate', () => {
         update: jest.fn().mockResolvedValue({ ...createdPayment, status: 'SUCCESS' }),
       };
       const loyaltyAccount = { findUnique: jest.fn() };
-      const tx = { stockEntry, stockReservation, order, orderStatusHistory, payment, loyaltyAccount, loyaltyMovement: { create: jest.fn() } };
+      const tx = { order, orderStatusHistory, payment, loyaltyAccount, loyaltyMovement: { create: jest.fn() } };
 
       const prismaMock = {
         order: { findFirst: jest.fn().mockResolvedValue(orderRow) },
         payment: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null) },
-        stockReservation: { findMany: jest.fn().mockResolvedValue([resRow]) },
         $transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
       };
       const prisma = prismaMock as unknown as PrismaService;
@@ -140,7 +115,6 @@ describe('PaymentsService initiate', () => {
       await service.initiate('user-1', dto, 'idem-1');
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
       expect(schedulePaymentTimeout).not.toHaveBeenCalled();
-      expect(stockEntry.update).toHaveBeenCalled();
       expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'payment.dev.auto_success' }), expect.anything());
     } finally {
       process.env.NODE_ENV = prevNode;
@@ -158,14 +132,8 @@ describe('PaymentsService initiate', () => {
       const config = { get: jest.fn(() => undefined) } as unknown as ConfigService;
       const schedulePaymentTimeout = jest.fn();
       const orderRow = baseOrder();
-      const resRow = reservation();
       const createdPayment = { id: 'pay-1', orderId: 'order-1', amount: new Decimal('100') };
 
-      const stockEntry = { update: jest.fn() };
-      const stockReservation = {
-        findMany: jest.fn().mockResolvedValue([resRow]),
-        updateMany: jest.fn(),
-      };
       const order = { findUniqueOrThrow: jest.fn().mockResolvedValue(orderRow), update: jest.fn() };
       const orderStatusHistory = { create: jest.fn() };
       const payment = {
@@ -173,26 +141,22 @@ describe('PaymentsService initiate', () => {
         update: jest.fn().mockResolvedValue({ ...createdPayment, status: 'SUCCESS' }),
       };
       const loyaltyAccount = { findUnique: jest.fn() };
-      const tx = { stockEntry, stockReservation, order, orderStatusHistory, payment, loyaltyAccount, loyaltyMovement: { create: jest.fn() } };
+      const tx = { order, orderStatusHistory, payment, loyaltyAccount, loyaltyMovement: { create: jest.fn() } };
 
       const prismaMock = {
         order: { findFirst: jest.fn().mockResolvedValue(orderRow) },
         payment: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null) },
-        stockReservation: { findMany: jest.fn().mockResolvedValue([resRow]) },
         $transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
       };
       const prisma = prismaMock as unknown as PrismaService;
 
-      const statuses = { assert: jest.fn() } as unknown as OrderStatusService;
-      const audit = { log: jest.fn() };
-
       const service = new PaymentsService(
         config,
         prisma,
-        statuses,
+        { assert: jest.fn() } as unknown as OrderStatusService,
         { initiate: jest.fn().mockResolvedValue({ providerPaymentId: 'p', conversationId: 'c', redirectUrl: 'http://x' }) } as never,
         { schedulePaymentTimeout } as never,
-        audit as never,
+        { log: jest.fn() } as never,
         { createOrderStatusNotification: jest.fn() } as never,
       );
 
@@ -222,7 +186,6 @@ describe('PaymentsService initiate', () => {
             idempotencyKey: 'user-1:order-1:iyzico-cf',
           }),
         },
-        stockReservation: { findMany: jest.fn() },
         $transaction: jest.fn(),
       };
       const prisma = prismaMock as unknown as PrismaService;
@@ -244,7 +207,6 @@ describe('PaymentsService initiate', () => {
         expect(e).toBeInstanceOf(AppException);
         expect((e as AppException).getResponse()).toMatchObject({ code: ERROR_CODES.PAYMENT_ALREADY_COMPLETED });
       }
-      expect(prismaMock.stockReservation.findMany).not.toHaveBeenCalled();
     } finally {
       process.env.NODE_ENV = prev;
     }

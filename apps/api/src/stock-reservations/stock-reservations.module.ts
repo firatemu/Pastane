@@ -1,1 +1,0 @@
-import { Module } from '@nestjs/common'; import { StockReservationsService } from './stock-reservations.service'; @Module({providers:[StockReservationsService],exports:[StockReservationsService]}) export class StockReservationsModule {}

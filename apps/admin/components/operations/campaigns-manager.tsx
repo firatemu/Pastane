@@ -3,17 +3,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { ColumnDef } from '@tanstack/react-table';
 import type { z } from 'zod';
 import { adminFetch } from '../../lib/api/catalog';
 import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-errors';
 import { can } from '../../lib/permissions/can';
 import { createCampaignSchema, updateCampaignSchema } from '../../lib/operations/schemas';
 import type { CampaignRow } from '../../lib/operations/types';
-import { DataTable } from '../shared/data-table';
-import { PageSection } from '../shared/page-section';
-import { Field } from '../shared/form-field';
 import { ErrorState, LoadingState } from '../shared/async-state';
+import {
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminSelectClass,
+} from '../shared/admin-form-controls';
+import { CampaignsStatsBar } from './campaigns-stats-bar';
+import { CampaignsList } from './campaigns-list';
+import { CampaignDetailModal } from './campaign-detail-modal';
+import { CampaignFormSheet } from './campaign-form-sheet';
 
 type CreateForm = z.infer<typeof createCampaignSchema>;
 type UpdateForm = z.infer<typeof updateCampaignSchema>;
@@ -22,7 +27,12 @@ export function CampaignsManager({ permissions }: { permissions: string[] }): Re
   const [rows, setRows] = useState<CampaignRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<CampaignRow | null>(null);
   const [editing, setEditing] = useState<CampaignRow | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'PERCENT' | 'FIXED'>('ALL');
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createCampaignSchema) as Resolver<CreateForm>,
@@ -57,18 +67,33 @@ export function CampaignsManager({ permissions }: { permissions: string[] }): Re
     void load();
   }, []);
 
-  useEffect(() => {
-    if (!editing) return;
-    editForm.reset({
-      name: editing.name,
-      description: editing.description ?? '',
-      type: editing.type,
-      value: Number(editing.value),
-      status: editing.status as 'ACTIVE' | 'INACTIVE',
-      startDate: editing.startDate.slice(0, 10),
-      endDate: editing.endDate ? editing.endDate.slice(0, 10) : '',
+  function startAdd(): void {
+    setEditing(null);
+    createForm.reset({
+      name: '',
+      description: '',
+      type: 'PERCENT',
+      value: 0,
+      status: 'ACTIVE',
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: '',
     });
-  }, [editing]);
+    setFormOpen(true);
+  }
+
+  function startEdit(row: CampaignRow): void {
+    setEditing(row);
+    editForm.reset({
+      name: row.name,
+      description: row.description ?? '',
+      type: row.type,
+      value: Number(row.value),
+      status: row.status as 'ACTIVE' | 'INACTIVE',
+      startDate: row.startDate.slice(0, 10),
+      endDate: row.endDate ? row.endDate.slice(0, 10) : '',
+    });
+    setFormOpen(true);
+  }
 
   async function submitCreate(v: CreateForm): Promise<void> {
     try {
@@ -81,6 +106,7 @@ export function CampaignsManager({ permissions }: { permissions: string[] }): Re
           description: v.description || undefined,
         }),
       });
+      setFormOpen(false);
       createForm.reset({
         name: '',
         description: '',
@@ -107,6 +133,7 @@ export function CampaignsManager({ permissions }: { permissions: string[] }): Re
       };
       await adminFetch(`/campaigns/${editing.id}`, { method: 'PATCH', body: JSON.stringify(body) });
       setEditing(null);
+      setFormOpen(false);
       await load();
     } catch (e) {
       setError(adminMessageFromUnknownError(e, 'Kampanya güncellenemedi.'));
@@ -119,139 +146,139 @@ export function CampaignsManager({ permissions }: { permissions: string[] }): Re
       setError(null);
       await adminFetch(`/campaigns/${row.id}`, { method: 'DELETE' });
       await load();
+      if (selected?.id === row.id) setSelected(null);
     } catch (e) {
       setError(adminMessageFromUnknownError(e, 'Kampanya pasifleştirilemedi.'));
     }
   }
 
-  const columns = useMemo<ColumnDef<CampaignRow>[]>(
-    () => [
-      { header: 'Ad', accessorKey: 'name' },
-      { header: 'Tür', accessorKey: 'type' },
-      {
-        header: 'Değer',
-        cell: ({ row }) => row.original.value,
-      },
-      {
-        header: 'Durum',
-        cell: ({ row }) =>
-          row.original.status === 'ACTIVE'
-            ? 'Aktif'
-            : row.original.status === 'INACTIVE'
-              ? 'Pasif'
-              : row.original.status,
-      },
-      {
-        header: 'Başlangıç',
-        cell: ({ row }) => new Date(row.original.startDate).toLocaleDateString('tr-TR'),
-      },
-      {
-        header: 'Aksiyon',
-        cell: ({ row }) => (
-          <div className="flex flex-wrap gap-2">
-            {can(permissions, ['campaigns.update']) ? (
-              <button type="button" className="text-amber-800" onClick={() => setEditing(row.original)}>
-                Düzenle
-              </button>
-            ) : null}
-            {can(permissions, ['campaigns.delete']) ? (
-              <button type="button" className="text-red-700" onClick={() => void removeRow(row.original)}>
-                Pasifleştir
-              </button>
-            ) : null}
-          </div>
-        ),
-      },
-    ],
-    [permissions],
-  );
+  const activeRows = useMemo(() => rows.filter((r) => !r.deletedAt), [rows]);
+
+  const filteredRows = useMemo(() => {
+    return activeRows.filter((row) => {
+      const matchesSearch =
+        row.name.toLowerCase().includes(search.toLowerCase()) ||
+        (row.description && row.description.toLowerCase().includes(search.toLowerCase()));
+      const matchesStatus = statusFilter === 'ALL' || row.status === statusFilter;
+      const matchesType = typeFilter === 'ALL' || row.type === typeFilter;
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [activeRows, search, statusFilter, typeFilter]);
+
+  const activeForm = editing ? editForm : createForm;
+  const activeSubmit = editing
+    ? editForm.handleSubmit(submitEdit)
+    : createForm.handleSubmit(submitCreate);
 
   if (loading) return <LoadingState label="Kampanyalar yükleniyor…" />;
 
   return (
-    <PageSection title="Kampanyalar" description="Liste, oluşturma ve güncelleme backend kampanya kayıtlarıyla eşleşir.">
-      {error ? <ErrorState message={error} /> : null}
-      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <DataTable data={rows.filter((r) => !r.deletedAt)} columns={columns} />
-        <div className="space-y-6">
-          {can(permissions, ['campaigns.create']) ? (
-            <form className="space-y-3 rounded-3xl border bg-white p-5" onSubmit={createForm.handleSubmit(submitCreate)}>
-              <h2 className="font-semibold">Yeni kampanya</h2>
-              <Field label="Ad" error={createForm.formState.errors.name?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...createForm.register('name')} />
-              </Field>
-              <Field label="Açıklama" error={createForm.formState.errors.description?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...createForm.register('description')} />
-              </Field>
-              <Field label="Tür (ör. PERCENT, FIXED)" error={createForm.formState.errors.type?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...createForm.register('type')} />
-              </Field>
-              <Field label="Değer" error={createForm.formState.errors.value?.message}>
-                <input type="number" step="0.01" className="w-full rounded-2xl border px-3 py-2" {...createForm.register('value', { valueAsNumber: true })} />
-              </Field>
-              <Field label="Durum" error={createForm.formState.errors.status?.message}>
-                <select className="w-full rounded-2xl border px-3 py-2" {...createForm.register('status')}>
-                  <option value="ACTIVE">Aktif</option>
-                  <option value="INACTIVE">Pasif</option>
-                </select>
-              </Field>
-              <Field label="Başlangıç" error={createForm.formState.errors.startDate?.message}>
-                <input type="date" className="w-full rounded-2xl border px-3 py-2" {...createForm.register('startDate')} />
-              </Field>
-              <Field label="Bitiş (isteğe bağlı)" error={createForm.formState.errors.endDate?.message}>
-                <input type="date" className="w-full rounded-2xl border px-3 py-2" {...createForm.register('endDate')} />
-              </Field>
-              <button className="rounded-2xl bg-stone-900 px-4 py-2 text-white" type="submit">
-                Oluştur
-              </button>
-            </form>
-          ) : null}
-          {editing && can(permissions, ['campaigns.update']) ? (
-            <form className="space-y-3 rounded-3xl border bg-white p-5" onSubmit={editForm.handleSubmit(submitEdit)}>
-              <h2 className="font-semibold">Düzenle</h2>
-              <p className="text-sm text-stone-600">{editing.name}</p>
-              <Field label="Ad" error={editForm.formState.errors.name?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...editForm.register('name')} />
-              </Field>
-              <Field label="Açıklama" error={editForm.formState.errors.description?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...editForm.register('description')} />
-              </Field>
-              <Field label="Tür" error={editForm.formState.errors.type?.message}>
-                <input className="w-full rounded-2xl border px-3 py-2" {...editForm.register('type')} />
-              </Field>
-              <Field label="Değer" error={editForm.formState.errors.value?.message}>
-                <input type="number" step="0.01" className="w-full rounded-2xl border px-3 py-2" {...editForm.register('value', { valueAsNumber: true })} />
-              </Field>
-              <Field label="Durum" error={editForm.formState.errors.status?.message}>
-                <select className="w-full rounded-2xl border px-3 py-2" {...editForm.register('status')}>
-                  <option value="ACTIVE">Aktif</option>
-                  <option value="INACTIVE">Pasif</option>
-                </select>
-              </Field>
-              <Field label="Başlangıç" error={editForm.formState.errors.startDate?.message}>
-                <input type="date" className="w-full rounded-2xl border px-3 py-2" {...editForm.register('startDate')} />
-              </Field>
-              <Field label="Bitiş" error={editForm.formState.errors.endDate?.message}>
-                <input type="date" className="w-full rounded-2xl border px-3 py-2" {...editForm.register('endDate')} />
-              </Field>
-              <div className="flex gap-2">
-                <button className="rounded-2xl bg-stone-900 px-4 py-2 text-white" type="submit">
-                  Kaydet
-                </button>
-                <button
-                  type="button"
-                  className="rounded-2xl border px-4 py-2"
-                  onClick={() => {
-                    setEditing(null);
-                  }}
-                >
-                  İptal
-                </button>
-              </div>
-            </form>
-          ) : null}
+    <section className="space-y-stack-md">
+      <header>
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface">
+          Kampanyalar
+        </h1>
+        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-on-surface-variant">
+          İndirim kampanyalarını oluşturun, düzenleyin ve yönetin. Yüzde veya sabit tutar bazlı
+          indirimler tanımlayın.
+        </p>
+      </header>
+
+      <CampaignsStatsBar campaigns={activeRows} />
+
+      {error && (
+        <div className="rounded-2xl border border-error/20 bg-error-container/45 px-4 py-3 text-sm text-error font-medium">
+          {error}
         </div>
+      )}
+
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col gap-3 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery lg:flex-row lg:items-end lg:justify-between">
+        <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+            <span className="text-on-surface-variant">Ara</span>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3.5 top-2.5 text-[20px] text-outline">
+                search
+              </span>
+              <input
+                className={`${adminInputClass} pl-11`}
+                placeholder="Kampanya adı veya açıklamasına göre ara..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </label>
+          <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+            <span className="text-on-surface-variant">Tür</span>
+            <select
+              className={adminSelectClass}
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as 'ALL' | 'PERCENT' | 'FIXED')}
+            >
+              <option value="ALL">Hepsi</option>
+              <option value="PERCENT">Yüzde</option>
+              <option value="FIXED">Sabit</option>
+            </select>
+          </label>
+          <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+            <span className="text-on-surface-variant">Durum</span>
+            <select
+              className={adminSelectClass}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+            >
+              <option value="ALL">Hepsi</option>
+              <option value="ACTIVE">Aktif</option>
+              <option value="INACTIVE">Pasif</option>
+            </select>
+          </label>
+        </div>
+        {can(permissions, ['campaigns.create']) && (
+          <button
+            type="button"
+            className={`${adminPrimaryButtonClass} shrink-0`}
+            onClick={startAdd}
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            Yeni kampanya
+          </button>
+        )}
       </div>
-    </PageSection>
+
+      <CampaignsList
+        campaigns={filteredRows}
+        selectedId={selected?.id ?? null}
+        onSelect={setSelected}
+        onEdit={startEdit}
+        onRemove={removeRow}
+        canEdit={can(permissions, ['campaigns.update'])}
+        canDelete={can(permissions, ['campaigns.delete'])}
+      />
+
+      <CampaignDetailModal
+        campaign={selected}
+        permissions={permissions}
+        onEdit={() => {
+          if (selected) {
+            const row = selected;
+            setSelected(null);
+            startEdit(row);
+          }
+        }}
+        onClose={() => setSelected(null)}
+      />
+
+      <CampaignFormSheet
+        open={formOpen}
+        editing={editing}
+        form={activeForm}
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
+        onSubmit={activeSubmit}
+      />
+    </section>
   );
 }

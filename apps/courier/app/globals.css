@@ -2,5 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-body { @apply bg-amber-50 text-stone-900 antialiased; }
+:root {
+  color-scheme: light;
+}
+body {
+  @apply bg-stone-100 text-stone-900 antialiased;
+}

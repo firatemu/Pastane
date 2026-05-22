@@ -34,7 +34,20 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     init.body = isMultipartContentType(contentType) ? await request.arrayBuffer() : await request.text();
   }
 
-  const response = await fetch(target, init);
+  let response: Response;
+  try {
+    response = await fetch(target, init);
+  } catch {
+    const body = {
+      success: false as const,
+      message: 'Nest API bağlantısı kurulamadı. ADMIN_API_URL veya API_URL ortam değişkenlerini kontrol edin.',
+    };
+    return NextResponse.json(body, {
+      status: 503,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
   return new NextResponse(await response.arrayBuffer(), {
     status: response.status,
     headers: { 'Content-Type': response.headers.get('content-type') ?? 'application/json' },

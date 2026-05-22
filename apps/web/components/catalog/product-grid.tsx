@@ -1,7 +1,7 @@
 import type { Product } from '../../lib/catalog/types';
 import { ProductCard } from './product-card';
 
-export function ProductGrid({ products }: Readonly<{ products: Product[] }>): React.JSX.Element {
-  if (!products.length) return <div className="rounded-[2rem] border border-dashed border-amber-300 bg-white/70 p-8 text-center text-stone-600">Bu kategoride henüz aktif ürün bulunmuyor.</div>;
-  return <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div>;
+export function ProductGrid({ products, emptyLabel = 'Bu kategoride henüz aktif ürün bulunmuyor.' }: Readonly<{ products: Product[]; emptyLabel?: string }>): React.JSX.Element {
+  if (!products.length) return <div className="stitch-panel rounded-3xl p-8 text-center text-muted">{emptyLabel}</div>;
+  return <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div>;
 }

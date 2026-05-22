@@ -6,7 +6,6 @@ import { Queue } from 'bullmq';
 @Injectable()
 export class QueuesService implements OnModuleDestroy {
   readonly payments: Queue;
-  readonly stock: Queue;
   readonly notifications: Queue;
 
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {
@@ -16,7 +15,6 @@ export class QueuesService implements OnModuleDestroy {
       password: this.config.get('REDIS_PASSWORD'),
     };
     this.payments = new Queue('payments', { connection });
-    this.stock = new Queue('stock', { connection });
     this.notifications = new Queue('notifications', { connection });
   }
 
@@ -25,19 +23,6 @@ export class QueuesService implements OnModuleDestroy {
       await this.payments.add('payment-timeout', { paymentId }, {
         jobId: `payment-timeout:${paymentId}`,
         delay: Number(this.config.get('PAYMENT_TIMEOUT_MS', 10 * 60 * 1000)),
-        removeOnComplete: true,
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async scheduleStockTimeout(orderId: string): Promise<boolean> {
-    try {
-      await this.stock.add('stock-reservation-timeout', { orderId }, {
-        jobId: `stock-timeout:${orderId}`,
-        delay: Number(this.config.get('STOCK_RESERVATION_TIMEOUT_MS', 10 * 60 * 1000)),
         removeOnComplete: true,
       });
       return true;
@@ -61,6 +46,6 @@ export class QueuesService implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([this.payments.close(), this.stock.close(), this.notifications.close()]);
+    await Promise.all([this.payments.close(), this.notifications.close()]);
   }
 }

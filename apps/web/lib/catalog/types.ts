@@ -50,6 +50,8 @@ export interface Product {
   images: ProductImage[];
   allergens: ProductAllergen[];
   optionGroups: ProductOptionGroup[];
+  isPurchasable?: boolean;
+  availabilityReason?: 'UNPUBLISHED' | 'OUTSIDE_SALE_WINDOW' | 'INACTIVE' | null;
 }
 
 export interface PaginatedProducts {

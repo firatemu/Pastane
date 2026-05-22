@@ -6,7 +6,13 @@ import type { AuthResponse } from '../../../../lib/auth/types';
 import { adminFacingMessageFromApi } from '../../../../lib/messages/admin-facing-errors';
 
 export async function POST(request: Request): Promise<Response> {
-  const body = (await request.json()) as { phone?: string; password?: string };
+  let body: { phone?: string; password?: string };
+  try {
+    body = (await request.json()) as { phone?: string; password?: string };
+  } catch {
+    return NextResponse.json({ message: 'İstek gövdesi okunamadı.' }, { status: 400 });
+  }
+
   let response: Response;
   try {
     response = await fetch(`${getAdminApiBaseUrl()}/api/v1/auth/login`, {
@@ -18,7 +24,14 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return NextResponse.json({ message: 'Bağlantı kurulamadı. Lütfen tekrar deneyin.' }, { status: 503 });
   }
-  const payload = (await response.json()) as { data?: AuthResponse; error?: { message?: string; code?: string } };
+
+  let payload: { data?: AuthResponse; error?: { message?: string; code?: string } };
+  try {
+    const text = await response.text();
+    payload = text ? (JSON.parse(text) as typeof payload) : {};
+  } catch {
+    return NextResponse.json({ message: 'Kimlik doğrulama sunucusu beklenmedik bir yanıt döndürdü.' }, { status: 502 });
+  }
 
   if (!response.ok || !payload.data) {
     return NextResponse.json(

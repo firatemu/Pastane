@@ -69,4 +69,7 @@ export const adminUserUpdateSchema = z.object({
   lastName: z.string().min(1, requiredText).optional(),
   email: z.union([z.literal(''), z.string().email('Geçerli bir e-posta adresi girin.')]).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'BANNED']).optional(),
+  roleName: z
+    .enum(['ADMIN', 'ORDER_OPERATOR', 'PRODUCT_MANAGER', 'COURIER', 'CUSTOMER'])
+    .optional(),
 });

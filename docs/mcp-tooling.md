@@ -30,6 +30,9 @@ Cursor stdio servers that need `.env` or a working `npx` PATH use bash wrappers:
 
 After changing `.cursor/mcp.json` or `.env`, **restart Cursor** so MCP servers reload.
 
+### Filesystem MCP (`filesystem`)
+- Cursor treats the path `.` as illegal in some setups. This repo uses **`${workspaceFolder}`** in `mcp.json` so the server is rooted at the opened workspace.
+
 ### Troubleshooting
 - **git / postgres / stitch red:** Run `bash scripts/mcp/<name>.sh` from the repo root; fix the printed error (missing `.env` key, Postgres down, invalid API key).
 - **postgres connection refused:** `pnpm docker:dev:up` and confirm `nc -zv 127.0.0.1 5432`.

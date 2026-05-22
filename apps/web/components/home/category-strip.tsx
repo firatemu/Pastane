@@ -1,25 +1,21 @@
 import type { Category } from '../../lib/catalog/types';
+import { categoryGlyphs } from '../../lib/stitch-design';
 
 export function CategoryStrip({ categories }: Readonly<{ categories: Category[] }>): React.JSX.Element {
   return (
-    <section className="mt-10">
-      <div className="mb-4 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">Kategoriler</p>
-          <h2 className="mt-2 text-2xl font-semibold">Ne arıyorsun?</h2>
-        </div>
-      </div>
+    <section className="-mx-4 border-b border-outline-soft/20 bg-surface px-4 py-12 sm:-mx-6 sm:px-6 lg:-mx-12 lg:px-12">
       {categories.length ? (
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {categories.map((category) => (
-            <a className="shrink-0 rounded-3xl border border-amber-300 bg-white px-5 py-3 font-medium text-stone-800 hover:bg-amber-50" href={`/kategori/${category.slug}`} key={category.id}>
-              <span>{category.name}</span>
-              {category.children?.length ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">+{category.children.length}</span> : null}
-              {category.description ? <span className="mt-1 block max-w-48 truncate text-xs font-normal text-stone-500">{category.description}</span> : null}
+        <div className="mx-auto flex max-w-stitch-container gap-8 overflow-x-auto pb-2 md:justify-center md:gap-14">
+          {categories.slice(0, 6).map((category, index) => (
+            <a className="group flex shrink-0 flex-col items-center gap-3 text-center" href={`/kategori/${category.slug}`} key={category.id}>
+              <span className="flex h-20 w-20 items-center justify-center rounded-full border border-outline-soft/50 bg-surface-lowest text-lg font-bold uppercase text-primary shadow-soft transition group-hover:border-primary md:h-24 md:w-24">
+                {categoryGlyphs[index % categoryGlyphs.length]}
+              </span>
+              <span className="max-w-32 text-xs font-bold uppercase tracking-[0.16em] text-muted transition group-hover:text-primary">{category.name}</span>
             </a>
           ))}
         </div>
-      ) : <p className="rounded-[2rem] border border-dashed border-amber-300 bg-white/70 p-5 text-sm text-stone-600">Henüz aktif kategori yayınlanmadı.</p>}
+      ) : <p className="stitch-panel mx-auto max-w-stitch-container rounded-3xl p-5 text-sm text-muted">Henüz aktif kategori yayınlanmadı.</p>}
     </section>
   );
 }

@@ -17,6 +17,7 @@ class UpdateUserDto {
     lastName;
     email;
     status;
+    roleName;
 }
 exports.UpdateUserDto = UpdateUserDto;
 __decorate([
@@ -39,4 +40,9 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.UserStatus),
     __metadata("design:type", String)
 ], UpdateUserDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.RoleType),
+    __metadata("design:type", String)
+], UpdateUserDto.prototype, "roleName", void 0);
 //# sourceMappingURL=update-user.dto.js.map

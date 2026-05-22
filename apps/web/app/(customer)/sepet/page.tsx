@@ -1,2 +1,12 @@
 import { CartPageClient } from '../../../components/cart/cart-page-client';
-export default function CartPage(): React.JSX.Element { return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8"><CartPageClient /></main>; }
+export default function CartPage(): React.JSX.Element {
+  return (
+    <main className="stitch-container py-12">
+      <div className="mb-10">
+        <p className="stitch-eyebrow">Your Selection</p>
+        <h1 className="stitch-title mt-3">Sepetim</h1>
+      </div>
+      <CartPageClient />
+    </main>
+  );
+}

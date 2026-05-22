@@ -5,6 +5,7 @@ node_modules/
 # builds
 .next/
 .next-host/
+.next-docker/
 .next-ci/
 .next-ci-*/
 tmp/

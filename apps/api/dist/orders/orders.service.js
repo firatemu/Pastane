@@ -78,7 +78,8 @@ let OrdersService = class OrdersService {
             const setting = await tx.loyaltySetting.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
             const loyaltyDiscount = setting && dto.loyaltyPointsUsed ? money_util_1.money.round(money_util_1.money.multiply(setting.pointValue, dto.loyaltyPointsUsed)) : money_util_1.money.of(0);
             const grandTotal = money_util_1.money.round(money_util_1.money.subtract(money_util_1.money.add(subtotal, deliveryFee), loyaltyDiscount));
-            const order = await tx.order.create({ data: { orderNumber: (0, order_number_util_1.createOrderNumber)(), userId, deliveryType: dto.deliveryType, addressSnapshot, pickupStoreId: dto.pickupStoreId, scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined, subtotal, deliveryFee, loyaltyDiscount, loyaltyPointsUsed: dto.loyaltyPointsUsed ?? 0, grandTotal, note: dto.note, status: client_1.OrderStatus.PAYMENT_PENDING } });
+            const orderNumber = await this.nextOrderNumber(tx);
+            const order = await tx.order.create({ data: { orderNumber, userId, deliveryType: dto.deliveryType, addressSnapshot, pickupStoreId: dto.pickupStoreId, scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined, subtotal, deliveryFee, loyaltyDiscount, loyaltyPointsUsed: dto.loyaltyPointsUsed ?? 0, grandTotal, note: dto.note, status: client_1.OrderStatus.PAYMENT_PENDING } });
             const reservationItems = [];
             for (const item of priced) {
                 const oi = await tx.orderItem.create({ data: { orderId: order.id, productId: item.cartItem.productId, productNameSnapshot: item.cartItem.product.name, unitPriceSnapshot: item.unit, quantity: item.cartItem.quantity, customNote: item.cartItem.customNote, options: { create: item.cartItem.options.map(({ optionId, option }) => ({ optionId, optionNameSnapshot: option.name, priceModifierSnapshot: option.priceModifier })) } } });
@@ -145,6 +146,20 @@ let OrdersService = class OrdersService {
     async cancel(userId, id) { return this.prisma.$transaction(async (tx) => { const o = await tx.order.findFirst({ where: { id, userId, deletedAt: null } }); if (!o)
         throw new app_exception_1.AppException(error_codes_1.ERROR_CODES.ORDER_NOT_FOUND, 'Order not found', common_1.HttpStatus.NOT_FOUND); this.statuses.assert(o.status, client_1.OrderStatus.CANCELLED); await tx.stockReservation.updateMany({ where: { orderId: id, status: client_1.StockReservationStatus.ACTIVE }, data: { status: client_1.StockReservationStatus.RELEASED, releasedAt: new Date() } }); const order = await tx.order.update({ where: { id }, data: { status: client_1.OrderStatus.CANCELLED } }); await tx.orderStatusHistory.create({ data: { orderId: id, status: client_1.OrderStatus.CANCELLED } }); await this.audit.log({ actorId: userId, action: 'orders.cancel', entityType: 'Order', entityId: id, newValues: { status: client_1.OrderStatus.CANCELLED } }, tx); await this.notifications.createOrderStatusNotification(tx, o.userId, o.orderNumber, client_1.OrderStatus.CANCELLED); return order; }); }
     detailInclude() { return { user: { select: { id: true, firstName: true, lastName: true, phone: true, email: true } }, items: { include: { options: true, review: true, product: { select: { id: true, slug: true, name: true } } } }, statusHistory: true, payments: true, stockReservations: true, pickupStore: true, delivery: { include: { courier: { include: { user: { select: { id: true, firstName: true, lastName: true, phone: true } } } } } } }; }
+    async nextOrderNumber(tx, now = new Date()) {
+        const prefix = (0, order_number_util_1.orderNumberDatePrefix)(now);
+        const latest = await tx.order.findMany({
+            where: { orderNumber: { startsWith: prefix } },
+            orderBy: { orderNumber: 'desc' },
+            select: { orderNumber: true },
+            take: 100,
+        });
+        const maxSequence = latest.reduce((max, { orderNumber }) => {
+            const match = orderNumber.match(new RegExp(`^${prefix}(\\d{3})$`));
+            return match ? Math.max(max, Number(match[1])) : max;
+        }, 0);
+        return (0, order_number_util_1.createOrderNumber)(maxSequence + 1, now);
+    }
 };
 exports.OrdersService = OrdersService;
 exports.OrdersService = OrdersService = __decorate([

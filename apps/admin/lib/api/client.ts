@@ -42,16 +42,27 @@ export function getAdminApiBaseUrl(): string {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getAdminApiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getAdminApiBaseUrl()}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error('Nest API bağlantısı kurulamadı.');
+  }
 
-  const payload = (await response.json()) as { success?: boolean; data?: T; error?: { message?: string; code?: string } };
+  let payload: { success?: boolean; data?: T; error?: { message?: string; code?: string } };
+  try {
+    const text = await response.text();
+    payload = text ? (JSON.parse(text) as typeof payload) : {};
+  } catch {
+    throw new Error('Nest API beklenmedik bir yanıt döndürdü (JSON değil).');
+  }
   if (!response.ok || payload.success === false) {
     throw new Error(adminFacingMessageFromApi(response.status, payload.error, 'İstek tamamlanamadı.'));
   }

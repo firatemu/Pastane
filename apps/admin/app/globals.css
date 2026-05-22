@@ -2,6 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-body { @apply bg-stone-100 text-stone-900 antialiased; }
-* { @apply border-stone-200; }
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background-color: #fff8f5;
+  color: #211a14;
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.material-symbols-outlined[data-fill='true'] {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 80mm;
+    background: #fff;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .thermal-receipt-print,
+  .thermal-receipt-print * {
+    visibility: visible !important;
+  }
+
+  .thermal-receipt-print {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important;
+    min-height: auto !important;
+    padding: 4mm !important;
+    box-shadow: none !important;
+  }
+
+  .thermal-print-modal-chrome {
+    display: none !important;
+  }
+}

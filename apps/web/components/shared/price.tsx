@@ -1,8 +1,9 @@
-export function Price({ value, previous }: Readonly<{ value: string; previous?: string | null }>): React.JSX.Element {
+export function Price({ value, previous, size = 'default' }: Readonly<{ value: string; previous?: string | null; size?: 'default' | 'compact' }>): React.JSX.Element {
+  const valueClass = size === 'compact' ? 'font-display text-lg font-semibold text-primary' : 'font-display text-2xl font-semibold text-primary';
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-xl font-semibold text-stone-950">{formatTry(value)}</span>
-      {previous ? <span className="text-sm text-stone-400 line-through">{formatTry(previous)}</span> : null}
+      <span className={valueClass}>{formatTry(value)}</span>
+      {previous ? <span className={size === 'compact' ? 'text-xs text-muted/60 line-through' : 'text-sm text-muted/60 line-through'}>{formatTry(previous)}</span> : null}
     </div>
   );
 }

@@ -20,6 +20,7 @@
     "docker:dev:up": "docker compose --env-file .env -f docker/docker-compose.dev.yml up -d",
     "docker:dev:down": "docker compose --env-file .env -f docker/docker-compose.dev.yml down",
     "docker:dev:logs": "docker compose --env-file .env -f docker/docker-compose.dev.yml logs -f",
+    "docker:dev:rebuild-api": "bash scripts/docker-rebuild-api.sh",
     "docker:prod:up": "docker compose --env-file .env.prod -f docker/docker-compose.prod.yml up -d",
     "docker:prod:config": "bash -c 'cp -n .env.prod.example .env.prod 2>/dev/null || true; docker compose --env-file .env.prod -f docker/docker-compose.prod.yml config'",
     "docker:prod:build": "bash -c 'cp -n .env.prod.example .env.prod 2>/dev/null || true; docker compose --env-file .env.prod -f docker/docker-compose.prod.yml build'",
@@ -27,6 +28,7 @@
     "repo:status": "bash scripts/repo-status.sh",
     "verify:structure": "bash scripts/verify-structure.sh",
     "fix:next-perms": "bash scripts/fix-next-perms.sh",
+    "fix:frontend-cache": "bash scripts/fix-frontend-next-cache.sh",
     "prisma:generate": "pnpm --filter @pastane/database prisma:generate",
     "build:web": "pnpm prisma:generate && turbo run build --filter=@pastane/web",
     "build:web:clean": "bash scripts/web-build-clean.sh"

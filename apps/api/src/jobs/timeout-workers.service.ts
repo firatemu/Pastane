@@ -14,7 +14,6 @@ export class TimeoutWorkersService implements OnModuleInit, OnModuleDestroy {
     const connection = { host: this.config.get('REDIS_HOST', 'localhost'), port: Number(this.config.get('REDIS_PORT', 6379)), password: this.config.get('REDIS_PASSWORD') };
     this.workers = [
       new Worker('payments', (job) => this.payments.timeout(job.data.paymentId), { connection }),
-      new Worker('stock', (job) => this.payments.expireReservation(job.data.orderId), { connection }),
       new Worker('notifications', (job) => this.notifications.process(job.data.notificationId), { connection }),
     ];
     for (const worker of this.workers) worker.on('failed', (job, error) => this.logger.warn(`Queue job failed: ${job?.name ?? 'unknown'} ${error.message}`));

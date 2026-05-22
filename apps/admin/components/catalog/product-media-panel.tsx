@@ -4,9 +4,20 @@ import { useState } from 'react';
 import { adminFetch } from '../../lib/api/catalog';
 import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-errors';
 import type { Product } from '../../lib/catalog/types';
+import { adminInputClass, adminPrimaryButtonClass } from '../shared/admin-form-controls';
 import { ErrorState } from '../shared/async-state';
 
-export function ProductMediaPanel({ product, onChanged }: { product: Product; onChanged: () => Promise<void> }): React.JSX.Element {
+export function ProductMediaPanel({
+  product,
+  onChanged,
+  embedded = false,
+  readOnly = false,
+}: Readonly<{
+  product: Product;
+  onChanged: () => Promise<void>;
+  embedded?: boolean;
+  readOnly?: boolean;
+}>): React.JSX.Element {
   const [file, setFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
   const [primary, setPrimary] = useState(false);
@@ -41,33 +52,59 @@ export function ProductMediaPanel({ product, onChanged }: { product: Product; on
     }
   }
 
+  const shell = embedded ? 'space-y-4' : 'space-y-4 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-bakery';
+
   return (
-    <section className="space-y-4 rounded-3xl border bg-white p-5">
-      <h2 className="font-semibold">Ürün görselleri</h2>
+    <section className={shell}>
+      {embedded ? null : <h2 className="font-display text-lg font-semibold text-on-surface">Ürün görselleri</h2>}
       {error ? <ErrorState message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-        <button className="rounded-2xl bg-stone-900 px-4 py-2 text-white" onClick={upload}>
-          Yükle
-        </button>
-      </div>
-      <input className="w-full rounded-2xl border px-3 py-2" placeholder="Alt metin" value={altText} onChange={(event) => setAltText(event.target.value)} />
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={primary} onChange={(event) => setPrimary(event.target.checked)} /> Birincil görsel
-      </label>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {product.images.map((image) => (
-          <article className="rounded-2xl border p-3" key={image.id}>
-            <img className="h-28 w-full rounded-xl object-cover" src={image.url} alt={image.altText ?? product.name} />
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span>{image.isPrimary ? 'Birincil' : 'Görsel'}</span>
-              <button className="text-red-700" onClick={() => remove(image.id)}>
-                Sil
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+
+      {!readOnly ? (
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-on-surface">
+            <span className="text-on-surface-variant">Dosya seç</span>
+            <input
+              type="file"
+              accept="image/*"
+              className={`${adminInputClass} mt-1.5 w-full min-w-0`}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          <input
+            className={adminInputClass}
+            placeholder="Alt metin (opsiyonel)"
+            value={altText}
+            onChange={(event) => setAltText(event.target.value)}
+          />
+          <label className="flex items-center gap-2 text-sm text-on-surface">
+            <input type="checkbox" checked={primary} onChange={(event) => setPrimary(event.target.checked)} />
+            Birincil görsel
+          </label>
+          <button type="button" className={`${adminPrimaryButtonClass} w-full`} onClick={upload} disabled={!file}>
+            Yükle
+          </button>
+        </div>
+      ) : null}
+
+      {product.images.length === 0 ? (
+        <p className="text-sm text-on-surface-variant">Görsel eklenmemiş.</p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {product.images.map((image) => (
+            <article className="rounded-2xl border border-outline-variant/35 p-3" key={image.id}>
+              <img className="h-28 w-full rounded-xl object-cover" src={image.url} alt={image.altText ?? product.name} />
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <span className="text-on-surface-variant">{image.isPrimary ? 'Birincil' : 'Görsel'}</span>
+                {!readOnly ? (
+                  <button type="button" className="font-semibold text-error" onClick={() => remove(image.id)}>
+                    Sil
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

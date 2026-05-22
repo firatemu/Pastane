@@ -15,4 +15,5 @@ fi
 exec npx -y mcp-remote@latest \
   "https://stitch.googleapis.com/mcp" \
   --transport http-only \
+  --silent \
   --header "X-Goog-Api-Key:${STITCH_GOOG_API_KEY}"

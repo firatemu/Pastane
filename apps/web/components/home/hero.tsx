@@ -3,22 +3,26 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { HomeBanner } from '../../lib/catalog/types';
+import { stitchImages } from '../../lib/stitch-design';
 
 function StaticHeroFallback(): React.JSX.Element {
   return (
-    <section className="grid gap-8 rounded-[2rem] border border-amber-200/70 bg-white/80 p-6 shadow-[0_20px_80px_rgba(120,53,15,0.08)] sm:p-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-amber-700">Günlük taze üretim</p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-stone-950 sm:text-5xl">Pastalar, tatlılar ve fırından yeni çıkan lezzetler.</h1>
-        <p className="mt-5 max-w-2xl text-base leading-7 text-stone-600">
-          Her ürün sayfasında içerik, alerjenler ve özelleştirme seçenekleri açıkça görünür. Sepetten ödemeye tek akışla ilerleyebilir, sipariş durumunu hesabından takip edebilirsin.
+    <section className="relative -mx-4 flex min-h-[calc(100vh-88px)] items-center justify-center overflow-hidden sm:-mx-6 lg:-mx-12">
+      <img
+        alt="Koyu çikolatalı katmanlı pasta"
+        className="absolute inset-0 h-full w-full object-cover"
+        src={stitchImages.hero}
+      />
+      <div className="absolute inset-0 bg-black/35" />
+      <div className="relative z-10 mx-auto max-w-3xl px-6 text-center text-white">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-gold">Rosemary & Wild Honey</p>
+        <h1 className="mt-5 font-display text-5xl font-bold leading-tight sm:text-7xl">
+          Artisanal decadence, crafted for the discerning.
+        </h1>
+        <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/85">
+          Saf kakao, botanik infüzyonlar ve günlük üretimin sakin lüksüyle tasarlanmış pastane vitrini.
         </p>
-      </div>
-      <div className="rounded-[2rem] bg-gradient-to-br from-amber-100 via-rose-50 to-orange-100 p-6">
-        <div className="rounded-[1.5rem] border border-white/80 bg-white/75 p-5 shadow-sm">
-          <p className="text-sm font-medium text-stone-500">Vitrin sözü</p>
-          <p className="mt-3 text-2xl font-semibold text-stone-950">Sıcak, taze, net.</p>
-        </div>
+        <Link className="stitch-button mt-8 border border-white/20" href="#collections">Koleksiyonları keşfet</Link>
       </div>
     </section>
   );
@@ -28,7 +32,7 @@ function BannerMedia({ banner }: { banner: HomeBanner }): React.JSX.Element {
   const imageAlt = banner.title ? `${banner.title} — vitrin görseli` : 'Vitrin görseli';
   if (banner.mediaType === 'VIDEO') {
     return (
-      <div className="relative min-h-[220px] w-full overflow-hidden rounded-[2rem] sm:min-h-[280px]">
+      <div className="relative h-full w-full overflow-hidden">
         <video
           className="hidden h-full w-full object-cover sm:block"
           src={banner.desktopMediaUrl}
@@ -51,7 +55,7 @@ function BannerMedia({ banner }: { banner: HomeBanner }): React.JSX.Element {
     );
   }
   return (
-    <div className="relative min-h-[220px] w-full overflow-hidden rounded-[2rem] sm:min-h-[280px]">
+    <div className="relative h-full w-full overflow-hidden">
       <picture>
         <source media="(max-width: 639px)" srcSet={banner.mobileMediaUrl} />
         <img src={banner.desktopMediaUrl} alt={imageAlt} className="h-full w-full object-cover" />
@@ -85,7 +89,7 @@ function HomeHeroCarousel({ banners }: { banners: HomeBanner[] }): React.JSX.Ele
   };
   return (
     <section
-      className="overflow-hidden rounded-[2rem] border border-amber-200/70 bg-stone-950/5 shadow-[0_20px_80px_rgba(120,53,15,0.08)] outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+      className="relative -mx-4 min-h-[calc(100vh-88px)] overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:-mx-6 lg:-mx-12"
       role="region"
       aria-roledescription="carousel"
       aria-label="Vitrin bannerları"
@@ -95,38 +99,37 @@ function HomeHeroCarousel({ banners }: { banners: HomeBanner[] }): React.JSX.Ele
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         Slayt {index + 1} / {safe.length}: {current.title}
       </p>
-      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
-        <div className="order-2 flex flex-col justify-center p-6 sm:p-10 lg:order-1">
+      <div className="absolute inset-0 bg-black/35" />
+      <div className="relative z-10 flex min-h-[calc(100vh-88px)] items-center justify-center">
+        <div className="max-w-3xl px-6 text-center text-white">
           {safe.length > 1 ? (
-            <div className="mb-4 flex gap-2" aria-label="Banner seçimi">
+            <div className="mx-auto mb-6 flex max-w-xs gap-2" aria-label="Banner seçimi">
               {safe.map((b, i) => (
                 <button
                   key={b.id}
                   type="button"
                   aria-current={i === index ? 'true' : undefined}
                   aria-label={`Slayt ${i + 1} / ${safe.length}: ${b.title}`}
-                  className={`h-2 flex-1 rounded-full transition ${i === index ? 'bg-amber-600' : 'bg-stone-300'}`}
+                  className={`h-1.5 flex-1 rounded-full transition ${i === index ? 'bg-gold' : 'bg-white/40'}`}
                   onClick={() => setIndex(i)}
                 />
               ))}
             </div>
           ) : null}
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-amber-700">Günlük taze üretim</p>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl lg:text-5xl">{current.title}</h1>
-          {current.subtitle ? <p className="mt-3 text-lg text-amber-800">{current.subtitle}</p> : null}
-          {current.description ? <p className="mt-4 max-w-xl text-base leading-7 text-stone-600">{current.description}</p> : null}
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-gold">Günlük taze üretim</p>
+          <h1 className="mt-5 font-display text-5xl font-bold leading-tight sm:text-7xl">{current.title}</h1>
+          {current.subtitle ? <p className="mt-4 text-lg text-white/85">{current.subtitle}</p> : null}
+          {current.description ? <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-white/80">{current.description}</p> : null}
           {current.buttonText && current.buttonUrl ? (
             <Link
-              className="mt-6 inline-flex w-fit rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800"
+              className="stitch-button mt-8 border border-white/20"
               href={current.buttonUrl}
             >
               {current.buttonText}
             </Link>
           ) : null}
         </div>
-        <div className="order-1 lg:order-2">
-          <BannerMedia banner={current} />
-        </div>
+        <div className="absolute inset-0 -z-10"><BannerMedia banner={current} /></div>
       </div>
     </section>
   );

@@ -3,24 +3,37 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@pastane/tr-api-errors": ["../../packages/tr-api-errors/src/index.ts"]
+      "@pastane/tr-api-errors": [
+        "../../packages/tr-api-errors/src/index.ts"
+      ]
     },
     "jsx": "preserve",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": false,
     "incremental": true,
     "module": "esnext",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "isolatedModules": true
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    ".next-ci/types/**/*.ts",
     ".next/types/**/*.ts",
-    ".next-ci/types/**/*.ts"
+    "next-env.d.ts",
+    ".next-docker/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

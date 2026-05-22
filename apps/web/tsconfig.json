@@ -30,8 +30,9 @@
     "**/*.tsx",
     ".next-ci/types/**/*.ts",
     ".next/types/**/*.ts",
+    "/tmp/pastane-web-next/types/**/*.ts",
     "next-env.d.ts",
-    "/tmp/pastane-web-next/types/**/*.ts"
+    ".next-docker/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

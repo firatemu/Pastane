@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
   experimental: {
     middlewareClientMaxBodySize: '30mb',
   },
+  async redirects() {
+    /** Browsers still request /favicon.ico; serve the app icon at /icon.svg. */
+    return [{ source: '/favicon.ico', destination: '/icon.svg', permanent: false }];
+  },
 };
 
 export default nextConfig;

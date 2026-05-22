@@ -4,7 +4,7 @@ import { StorefrontHeader } from './storefront-header';
 
 export function StorefrontShell({ children, session }: Readonly<{ children: React.ReactNode; session?: CustomerSession }>): React.JSX.Element {
   return (
-    <div className="min-h-screen bg-[#fffaf3]">
+    <div className="min-h-screen bg-background pt-[88px] text-ink">
       {session ? <StorefrontHeader session={session} /> : <StorefrontHeader />}
       {children}
       <StorefrontFooter />

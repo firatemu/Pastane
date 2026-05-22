@@ -9,6 +9,7 @@ import { MetricCard } from '../dashboard/metric-card';
 import { PageSection } from '../shared/page-section';
 import { ErrorState, LoadingState } from '../shared/async-state';
 import { formatTry } from '../../lib/format/format-try';
+import { adminInputClass, adminPrimaryButtonClass } from '../shared/admin-form-controls';
 
 /** API `GET /reports/products/summary` payload inside `data`. */
 interface ProductsSummaryPayload {
@@ -47,7 +48,9 @@ export function ReportsSummary({ permissions }: { permissions: string[] }): Reac
       try {
         setError(null);
         const [salesResult, productsPayload] = await Promise.all([
-          can(permissions, ['reports.sales']) ? adminFetch<SalesSummary>('/reports/sales/summary') : Promise.resolve(null),
+          can(permissions, ['reports.sales'])
+            ? adminFetch<SalesSummary>('/reports/sales/summary')
+            : Promise.resolve(null),
           can(permissions, ['reports.products'])
             ? adminFetch<ProductsSummaryPayload>('/reports/products/summary')
             : Promise.resolve(null),
@@ -65,24 +68,27 @@ export function ReportsSummary({ permissions }: { permissions: string[] }): Reac
   }, [permissions]);
 
   return (
-    <PageSection title="Temel Raporlar" description="Tarih aralığı opsiyonel; boş bırakılırsa backend varsayılan aralığı kullanır.">
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border bg-white p-4">
-        <label className="flex flex-col text-sm">
-          <span className="text-stone-600">Başlangıç</span>
+    <PageSection
+      title="Temel Raporlar"
+      description="Satış hacmi ve ürün performansını tarih aralığına göre izleyin."
+    >
+      <div className="flex flex-col gap-3 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery sm:flex-row sm:items-end">
+        <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+          <span className="text-on-surface-variant">Başlangıç</span>
           <input
             type="date"
-            className="mt-1 rounded-2xl border px-3 py-2"
+            className={adminInputClass}
             value={startDate}
             onChange={(e) => {
               setStartDate(e.target.value);
             }}
           />
         </label>
-        <label className="flex flex-col text-sm">
-          <span className="text-stone-600">Bitiş</span>
+        <label className="block space-y-1.5 text-sm font-medium text-on-surface">
+          <span className="text-on-surface-variant">Bitiş</span>
           <input
             type="date"
-            className="mt-1 rounded-2xl border px-3 py-2"
+            className={adminInputClass}
             value={endDate}
             onChange={(e) => {
               setEndDate(e.target.value);
@@ -91,7 +97,7 @@ export function ReportsSummary({ permissions }: { permissions: string[] }): Reac
         </label>
         <button
           type="button"
-          className="rounded-2xl bg-stone-900 px-4 py-2 text-sm text-white"
+          className={adminPrimaryButtonClass}
           onClick={() => {
             setLoading(true);
             void (async () => {
@@ -99,7 +105,9 @@ export function ReportsSummary({ permissions }: { permissions: string[] }): Reac
                 setError(null);
                 const q = buildQuery();
                 const [salesResult, productsPayload] = await Promise.all([
-                  can(permissions, ['reports.sales']) ? adminFetch<SalesSummary>(`/reports/sales/summary${q}`) : Promise.resolve(null),
+                  can(permissions, ['reports.sales'])
+                    ? adminFetch<SalesSummary>(`/reports/sales/summary${q}`)
+                    : Promise.resolve(null),
                   can(permissions, ['reports.products'])
                     ? adminFetch<ProductsSummaryPayload>(`/reports/products/summary${q}`)
                     : Promise.resolve(null),
@@ -114,6 +122,7 @@ export function ReportsSummary({ permissions }: { permissions: string[] }): Reac
             })();
           }}
         >
+          <span className="material-symbols-outlined text-[20px]">filter_alt</span>
           Uygula
         </button>
       </div>
@@ -130,19 +139,33 @@ export function ReportsSummary({ permissions }: { permissions: string[] }): Reac
             </div>
           ) : null}
           {products.length ? (
-            <section className="mt-6 rounded-3xl border bg-white p-5">
-              <h2 className="font-semibold">En çok satan ürünler</h2>
+            <section className="mt-6 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-5 shadow-bakery">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[22px] text-chocolate">
+                  leaderboard
+                </span>
+                <h2 className="font-display text-xl font-semibold text-on-surface">
+                  En çok satan ürünler
+                </h2>
+              </div>
               <div className="mt-4 space-y-2">
                 {products.map((product) => (
-                  <div className="flex justify-between text-sm" key={`${product.productNameSnapshot}-${product.quantity}`}>
-                    <span>{product.productNameSnapshot}</span>
-                    <span>{product.quantity}</span>
+                  <div
+                    className="flex justify-between rounded-xl border border-outline-variant/35 bg-surface-container-low px-3 py-2 text-sm"
+                    key={`${product.productNameSnapshot}-${product.quantity}`}
+                  >
+                    <span className="font-medium text-on-surface">
+                      {product.productNameSnapshot}
+                    </span>
+                    <span className="font-semibold text-secondary">{product.quantity}</span>
                   </div>
                 ))}
               </div>
             </section>
           ) : (
-            <div className="mt-6 rounded-3xl border bg-white p-5 text-sm text-stone-600">Bu aralıkta raporlanacak ürün satışı yok.</div>
+            <div className="mt-6 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-5 text-sm text-on-surface-variant shadow-bakery">
+              Bu aralıkta raporlanacak ürün satışı yok.
+            </div>
           )}
         </>
       )}

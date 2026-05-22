@@ -1,31 +1,75 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Product } from '../../lib/catalog/types';
+import { stitchImages } from '../../lib/stitch-design';
+import { messageFromCustomerApiPayload, type ParsedCustomerApiPayload } from '../../lib/messages/customer-facing-errors';
 import { Price } from '../shared/price';
 
 export function ProductCard({ product }: Readonly<{ product: Product }>): React.JSX.Element {
   const image = product.images.find((item) => item.isPrimary) ?? product.images[0];
-  const activeOptionGroups = product.optionGroups.filter((group) => group.options.some((option) => option.isActive));
-  const allergenNames = product.allergens.map(({ allergen }) => allergen.name).slice(0, 2);
+  const soldOut = product.isPurchasable === false;
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+
+  async function addToCart(): Promise<void> {
+    setBusy(true);
+    setMessage(null);
+    const response = await fetch('/api/cart/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId: product.id, quantity: 1, optionIds: [] }),
+    });
+    if (response.status === 401) {
+      router.push('/giris?neden=oturum');
+      return;
+    }
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as ParsedCustomerApiPayload;
+      setMessage(messageFromCustomerApiPayload(response.status, payload, 'Ürün sepete eklenemedi.'));
+      setBusy(false);
+      return;
+    }
+    setMessage('Sepete eklendi.');
+    setBusy(false);
+    window.dispatchEvent(new Event('cart:changed'));
+    router.refresh();
+  }
+
   return (
-    <article className="overflow-hidden rounded-[1.75rem] border border-amber-200/70 bg-white shadow-sm">
-      <a href={`/urun/${product.slug}`}>
-        <div className="relative aspect-[4/3] bg-gradient-to-br from-amber-100 via-rose-50 to-orange-100">
-          {product.discountedPrice ? <span className="absolute left-4 top-4 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">İndirimli</span> : null}
-          {image ? <img alt={image.altText ?? product.name} className="h-full w-full object-cover" src={image.url} /> : <div className="flex h-full items-end p-5 text-sm text-stone-500">Ürün fotoğrafı yakında</div>}
-        </div>
-        <div className="space-y-3 p-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">{product.category.name}</p>
-            <h2 className="mt-2 text-xl font-semibold text-stone-950">{product.name}</h2>
-          </div>
-          <p className="line-clamp-2 min-h-10 text-sm leading-5 text-stone-600">{product.shortDescription ?? product.description ?? 'Taze hazırlanır.'}</p>
-          <div className="flex flex-wrap gap-2 text-xs text-stone-600">
-            {product.preparationMinutes ? <span className="rounded-full bg-stone-100 px-2.5 py-1">~{product.preparationMinutes} dk</span> : null}
-            {activeOptionGroups.length ? <span className="rounded-full bg-stone-100 px-2.5 py-1">Özelleştirilebilir</span> : null}
-            {allergenNames.length ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-900">Alerjen: {allergenNames.join(', ')}{product.allergens.length > allergenNames.length ? '…' : ''}</span> : null}
-          </div>
-          <Price value={product.discountedPrice ?? product.price} previous={product.discountedPrice ? product.price : null} />
+    <article className={`group flex h-full flex-col overflow-hidden rounded-3xl border border-outline-soft/50 bg-surface-lowest shadow-soft transition hover:-translate-y-1 hover:shadow-ambient ${soldOut ? 'opacity-80' : ''}`}>
+      <a className="block" href={`/urun/${product.slug}`}>
+        <div className="relative h-56 overflow-hidden bg-surface-low sm:h-64">
+          {soldOut ? <span className="absolute left-4 top-4 z-10 rounded-full bg-primary/90 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-white">Tükendi</span> : null}
+          {!soldOut && product.discountedPrice ? <span className="absolute left-4 top-4 z-10 rounded-full bg-honey px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-primary">İndirimli</span> : null}
+          <img
+            alt={image?.altText ?? product.name}
+            className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${soldOut ? 'grayscale-[0.35]' : ''}`}
+            src={image?.url ?? stitchImages.tart}
+          />
         </div>
       </a>
+      <div className="mt-auto space-y-2 p-4">
+        <a className="block" href={`/urun/${product.slug}`}>
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-secondary">{product.category.name}</p>
+          <h2 className="mt-1 font-display text-lg font-semibold leading-tight text-primary">{product.name}</h2>
+        </a>
+        <div className="flex items-end justify-between gap-3">
+          <Price value={product.discountedPrice ?? product.price} previous={product.discountedPrice ? product.price : null} size="compact" />
+          <button
+            aria-label={`${product.name} ürününü sepete ekle`}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-semibold leading-none text-white transition hover:bg-primary-container disabled:cursor-not-allowed disabled:bg-muted"
+            disabled={busy || soldOut}
+            onClick={() => void addToCart()}
+            type="button"
+          >
+            {busy ? '...' : '+'}
+          </button>
+        </div>
+        {message ? <p className={`text-xs ${message === 'Sepete eklendi.' ? 'text-primary' : 'text-error'}`}>{message}</p> : null}
+      </div>
     </article>
   );
 }

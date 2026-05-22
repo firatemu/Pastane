@@ -1,2 +1,56 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common'; import { PrismaService } from '../database/prisma.service'; import { AppException } from '../common/exceptions/app.exception'; import { normalizePagination } from '../common/utils/pagination.util'; import { ERROR_CODES } from '../common/constants/error-codes'; import type { CreateAllergenDto } from './dto/create-allergen.dto'; import type { UpdateAllergenDto } from './dto/update-allergen.dto';
-@Injectable() export class AllergensService { constructor(@Inject(PrismaService) private readonly prisma:PrismaService){} async list(page?:number,limit?:number){const p=normalizePagination(page,limit); const [items,total]=await this.prisma.$transaction([this.prisma.allergen.findMany({where:{deletedAt:null},orderBy:{name:'asc'},skip:(p.page-1)*p.limit,take:p.limit}),this.prisma.allergen.count({where:{deletedAt:null}})]); return {items,meta:{...p,total,totalPages:Math.ceil(total/p.limit)}}} async get(id:string){const x=await this.prisma.allergen.findFirst({where:{id,deletedAt:null}}); if(!x) throw new AppException(ERROR_CODES.ALLERGEN_NOT_FOUND,'Allergen not found',HttpStatus.NOT_FOUND); return x;} create(dto:CreateAllergenDto){return this.prisma.allergen.create({data:dto})} async update(id:string,dto:UpdateAllergenDto){await this.get(id); return this.prisma.allergen.update({where:{id},data:dto})} async remove(id:string){await this.get(id); return this.prisma.allergen.update({where:{id},data:{deletedAt:new Date()}})} }
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { ERROR_CODES } from '../common/constants/error-codes';
+import { AppException } from '../common/exceptions/app.exception';
+import { normalizePagination } from '../common/utils/pagination.util';
+import { PrismaService } from '../database/prisma.service';
+import type { CreateAllergenDto } from './dto/create-allergen.dto';
+import type { UpdateAllergenDto } from './dto/update-allergen.dto';
+
+@Injectable()
+export class AllergensService {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  async list(page?: number, limit?: number) {
+    const p = normalizePagination(page, limit);
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.allergen.findMany({
+        where: { deletedAt: null },
+        orderBy: { name: 'asc' },
+        skip: (p.page - 1) * p.limit,
+        take: p.limit,
+        include: {
+          _count: { select: { products: true } },
+        },
+      }),
+      this.prisma.allergen.count({ where: { deletedAt: null } }),
+    ]);
+
+    return {
+      items: items.map((i) => ({ ...i, productCount: i._count.products })),
+      meta: { ...p, total, totalPages: Math.ceil(total / p.limit) },
+    };
+  }
+
+  async get(id: string) {
+    const x = await this.prisma.allergen.findFirst({ where: { id, deletedAt: null } });
+    if (!x) {
+      throw new AppException(ERROR_CODES.ALLERGEN_NOT_FOUND, 'Allergen not found', HttpStatus.NOT_FOUND);
+    }
+    return x;
+  }
+
+  create(dto: CreateAllergenDto) {
+    return this.prisma.allergen.create({ data: dto });
+  }
+
+  async update(id: string, dto: UpdateAllergenDto) {
+    await this.get(id);
+    return this.prisma.allergen.update({ where: { id }, data: dto });
+  }
+
+  async remove(id: string) {
+    await this.get(id);
+    return this.prisma.allergen.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+}

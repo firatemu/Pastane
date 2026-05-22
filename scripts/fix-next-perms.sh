@@ -7,10 +7,12 @@ if ! command -v sudo >/dev/null 2>&1; then
   exit 1
 fi
 for app in admin web courier; do
-  dir="$ROOT/apps/$app/.next"
-  if [[ -d "$dir" ]]; then
-    echo "chown $(id -u):$(id -g) $dir"
-    sudo chown -R "$(id -u):$(id -g)" "$dir"
-  fi
+  for dir in .next .next-docker .next-host .next-ci; do
+    path="$ROOT/apps/$app/$dir"
+    if [[ -d "$path" ]]; then
+      echo "chown $(id -u):$(id -g) $path"
+      sudo chown -R "$(id -u):$(id -g)" "$path"
+    fi
+  done
 done
-echo "Done. Or remove caches: rm -rf apps/*/.next"
+echo "Done. To fully reset dev CSS/chunks: pnpm fix:frontend-cache"

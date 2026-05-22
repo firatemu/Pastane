@@ -1,15 +1,170 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
+  --font-display: 'Playfair Display';
+  --font-body: 'DM Sans';
 }
 
 body {
-  @apply bg-[#fffaf3] text-stone-900 antialiased;
+  background: #faf9f6;
+  color: #1a1c1a;
+  font-family: var(--font-body), Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
-  @apply transition-colors;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+@layer components {
+  .stitch-container {
+    width: 100%;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .stitch-eyebrow {
+    color: #735c00;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .stitch-title {
+    color: #334537;
+    font-family: var(--font-display), Georgia, serif;
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .stitch-panel {
+    background: #ffffff;
+    border: 1px solid rgb(195 200 193 / 0.4);
+    box-shadow: 0 16px 48px rgba(26, 28, 26, 0.06);
+  }
+
+  .stitch-button {
+    align-items: center;
+    background: #334537;
+    border-radius: 9999px;
+    color: #ffffff;
+    display: inline-flex;
+    font-size: 0.875rem;
+    font-weight: 700;
+    justify-content: center;
+    letter-spacing: 0.14em;
+    padding: 0.75rem 1.75rem;
+    text-transform: uppercase;
+    transition: background-color 150ms ease;
+  }
+
+  .stitch-button:hover {
+    background: #4a5d4e;
+  }
+
+  .stitch-input {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid #c3c8c1;
+    color: #1a1c1a;
+    min-height: 3rem;
+    outline: none;
+    padding: 0.75rem 0;
+    transition: border-color 150ms ease;
+    width: 100%;
+  }
+
+  .stitch-input::placeholder {
+    color: rgb(67 72 67 / 0.6);
+  }
+
+  .stitch-input:focus {
+    border-color: #334537;
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .stitch-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .stitch-title {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .stitch-container {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+@layer utilities {
+  .font-display { font-family: var(--font-display), Georgia, serif; }
+  .font-body { font-family: var(--font-body), Arial, sans-serif; }
+  .text-ink { color: #1a1c1a; }
+  .text-muted { color: #434843; }
+  .text-primary { color: #334537; }
+  .text-secondary { color: #735c00; }
+  .text-gold { color: #e9c349; }
+  .text-honey { color: #fed65b; }
+  .text-error { color: #ba1a1a; }
+  .bg-background { background-color: #faf9f6; }
+  .bg-surface { background-color: #faf9f6; }
+  .bg-surface-lowest { background-color: #ffffff; }
+  .bg-surface-low { background-color: #f4f3f1; }
+  .bg-surface-container { background-color: #efeeeb; }
+  .bg-surface-high { background-color: #e9e8e5; }
+  .bg-surface-highest { background-color: #e3e2e0; }
+  .bg-primary { background-color: #334537; }
+  .bg-primary\/45 { background-color: rgb(51 69 55 / 0.45); }
+  .bg-primary\/50 { background-color: rgb(51 69 55 / 0.5); }
+  .bg-primary\/85 { background-color: rgb(51 69 55 / 0.85); }
+  .bg-primary\/90 { background-color: rgb(51 69 55 / 0.9); }
+  .bg-primary-container { background-color: #4a5d4e; }
+  .bg-primary-fixed { background-color: #d3e8d5; }
+  .bg-surface-container\/95 { background-color: rgb(239 238 235 / 0.95); }
+  .bg-honey { background-color: #fed65b; }
+  .bg-honey\/20 { background-color: rgb(254 214 91 / 0.2); }
+  .bg-honey\/40 { background-color: rgb(254 214 91 / 0.4); }
+  .bg-gold { background-color: #e9c349; }
+  .border-outline-soft { border-color: #c3c8c1; }
+  .border-outline-soft\/20 { border-color: rgb(195 200 193 / 0.2); }
+  .border-outline-soft\/30 { border-color: rgb(195 200 193 / 0.3); }
+  .border-outline-soft\/40 { border-color: rgb(195 200 193 / 0.4); }
+  .border-outline-soft\/50 { border-color: rgb(195 200 193 / 0.5); }
+  .border-outline-soft\/60 { border-color: rgb(195 200 193 / 0.6); }
+  .border-outline-soft\/70 { border-color: rgb(195 200 193 / 0.7); }
+  .border-primary { border-color: #334537; }
+  .border-honey { border-color: #fed65b; }
+  .border-honey\/60 { border-color: rgb(254 214 91 / 0.6); }
+  .border-gold { border-color: #e9c349; }
+  .text-muted\/50 { color: rgb(67 72 67 / 0.5); }
+  .text-muted\/60 { color: rgb(67 72 67 / 0.6); }
+  .text-muted\/80 { color: rgb(67 72 67 / 0.8); }
+  .shadow-soft { box-shadow: 0 16px 48px rgba(26, 28, 26, 0.06); }
+  .shadow-ambient { box-shadow: 0 28px 80px rgba(26, 28, 26, 0.08); }
+  .max-w-stitch-container { max-width: 1200px; }
+  .hover\:text-primary:hover { color: #334537; }
+  .hover\:text-secondary:hover { color: #735c00; }
+  .hover\:text-white:hover { color: #ffffff; }
+  .hover\:bg-primary-container:hover { background-color: #4a5d4e; }
+  .hover\:bg-surface-low:hover { background-color: #f4f3f1; }
+  .hover\:bg-surface-lowest:hover { background-color: #ffffff; }
+  .hover\:bg-gold:hover { background-color: #e9c349; }
+  .hover\:border-primary:hover { border-color: #334537; }
 }

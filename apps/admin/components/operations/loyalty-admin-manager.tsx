@@ -12,6 +12,11 @@ import type { LoyaltySettingRow } from '../../lib/operations/types';
 import { PageSection } from '../shared/page-section';
 import { Field } from '../shared/form-field';
 import { ErrorState, LoadingState } from '../shared/async-state';
+import {
+  adminInputClass,
+  adminPrimaryButtonClass,
+  adminTextareaClass,
+} from '../shared/admin-form-controls';
 
 type SettingsForm = z.infer<typeof loyaltySettingsFormSchema>;
 type AdjustForm = z.infer<typeof loyaltyAdjustSchema>;
@@ -114,65 +119,178 @@ export function LoyaltyAdminManager({ permissions }: { permissions: string[] }):
 
   if (loading) return <LoadingState label="Sadakat yükleniyor…" />;
 
+  const latest = rows.find((r) => r.isActive) ?? rows[0];
+  const canManage = can(permissions, ['loyalty.manageSettings']);
+
   return (
-    <PageSection title="Sadakat programı" description="Yeni ayar kaydı oluşturma ve manuel puan düzeltmesi.">
+    <PageSection
+      title="Sadakat programı"
+      description="Puan kazanım oranını, puan değerini ve manuel düzeltme işlemlerini yönetin."
+    >
       {error ? <ErrorState message={error} /> : null}
-      {info ? <p className="mb-4 text-sm text-green-800">{info}</p> : null}
+      {info ? (
+        <div className="rounded-xl border border-tertiary/25 bg-tertiary-container px-4 py-3 text-sm font-medium text-tertiary">
+          {info}
+        </div>
+      ) : null}
 
-      <div className="mb-6 rounded-3xl border bg-white p-5">
-        <h2 className="font-semibold">Mevcut ayar geçmişi</h2>
-        <ul className="mt-3 space-y-2 text-sm text-stone-700">
-          {rows.map((r) => (
-            <li key={r.id}>
-              {new Date(r.createdAt).toLocaleString('tr-TR')} — kazanç: {r.earnRate}, değer: {r.pointValue}, min. kullanım: {r.minimumRedeem},{' '}
-              {r.isActive ? 'aktif' : 'pasif'}
-            </li>
-          ))}
-        </ul>
+      <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
+        <div className="space-y-stack-md">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryTile icon="card_membership" label="Ayar kaydı" value={rows.length} />
+            <SummaryTile icon="percent" label="Kazanç oranı" value={latest?.earnRate ?? '0'} />
+            <SummaryTile icon="payments" label="Puan değeri" value={latest?.pointValue ?? '0'} />
+            <SummaryTile
+              icon="verified"
+              label="Durum"
+              value={latest?.isActive ? 'Aktif' : 'Pasif'}
+            />
+          </div>
+
+          <div className="rounded-card border border-outline-variant/35 bg-surface-container-lowest p-5 shadow-bakery">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[22px] text-chocolate">history</span>
+              <h2 className="font-display text-xl font-semibold text-on-surface">Ayar geçmişi</h2>
+            </div>
+            <div className="space-y-2">
+              {rows.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex flex-col gap-2 rounded-xl border border-outline-variant/35 bg-surface-container-low px-3 py-3 text-sm text-on-surface-variant sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span>{new Date(r.createdAt).toLocaleString('tr-TR')}</span>
+                  <span>
+                    Kazanç {r.earnRate} · Değer {r.pointValue} · Min. {r.minimumRedeem}
+                  </span>
+                  <span className="w-fit rounded-full bg-surface-container-lowest px-2.5 py-0.5 text-xs font-semibold text-secondary">
+                    {r.isActive ? 'Aktif' : 'Pasif'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {canManage ? (
+          <div className="space-y-5">
+            <form
+              className="space-y-4 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-bakery"
+              onSubmit={settingsForm.handleSubmit(saveSettings)}
+            >
+              <div className="flex items-center gap-2 border-b border-outline-variant/35 pb-3">
+                <span className="material-symbols-outlined text-[22px] text-chocolate">
+                  card_membership
+                </span>
+                <h2 className="font-display text-xl font-semibold text-on-surface">
+                  Yeni ayar kaydı
+                </h2>
+              </div>
+              <Field label="Kazanç oranı" error={settingsForm.formState.errors.earnRate?.message}>
+                <input
+                  type="number"
+                  step="0.0001"
+                  className={adminInputClass}
+                  {...settingsForm.register('earnRate', { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                label="Puan birim değeri"
+                error={settingsForm.formState.errors.pointValue?.message}
+              >
+                <input
+                  type="number"
+                  step="0.01"
+                  className={adminInputClass}
+                  {...settingsForm.register('pointValue', { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                label="Minimum kullanım puanı"
+                error={settingsForm.formState.errors.minimumRedeem?.message}
+              >
+                <input
+                  type="number"
+                  className={adminInputClass}
+                  {...settingsForm.register('minimumRedeem', { valueAsNumber: true })}
+                />
+              </Field>
+              <label className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/60 bg-surface-container-lowest p-3 text-sm font-semibold text-on-surface">
+                Aktif olarak kaydet
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 rounded border-outline-variant/60 text-chocolate focus:ring-secondary/50"
+                  {...settingsForm.register('isActive')}
+                />
+              </label>
+              <button className={`${adminPrimaryButtonClass} w-full`} type="submit">
+                <span className="material-symbols-outlined text-[20px]">save</span>
+                Ayarı kaydet
+              </button>
+            </form>
+
+            <form
+              className="space-y-4 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-6 shadow-bakery"
+              onSubmit={adjustForm.handleSubmit(adjust)}
+            >
+              <div className="flex items-center gap-2 border-b border-outline-variant/35 pb-3">
+                <span className="material-symbols-outlined text-[22px] text-chocolate">
+                  add_card
+                </span>
+                <h2 className="font-display text-xl font-semibold text-on-surface">Manuel puan</h2>
+              </div>
+              <Field label="Puan (+)" error={adjustForm.formState.errors.points?.message}>
+                <input
+                  type="number"
+                  className={adminInputClass}
+                  {...adjustForm.register('points', { valueAsNumber: true })}
+                />
+              </Field>
+              <Field label="Kullanıcı UUID" error={adjustForm.formState.errors.userId?.message}>
+                <input
+                  className={`${adminInputClass} font-mono text-sm`}
+                  {...adjustForm.register('userId')}
+                />
+              </Field>
+              <Field
+                label="QR kod (alternatif)"
+                error={adjustForm.formState.errors.qrCode?.message}
+              >
+                <input
+                  className={`${adminInputClass} font-mono text-sm`}
+                  {...adjustForm.register('qrCode')}
+                />
+              </Field>
+              <Field label="Not" error={adjustForm.formState.errors.note?.message}>
+                <textarea
+                  className={adminTextareaClass}
+                  rows={3}
+                  {...adjustForm.register('note')}
+                />
+              </Field>
+              <button className={`${adminPrimaryButtonClass} w-full`} type="submit">
+                <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                Düzeltmeyi uygula
+              </button>
+            </form>
+          </div>
+        ) : null}
       </div>
-
-      {can(permissions, ['loyalty.manageSettings']) ? (
-        <form className="mb-8 space-y-4 rounded-3xl border bg-white p-5" onSubmit={settingsForm.handleSubmit(saveSettings)}>
-          <h2 className="font-semibold">Yeni ayar kaydı</h2>
-          <Field label="Kazanç oranı (sipariş tutarı × oran)" error={settingsForm.formState.errors.earnRate?.message}>
-            <input type="number" step="0.0001" className="w-full rounded-2xl border px-3 py-2" {...settingsForm.register('earnRate', { valueAsNumber: true })} />
-          </Field>
-          <Field label="Puan birim değeri" error={settingsForm.formState.errors.pointValue?.message}>
-            <input type="number" step="0.01" className="w-full rounded-2xl border px-3 py-2" {...settingsForm.register('pointValue', { valueAsNumber: true })} />
-          </Field>
-          <Field label="Minimum kullanım puanı" error={settingsForm.formState.errors.minimumRedeem?.message}>
-            <input type="number" className="w-full rounded-2xl border px-3 py-2" {...settingsForm.register('minimumRedeem', { valueAsNumber: true })} />
-          </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...settingsForm.register('isActive')} />
-            Aktif olarak kaydet
-          </label>
-          <button className="rounded-2xl bg-stone-900 px-4 py-2 text-white" type="submit">
-            Ayarı kaydet
-          </button>
-        </form>
-      ) : null}
-
-      {can(permissions, ['loyalty.manageSettings']) ? (
-        <form className="space-y-4 rounded-3xl border bg-white p-5" onSubmit={adjustForm.handleSubmit(adjust)}>
-          <h2 className="font-semibold">Manuel puan ekleme</h2>
-          <Field label="Puan (+)" error={adjustForm.formState.errors.points?.message}>
-            <input type="number" className="w-full rounded-2xl border px-3 py-2" {...adjustForm.register('points', { valueAsNumber: true })} />
-          </Field>
-          <Field label="Kullanıcı UUID" error={adjustForm.formState.errors.userId?.message}>
-            <input className="w-full rounded-2xl border px-3 py-2" {...adjustForm.register('userId')} />
-          </Field>
-          <Field label="QR kod (alternatif)" error={adjustForm.formState.errors.qrCode?.message}>
-            <input className="w-full rounded-2xl border px-3 py-2 font-mono text-sm" {...adjustForm.register('qrCode')} />
-          </Field>
-          <Field label="Not" error={adjustForm.formState.errors.note?.message}>
-            <input className="w-full rounded-2xl border px-3 py-2" {...adjustForm.register('note')} />
-          </Field>
-          <button className="rounded-2xl bg-stone-900 px-4 py-2 text-white" type="submit">
-            Düzeltmeyi uygula
-          </button>
-        </form>
-      ) : null}
     </PageSection>
+  );
+}
+
+function SummaryTile({
+  icon,
+  label,
+  value,
+}: Readonly<{ icon: string; label: string; value: string | number }>): React.JSX.Element {
+  return (
+    <div className="rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-on-surface-variant">{label}</span>
+        <span className="material-symbols-outlined text-[22px] text-secondary">{icon}</span>
+      </div>
+      <p className="mt-3 text-2xl font-semibold tracking-tight text-on-surface">{value}</p>
+    </div>
   );
 }

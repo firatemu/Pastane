@@ -21,7 +21,7 @@ export function productJsonLd(product: Product, reviews: PaginatedReviews) {
       '@type': 'Offer',
       priceCurrency: 'TRY',
       price: product.discountedPrice ?? product.price,
-      availability: 'https://schema.org/InStock',
+      availability: product.isPurchasable === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
       url: absoluteUrl(`/urun/${product.slug}`),
     },
     ...(reviews.meta.total

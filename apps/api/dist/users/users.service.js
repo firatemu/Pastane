@@ -26,7 +26,12 @@ let UsersService = class UsersService {
     list() { return this.prisma.user.findMany({ where: { deletedAt: null }, select: { id: true, firstName: true, lastName: true, phone: true, email: true, status: true, role: { select: { name: true } }, isPhoneVerified: true } }); }
     async getById(id) { const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, firstName: true, lastName: true, phone: true, email: true, status: true, role: { select: { name: true } }, isPhoneVerified: true } }); if (!user)
         throw new app_exception_1.AppException(error_codes_1.ERROR_CODES.USER_NOT_FOUND, 'User not found', common_1.HttpStatus.NOT_FOUND); return user; }
-    async update(id, dto) { await this.getById(id); return this.prisma.user.update({ where: { id }, data: dto, select: { id: true, firstName: true, lastName: true, phone: true, email: true, status: true, isPhoneVerified: true } }); }
+    async update(id, dto) {
+        await this.getById(id);
+        const { roleName, ...userData } = dto;
+        const data = { ...userData, ...(roleName ? { role: { connect: { name: roleName } } } : {}) };
+        return this.prisma.user.update({ where: { id }, data, select: { id: true, firstName: true, lastName: true, phone: true, email: true, status: true, isPhoneVerified: true, role: { select: { name: true } } } });
+    }
     async updateOwn(id, dto) { await this.getById(id); return this.prisma.user.update({ where: { id }, data: dto, select: { id: true, firstName: true, lastName: true, phone: true, email: true, status: true, isPhoneVerified: true, role: { select: { name: true } } } }); }
     async changeOwnPassword(id, dto) { const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null } }); if (!user)
         throw new app_exception_1.AppException(error_codes_1.ERROR_CODES.USER_NOT_FOUND, 'User not found', common_1.HttpStatus.NOT_FOUND); if (!(await (0, bcryptjs_1.compare)(dto.currentPassword, user.passwordHash)))
