@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+# Credentials: Prefer Repository Secrets. Values also read from Actions > Variables (`vars`) if Secrets empty.
+# If you use a GitHub *Environment*-scoped Variables/Secrets, add `environment: <name>` to the job below.
+
 concurrency:
   group: production-deploy
   cancel-in-progress: false
@@ -17,10 +20,10 @@ jobs:
       - name: Verify deploy secrets
         env:
           GITHUB_REPO: ${{ github.repository }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
         run: |
           set -eo pipefail
           missing=()
@@ -28,18 +31,19 @@ jobs:
           [[ -z "${VPS_USER// }" ]] && missing+=(VPS_USER)
           [[ -z "${VPS_SSH_KEY// }" ]] && missing+=(VPS_SSH_KEY)
           if [[ ${#missing[@]} -gt 0 ]]; then
-            echo "::notice::Open: https://github.com/${GITHUB_REPO}/settings/secrets/actions"
-            echo "::error::Missing Actions secrets: ${missing[*]} (exact names VPS_HOST VPS_USER VPS_SSH_KEY)."
-            printf '%s\n' "Create each via New repository secret. VPS_SSH_KEY = full private key PEM for deploy@VPS_HOST."
-            printf '%s\n' "Optional: VPS_PORT (else 22). Forks need their own secrets. See docs/GITHUB_CI_SSH.md"
+            echo "::notice::Secrets: https://github.com/${GITHUB_REPO}/settings/secrets/actions"
+            echo "::notice::Variables: https://github.com/${GITHUB_REPO}/settings/variables/actions"
+            echo "::error::Missing VPS_* config: ${missing[*]}. Set Repository Secrets or Actions Variables named exactly VPS_HOST VPS_USER VPS_SSH_KEY."
+            printf '%s\n' "SSH private key MUST be stored as a Secret (not Variables). Optional: VPS_PORT (default 22)."
+            printf '%s\n' "Docs: docs/GITHUB_CI_SSH.md"
             exit 1
           fi
 
       - name: Prepare SSH
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
         run: |
           set -euo pipefail
           VPS_PORT="${VPS_PORT:-22}"
@@ -51,9 +55,9 @@ jobs:
 
       - name: Run deploy script on VPS
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
         run: |
           set -euo pipefail
           VPS_PORT="${VPS_PORT:-22}"

@@ -4,35 +4,46 @@ Workflow: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
 
 Trigger: push to `main`, or manual **workflow_dispatch**.
 
-## GitHub’a secret ekleme (CI “Missing … secrets” ise)
+## Secrets ve Actions Variables (`vars`)
 
-Workflow **Secrets** bekler; repoda eklenmezse job burada çıkar:
+Workflow **`secrets.NAME` sonra `vars.NAME`** sırasıyla doldurur (Repository **Secrets** veya **Variables** ile aynı isimleri kullanın).
 
-1. Aç: **github.com › [organizasyon/]Pastane › Settings › Secrets and variables › Actions › Repository secrets**  
-   Direkt link şablonu: `https://github.com/YOUR_OWNER/Pastane/settings/secrets/actions`
-2. Fork kullanıyorsanız **`YOUR_OWNER`** sizin **fork’unuzdur** — secret’lar üst repodan aktarılmaz.
-3. **New repository secret** ile şu **isimleri birebir** oluşturun (büyük/küçük harf dahil):
+- **Secrets:** `https://github.com/YOUR_OWNER/Pastane/settings/secrets/actions`
+- **Variables:** `https://github.com/YOUR_OWNER/Pastane/settings/variables/actions`
 
-| Name | Typical value |
-|------|----------------|
-| `VPS_HOST` | Sunucu IP (örn. `76.13.14.43`) |
-| `VPS_USER` | Örn. `deploy` |
-| `VPS_SSH_KEY` | `deploy` ile giriş yapan anahtarın **private PEM** içeriği (BEGIN/END dahil blok) |
+`VPS_HOST`, `VPS_USER`, isteğe bağlı `VPS_PORT` Variables’ta saklanabilir.
 
-4. Opsiyonel: **`VPS_PORT`** = `22`; yoksa workflow **22** kullanır.
-5. **Variables** ile karıştırmayın: private key için **Secrets** kullanın (`VPS_SSH_KEY`).
+**`VPS_SSH_KEY` mutlaka Secret olmalı** — Variable olarak private key yazmayın; Actions’ta düzgün maskelenmez ve daha kolay sızdırılabilir.
 
-## Required secrets
+**GitHub Environment** (Deployments → Environment) kullanıyorsanız değişkenler/secrets genelde **o ortama** bağlıdır: `deploy` job’unun altına **`environment: ortam-adınız`** satırını ekleyin (`deploy.yml`). Aksi halde workflow bu değerleri görmez.
 
-| Secret | Example | Notes |
-|--------|---------|--------|
-| `VPS_HOST` | `76.13.14.43` | Public IPv4 of the VPS |
-| `VPS_USER` | `deploy` | Non-root UNIX user that can run `docker` commands |
-| `VPS_PORT` | `22` | SSH listener port (**optional**: if omitted in GitHub, the workflow uses port `22`) |
-| `VPS_SSH_KEY` | *(full PEM private key)* | Key for `deploy@VPS`; **never** committed to Git |
+### Private anahtar paylaşıldıysa (sohbet, ticket, yanlış alan)
 
-Secrets must live under **Repository → Settings → Secrets and variables → Actions** (exact names above). Empty secrets produce errors like **`Bad port ''`** or **`Verify deploy secrets`** failing in CI.
+1. Sunucuda eşlenen **public key** satırını `deploy` için `authorized_keys` içinden kaldırın.
+2. Yeni anahtar çifti oluşturun; yalnızca `.pub` sunucuya eklenir.
+3. GitHub’da **`VPS_SSH_KEY` repository secret’ını** yeni private key ile güncelleyin; Variable’daki anahtarı **silin**.
 
+## İsimler (büyük/küçük harf dahil)
+
+| İsim          | Zorunlu | Not                                      |
+|---------------|---------|------------------------------------------|
+| `VPS_HOST`    | Evet    | Örn. `76.13.14.43`                       |
+| `VPS_USER`    | Evet    | Örn. `deploy`                            |
+| `VPS_SSH_KEY` | Evet    | Private key blok (**Secret**)            |
+| `VPS_PORT`    | Hayır   | Yoksa workflow **22** kullanır           |
+
+Fork’ta iş akışı çalışıyorsa Secrets/Variables **fork repoda** tanımlanmalıdır.
+
+## Required naming (English reference)
+
+| Name          | Example     | Notes |
+|---------------|-------------|--------|
+| `VPS_HOST`    | `76.13.14.43` | Public IPv4 |
+| `VPS_USER`    | `deploy`    | UNIX user |
+| `VPS_PORT`    | `22`        | Optional |
+| `VPS_SSH_KEY` | PEM / OpenSSH private key | Repository **Secret**, not plaintext in repo |
+
+Eksik değişkenler **`Verify deploy`** adımında hata üretir; boş **`VPS_PORT`** eskiden **`Bad port ''`** verirdi (şimdi fallback 22).
 
 ```bash
 ssh ... 'cd /var/www/pastane-app/app && ./deploy.sh'
