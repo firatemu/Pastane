@@ -19,13 +19,11 @@ Bu belge VPS ve GitHub tarafında **elde edilen çıktılar** işlendikçe günc
 
 9. Mobil typecheck düzeltmeleri: `StyleSheet.absoluteFill`, `@types/node`, `pnpm-lock.yaml`.
 
-### Commit’e alınmış değişiklikler
+### Commit (yerel)
 
-**Commit:** `e99aef5` — `chore: align production stack with host nginx and repo hygiene`
+Tek commit: `git log -1 --oneline` (bu branch’te tek `chore: align production stack with host nginx…` kaydı).
 
-İçerik özeti: Host Nginx prod mimarisi (`docker-compose.prod.yml`), Host vhost + storage, runbook/dokümantasyon, tracked `dist/` temizliği, mobil typecheck, lockfile.
-
-**Push:** Bu oturumda `git push` **çalıştırılmadı** (explicit push isteği yok). Yerelde:
+**Push:** Bu oturumda `git push` **çalıştırılmadı**. Uzak repoya göndermek için:
 
 ```bash
 git push -u origin main
