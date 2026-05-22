@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -45,7 +45,7 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
   const [roles, setRoles] = useState<AdminRoleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Design element state matching ProductsManager
   const [selected, setSelected] = useState<AdminUserRow | null>(null);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);

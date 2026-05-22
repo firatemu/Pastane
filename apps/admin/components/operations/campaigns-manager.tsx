@@ -9,7 +9,7 @@ import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-er
 import { can } from '../../lib/permissions/can';
 import { createCampaignSchema, updateCampaignSchema } from '../../lib/operations/schemas';
 import type { CampaignRow } from '../../lib/operations/types';
-import { ErrorState, LoadingState } from '../shared/async-state';
+import { LoadingState } from '../shared/async-state';
 import {
   adminInputClass,
   adminPrimaryButtonClass,

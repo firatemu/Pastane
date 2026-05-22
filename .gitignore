@@ -10,14 +10,18 @@ node_modules/
 .next-ci-*/
 tmp/
 build/
+dist/
 coverage/
 .turbo/
+logs/
+uploads/
 
 # env
 .env
 .env.*
 !.env.example
 !.env.prod.example
+!.env.production.example
 
 # logs
 *.log

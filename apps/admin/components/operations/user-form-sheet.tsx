@@ -4,7 +4,7 @@ import { type JSX } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import type { z } from 'zod';
 import type { adminUserUpdateSchema } from '../../lib/operations/schemas';
-import type { AdminRoleRow, AdminUserRow } from '../../lib/operations/types';
+import type { AdminUserRow } from '../../lib/operations/types';
 import { Field } from '../shared/form-field';
 import {
   adminInputClass,

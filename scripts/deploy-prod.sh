@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Forward production deploy: validate compose, rebuild images, recreate containers.
-# Prerequisites: .env.prod at repo root (copy from .env.prod.example).
+# Prerequisites: .env.production at repo root (copy from .env.production.example).
 # Usage:
 #   bash scripts/deploy-prod.sh
 # Optional:
-#   ENV_FILE=.env.prod COMPOSE_FILE=docker/docker-compose.prod.yml bash scripts/deploy-prod.sh
+#   ENV_FILE=.env.production COMPOSE_FILE=docker/docker-compose.prod.yml bash scripts/deploy-prod.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-ENV_FILE="${ENV_FILE:-.env.prod}"
+ENV_FILE="${ENV_FILE:-.env.production}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.prod.yml}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "error: $ENV_FILE not found. Copy .env.prod.example to .env.prod and fill secrets." >&2
+  echo "error: $ENV_FILE not found. Copy .env.production.example to .env.production and fill secrets." >&2
   exit 1
 fi
 
@@ -32,5 +32,5 @@ if [[ -z "$API_HOST" ]]; then
 fi
 
 echo "Deploy finished."
-echo "API health via Nginx before TLS: curl -fsS -H 'Host: ${API_HOST}' http://127.0.0.1/api/v1/health"
-echo "API health after TLS: curl -fsS https://${API_HOST}/api/v1/health"
+echo "API health via Nginx before TLS: curl -fsS -H 'Host: ${API_HOST}' http://127.0.0.1/health"
+echo "API health after TLS: curl -fsS https://${API_HOST}/health"

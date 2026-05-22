@@ -71,20 +71,21 @@ Do not expose PostgreSQL, Redis, MinIO, API, admin, courier, or web ports direct
 ## Deploy User Directory
 
 ```bash
-mkdir -p ~/apps
-cd ~/apps
-git clone git@github.com:firatemu/Pastane.git
-cd Pastane
+sudo mkdir -p /var/www/pastane-app
+sudo chown -R deploy:deploy /var/www/pastane-app
+cd /var/www/pastane-app
+git clone git@github.com:firatemu/Pastane.git app
+cd app
 ```
 
 ## Production Env
 
 ```bash
-cp .env.prod.example .env.prod
-chmod 600 .env.prod
+cp .env.production.example .env.production
+chmod 600 .env.production
 ```
 
-Edit `.env.prod` and replace every placeholder secret:
+Edit `.env.production` and replace every placeholder secret:
 
 - `POSTGRES_PASSWORD`
 - `DATABASE_URL`
@@ -119,8 +120,8 @@ NEXT_PUBLIC_SITE_URL=https://azem.cloud
 Start the stack on HTTP so Let's Encrypt can validate ACME challenges:
 
 ```bash
-bash scripts/deploy-prod.sh
-curl -fsS -H 'Host: api.azem.cloud' http://127.0.0.1/api/v1/health
+./deploy.sh
+curl -fsS -H 'Host: api.azem.cloud' http://127.0.0.1/health
 ```
 
 ## Certificates
@@ -142,13 +143,13 @@ Switch Nginx to HTTPS:
 
 ```bash
 cp docker/nginx/conf.d/pastane.ssl.conf.example docker/nginx/conf.d/pastane.conf
-docker compose --env-file .env.prod -f docker/docker-compose.prod.yml restart nginx
+docker compose --env-file .env.production -f docker/docker-compose.prod.yml restart nginx
 ```
 
 ## Smoke Tests
 
 ```bash
-curl -fsS https://api.azem.cloud/api/v1/health
+curl -fsS https://api.azem.cloud/health
 curl -I https://azem.cloud
 curl -I https://admin.azem.cloud
 curl -I https://courier.azem.cloud
@@ -170,7 +171,7 @@ Certbot installs a systemd renewal timer. Add this deploy hook so Nginx reloads 
 sudo mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-nginx >/dev/null <<'EOF'
 #!/usr/bin/env bash
-docker compose --env-file /home/azem/apps/Pastane/.env.prod -f /home/azem/apps/Pastane/docker/docker-compose.prod.yml restart nginx
+docker compose --env-file /var/www/pastane-app/app/.env.production -f /var/www/pastane-app/app/docker/docker-compose.prod.yml restart nginx
 EOF
 sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-nginx
 ```
@@ -180,7 +181,7 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-nginx
 Run a backup after first successful deployment:
 
 ```bash
-bash scripts/backup-prod.sh
+./backup-db.sh
 ```
 
 Add a nightly cron:
@@ -190,15 +191,15 @@ crontab -e
 ```
 
 ```cron
-15 3 * * * cd /home/azem/apps/Pastane && bash scripts/backup-prod.sh >> /var/log/pastane-backup.log 2>&1
+0 3 * * * /var/www/pastane-app/app/backup-db.sh >> /var/log/pastane-backup.log 2>&1
 ```
 
 ## Update Flow
 
 ```bash
-cd /home/azem/apps/Pastane
+cd /var/www/pastane-app/app
 git pull --ff-only origin main
-bash scripts/backup-prod.sh
-bash scripts/deploy-prod.sh
-curl -fsS https://api.azem.cloud/api/v1/health
+./backup-db.sh
+./deploy.sh
+curl -fsS https://api.azem.cloud/health
 ```

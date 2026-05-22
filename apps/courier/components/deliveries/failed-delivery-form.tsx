@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 
@@ -19,7 +19,7 @@ export function FailedDeliveryForm({
   onCancel: () => void;
 }): React.JSX.Element {
   const form = useForm<Form>({
-    resolver: zodResolver(failDeliverySchema),
+    resolver: zodResolver(failDeliverySchema) as Resolver<Form>,
     defaultValues: { reason: '' },
   });
 

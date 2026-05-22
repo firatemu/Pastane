@@ -1,7 +1,7 @@
 # Pastane reverse proxy — HTTPS configuration for azem.cloud.
 # Usage on the VPS after certificates exist:
 #   cp docker/nginx/conf.d/pastane.ssl.conf.example docker/nginx/conf.d/pastane.conf
-#   docker compose --env-file .env.prod -f docker/docker-compose.prod.yml restart nginx
+#   docker compose --env-file .env.production -f docker/docker-compose.prod.yml restart nginx
 
 upstream pastane_web {
   server web:3000;
@@ -41,6 +41,8 @@ server {
   location / {
     proxy_pass http://pastane_web;
     proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -59,6 +61,8 @@ server {
     limit_req zone=pastane_api burst=20 nodelay;
     proxy_pass http://pastane_api;
     proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -70,6 +74,8 @@ server {
     limit_req zone=pastane_auth burst=5 nodelay;
     proxy_pass http://pastane_api;
     proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -87,6 +93,8 @@ server {
   location / {
     proxy_pass http://pastane_admin;
     proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -104,6 +112,8 @@ server {
   location / {
     proxy_pass http://pastane_courier;
     proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -121,6 +131,8 @@ server {
   location / {
     proxy_pass http://pastane_minio_s3;
     proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

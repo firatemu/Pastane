@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Logical PostgreSQL backup (custom format) + optional MinIO volume note.
-# Requires docker compose Postgres running and .env.prod with POSTGRES_* vars.
+# Requires docker compose Postgres running and .env.production with POSTGRES_* vars.
 # Usage:
 #   bash scripts/backup-prod.sh
 set -euo pipefail
@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-ENV_FILE="${ENV_FILE:-.env.prod}"
+ENV_FILE="${ENV_FILE:-.env.production}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.prod.yml}"
 
 # Preserve BACKUP_DIR from the caller environment so `BACKUP_DIR=/tmp/foo ./scripts/backup-prod.sh`

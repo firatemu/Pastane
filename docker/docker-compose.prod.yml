@@ -15,7 +15,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: pastane_postgres_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     networks:
       - pastane_internal
@@ -37,7 +37,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: pastane_redis_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     networks:
       - pastane_internal
@@ -57,7 +57,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: pastane_minio_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     networks:
       - pastane_internal
@@ -85,15 +85,17 @@ services:
         VERSION: ${IMAGE_TAG:-v0.0.0-placeholder}
     image: ${REGISTRY:-pastane}/pastane-api:${IMAGE_TAG:-v0.0.0-placeholder}
     container_name: pastane_api_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     env_file:
-      - ../.env.prod
+      - ../.env.production
     networks:
       - pastane_internal
       - pastane_edge
     expose:
       - "3003"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,7 +107,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:'+(process.env.API_PORT||3003)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:'+(process.env.API_PORT||3003)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
         ]
       interval: 30s
       timeout: 15s
@@ -118,13 +120,14 @@ services:
       dockerfile: docker/Dockerfile.web.prod
       args:
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         VERSION: ${IMAGE_TAG:-v0.0.0-placeholder}
     image: ${REGISTRY:-pastane}/pastane-web:${IMAGE_TAG:-v0.0.0-placeholder}
     container_name: pastane_web_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     env_file:
-      - ../.env.prod
+      - ../.env.production
     networks:
       - pastane_edge
     expose:
@@ -138,13 +141,15 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.admin.prod
       args:
+        NEXT_PUBLIC_SITE_URL: ${ADMIN_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         VERSION: ${IMAGE_TAG:-v0.0.0-placeholder}
     image: ${REGISTRY:-pastane}/pastane-admin:${IMAGE_TAG:-v0.0.0-placeholder}
     container_name: pastane_admin_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     env_file:
-      - ../.env.prod
+      - ../.env.production
     networks:
       - pastane_edge
     expose:
@@ -158,13 +163,15 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.courier.prod
       args:
+        NEXT_PUBLIC_SITE_URL: ${COURIER_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         VERSION: ${IMAGE_TAG:-v0.0.0-placeholder}
     image: ${REGISTRY:-pastane}/pastane-courier:${IMAGE_TAG:-v0.0.0-placeholder}
     container_name: pastane_courier_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     env_file:
-      - ../.env.prod
+      - ../.env.production
     networks:
       - pastane_edge
     expose:
@@ -176,7 +183,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: pastane_nginx_prod
-    restart: always
+    restart: unless-stopped
     logging: *json-logging
     networks:
       - pastane_edge
@@ -199,3 +206,4 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  uploads_data:

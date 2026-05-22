@@ -6,7 +6,6 @@ import { ProductGrid } from './product-grid';
 
 export function ShopCatalog({ categories, products }: Readonly<{ categories: Category[]; products: Product[] }>): React.JSX.Element {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const selectedCategory = categories.find((category) => category.id === selectedCategoryId);
   const filteredProducts = useMemo(() => {
     if (!selectedCategoryId) return products;
     return products.filter((product) => product.category.id === selectedCategoryId);

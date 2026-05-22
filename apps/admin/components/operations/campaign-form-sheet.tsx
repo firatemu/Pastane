@@ -2,6 +2,8 @@
 
 import { type JSX } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
+import type { z } from 'zod';
+import type { createCampaignSchema, updateCampaignSchema } from '../../lib/operations/schemas';
 import type { CampaignRow } from '../../lib/operations/types';
 import { Field } from '../shared/form-field';
 import {
@@ -17,6 +19,9 @@ function errMsg(v: unknown): string | undefined {
   return undefined;
 }
 
+type CreateCampaignFormValues = z.infer<typeof createCampaignSchema>;
+type UpdateCampaignFormValues = z.infer<typeof updateCampaignSchema>;
+
 export function CampaignFormSheet({
   open,
   editing,
@@ -26,7 +31,7 @@ export function CampaignFormSheet({
 }: Readonly<{
   open: boolean;
   editing: CampaignRow | null;
-  form: UseFormReturn<any>;
+  form: UseFormReturn<CreateCampaignFormValues> | UseFormReturn<UpdateCampaignFormValues>;
   onClose: () => void;
   onSubmit: (e?: React.BaseSyntheticEvent) => Promise<void>;
 }>): JSX.Element | null {

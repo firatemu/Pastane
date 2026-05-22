@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roll back to a previous IMAGE_TAG by editing .env.prod (or override) and recreating app services.
+# Roll back to a previous IMAGE_TAG by editing .env.production (or override) and recreating app services.
 # Does NOT downgrade the database automatically — pair with migrations policy / restore if needed.
 # Usage:
 #   IMAGE_TAG=v0.9.0 bash scripts/rollback-prod.sh
@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-ENV_FILE="${ENV_FILE:-.env.prod}"
+ENV_FILE="${ENV_FILE:-.env.production}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.prod.yml}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
