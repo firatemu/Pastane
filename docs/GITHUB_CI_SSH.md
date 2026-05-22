@@ -15,7 +15,11 @@ Workflow **`secrets.NAME` sonra `vars.NAME`** sırasıyla doldurur (Repository *
 
 **`VPS_SSH_KEY` mutlaka Secret olmalı** — Variable olarak private key yazmayın; Actions’ta düzgün maskelenmez ve daha kolay sızdırılabilir.
 
-**GitHub Environment** (Deployments → Environment) kullanıyorsanız değişkenler/secrets genelde **o ortama** bağlıdır: `deploy` job’unun altına **`environment: ortam-adınız`** satırını ekleyin (`deploy.yml`). Aksi halde workflow bu değerleri görmez.
+İş akışı **`environment: production`** ile çalışır (GitHub’daki **Deployments → Environments → `production`** altındaki Secrets/Variables dahil edilir). Repository seviyesindeki Secret/Variable’lar da hâlâ geçerlidir.
+
+Ortamınızın adı `production` değilse → **Settings → Secrets and variables → Actions → Variables**: **`PASTANE_GITHUB_ENVIRONMENT`** = sizin ortam adınız (ör. `pastane-prod`).
+
+Ekranda sadece bir “Environment variables” listesi görüyorsanız, büyük olasılıkla **Environment** sekmesindesiniz; o zaman `VPS_HOST` / `VPS_USER` ve **`VPS_SSH_KEY` (Secret)** tam olarak **o ortama** eklenmiş olmalı. `VPS_SSH_KEY`’i yalnızca **Secret** olarak ekleyin, Variable değil.
 
 ### Private anahtar paylaşıldıysa (sohbet, ticket, yanlış alan)
 
