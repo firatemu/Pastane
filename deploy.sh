@@ -23,9 +23,17 @@ if grep -qE 'change_me|placeholder' "$ENV_FILE"; then
 fi
 
 echo "Deploying Pastane from $APP_DIR"
-git fetch origin main
-git checkout main
-git pull --ff-only origin main
+GIT_REF="${DEPLOY_GIT_REF:-main}"
+git fetch origin "$GIT_REF"
+git checkout "$GIT_REF"
+
+# Keep the VPS tree identical to GitHub. Uncommitted edits here break merges and belong in Git, not on the server.
+# Override only if you know you need legacy behaviour: DEPLOY_NO_HARD_RESET=1 ./deploy.sh (pull --ff-only; fails when dirty).
+if [[ "${DEPLOY_NO_HARD_RESET:-}" == "1" ]]; then
+  git pull --ff-only origin "$GIT_REF"
+else
+  git reset --hard "origin/$GIT_REF"
+fi
 
 echo "Validating compose config..."
 docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config >/dev/null

@@ -177,11 +177,11 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-host-nginx
 ## Backups & updates
 
 See [`OPERATIONS.md`](OPERATIONS.md) and upstream [`production-deployment-plan.md`](production-deployment-plan.md).
-
 ```bash
 cd /var/www/pastane-app/app
 ./backup-db.sh
-git pull --ff-only origin main
 ./deploy.sh
 curl -fsS https://api.azem.cloud/health
 ```
+
+`deploy.sh` already fetches **`origin/main`** and **resets** the working tree to match (replacing stray local file edits such as patched `package.json` on the server). Set `DEPLOY_NO_HARD_RESET=1` before running only if you intentionally need the older merge/pull flow.

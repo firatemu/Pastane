@@ -22,8 +22,9 @@ flowchart LR
 - **PostgreSQL, Redis**: Docker internal network only (`pastane_internal`); **no** host port publish.
 - **MinIO S3 API**: `127.0.0.1:9000` for Host Nginx `storage.azem.cloud` (compose publishes loopback-only).
 
-Compose file: [`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml)  
-Deploy helper: [`deploy.sh`](../deploy.sh) — `git pull`, `docker compose build`, `up -d`, `prisma migrate deploy`.
+Compose file: [`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml)
+
+Deploy helper: [`deploy.sh`](../deploy.sh) — syncs `main` to **`origin/main`** (`git fetch` + `reset --hard` by default so stray VPS edits never block deploy), then `docker compose build`, `up -d`, `prisma migrate deploy`. Legacy `pull --ff-only` behaviour: `DEPLOY_NO_HARD_RESET=1 ./deploy.sh` (fails when the repo is dirty).
 
 ## Routine deploy on VPS
 
