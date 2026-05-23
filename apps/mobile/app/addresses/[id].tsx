@@ -20,6 +20,10 @@ export default function EditAddressScreen(): React.JSX.Element {
 
   async function submit(): Promise<void> {
     if (!address) return;
+    if (!address.title.trim() || !address.city.trim() || !address.district.trim() || !address.fullAddress.trim()) {
+      setError('Başlık, il, ilçe ve açık adres zorunlu.');
+      return;
+    }
     setBusy(true);
     try {
       await updateAddress(address.id, address);

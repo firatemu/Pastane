@@ -35,6 +35,8 @@ export default function RootLayout(): React.JSX.Element {
             <Stack.Screen name="register" options={{ presentation: 'modal' }} />
             <Stack.Screen name="product/[slug]" />
             <Stack.Screen name="checkout" />
+            <Stack.Screen name="payment-result" />
+            <Stack.Screen name="profile" />
             <Stack.Screen name="orders/[id]" />
             <Stack.Screen name="addresses/index" />
             <Stack.Screen name="addresses/new" />

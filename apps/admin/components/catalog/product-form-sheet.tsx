@@ -4,7 +4,7 @@ import { useEffect, useState, type JSX } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import type { z } from 'zod';
 import type { productSchema } from '../../lib/catalog/schemas';
-import type { Allergen, Category, Product } from '../../lib/catalog/types';
+import type { Allergen, Category, Product, ProductUnit } from '../../lib/catalog/types';
 import { can } from '../../lib/permissions/can';
 import { PRODUCT_STATUS_LABELS } from './product-status-pill';
 import { ProductMediaPanel } from './product-media-panel';
@@ -27,6 +27,7 @@ export function ProductFormSheet({
   form,
   categories,
   allergens,
+  units,
   permissions,
   onClose,
   onSubmit,
@@ -37,16 +38,18 @@ export function ProductFormSheet({
   form: UseFormReturn<Form>;
   categories: Category[];
   allergens: Allergen[];
+  units: ProductUnit[];
   permissions: string[];
   onClose: () => void;
   onSubmit: (values: Form) => Promise<void>;
   onChanged?: () => Promise<void>;
 }>): JSX.Element | null {
-  if (!open) return null;
-
   const [tab, setTab] = useState<TabId>('details');
   const allergenIds = form.watch('allergenIds') ?? [];
   const isPublished = form.watch('isPublished');
+  const unitId = form.watch('unitId');
+  const selectedUnit = units.find((unit) => unit.id === unitId);
+  const needsQuantity = selectedUnit != null && selectedUnit.kind !== 'COUNT';
 
   const canMedia = Boolean(editing) && can(permissions, ['media.upload', 'media.delete']);
   const canOptions = Boolean(editing) && can(permissions, ['products.manageOptions']);
@@ -62,6 +65,8 @@ export function ProductFormSheet({
   useEffect(() => {
     setTab('details');
   }, [editing?.id, open]);
+
+  if (!open) return null;
 
   function toggleAllergen(id: string): void {
     const next = allergenIds.includes(id) ? allergenIds.filter((x) => x !== id) : [...allergenIds, id];
@@ -143,6 +148,36 @@ export function ProductFormSheet({
                     ))}
                   </select>
                 </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Satış birimi" error={form.formState.errors.unitId?.message}>
+                    <select className={adminSelectClass} {...form.register('unitId')}>
+                      <option value="">Birim seçin</option>
+                      {units.filter((unit) => unit.isActive).map((unit) => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.name} ({unit.symbol})
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label={needsQuantity ? 'Miktar (zorunlu)' : 'Miktar (opsiyonel)'}
+                    error={form.formState.errors.unitQuantity?.message as string | undefined}
+                  >
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      className={adminInputClass}
+                      placeholder={needsQuantity ? 'Örn. 500' : 'Boş bırakılabilir'}
+                      {...form.register('unitQuantity')}
+                    />
+                  </Field>
+                </div>
+                {needsQuantity ? (
+                  <p className="rounded-lg border border-secondary/20 bg-secondary-container/30 px-3 py-2 text-xs text-on-surface-variant">
+                    Vitrin örneği: {String(form.watch('unitQuantity') || '500')} {selectedUnit?.symbol} {String(form.watch('name') || 'ürün adı')}
+                  </p>
+                ) : null}
                 <Field label="Katalog durumu" error={form.formState.errors.status?.message}>
                   <select className={adminSelectClass} {...form.register('status')}>
                     {(Object.keys(PRODUCT_STATUS_LABELS) as Array<keyof typeof PRODUCT_STATUS_LABELS>).map((key) => (

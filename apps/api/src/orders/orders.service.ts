@@ -8,10 +8,12 @@ import { money } from '../common/utils/money.util';
 import { createOrderNumber, orderNumberDatePrefix } from '../common/utils/order-number.util';
 import { normalizePagination } from '../common/utils/pagination.util';
 import { AuditService } from '../audit/audit.service';
+import { CartService } from '../cart/cart.service';
 import { PrismaService } from '../database/prisma.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { QueuesService } from '../jobs/queues.service';
+import { formatProductDisplayName } from '../products/product-display.util';
 import { computeProductAvailability } from '../products/product-availability.util';
 import type { AssignCourierDto } from './dto/assign-courier.dto';
 import type { CreateOrderDto } from './dto/create-order.dto';
@@ -23,6 +25,7 @@ import { OrderStatusService } from './order-status.service';
 export class OrdersService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CartService) private readonly cartService: CartService,
     @Inject(OrderStatusService) private readonly statuses: OrderStatusService,
     @Inject(QueuesService) private readonly queues: QueuesService,
     @Inject(AuditService) private readonly audit: AuditService,
@@ -31,10 +34,11 @@ export class OrdersService {
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
+    await this.cartService.validateForCheckout(userId);
     const created = await this.prisma.$transaction(async (tx) => {
       const cart = await tx.cart.findUnique({
         where: { userId },
-        include: { items: { include: { product: true, options: { include: { option: true } } } } },
+        include: { items: { include: { product: { include: { unit: true } }, options: { include: { option: true } } } } },
       });
       if (!cart?.items.length) throw new AppException(ERROR_CODES.CART_EMPTY, 'Cart is empty', HttpStatus.BAD_REQUEST);
 
@@ -99,7 +103,7 @@ export class OrdersService {
           data: {
             orderId: order.id,
             productId: item.cartItem.productId,
-            productNameSnapshot: item.cartItem.product.name,
+            productNameSnapshot: formatProductDisplayName(item.cartItem.product),
             unitPriceSnapshot: item.unit,
             quantity: item.cartItem.quantity,
             customNote: item.cartItem.customNote,

@@ -43,7 +43,7 @@ Emülatör API adresleri:
 | Hedef | `EXPO_PUBLIC_API_URL` |
 |-------|------------------------|
 | Android emülatör | `http://10.0.2.2:3003` |
-| iOS simulator | `http://localhost:3003` |
+| iOS simulator | `http://10.0.2.2:3003` veya makinenizin LAN IP adresi |
 | Fiziksel cihaz (LAN) | `http://192.168.x.x:3003` |
 
 Prod API ile smoke test:

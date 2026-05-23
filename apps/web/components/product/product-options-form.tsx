@@ -63,7 +63,7 @@ export function ProductOptionsForm({ product }: Readonly<{ product: Product }>):
       </div>
       <div className="rounded-2xl bg-surface-low p-4">
         <p className="text-sm text-muted">Ön izleme toplamı</p>
-        <p className="mt-1 font-display text-3xl font-semibold text-primary">{formatTry(previewTotal)}</p>
+        <p className="mt-1 font-body text-3xl font-extrabold text-error">{formatTry(previewTotal)}</p>
         <p className="mt-2 text-xs text-muted/80">Nihai fiyat doğrulaması ödeme akışında sunucu tarafından yapılır.</p>
       </div>
       <button className="stitch-button w-full disabled:opacity-60" disabled={busy || soldOut} type="submit">{soldOut ? 'Satışa kapalı' : busy ? 'Ekleniyor...' : 'Sepete ekle'}</button>

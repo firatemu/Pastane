@@ -8,6 +8,7 @@ import { useAuth } from '@/context/auth-context';
 import { useCart } from '@/context/cart-context';
 import type { Product, ProductOptionGroup, Review } from '@/types';
 import { formatTry } from '@/utils/format';
+import { productLabel } from '@/utils/product-label';
 import { productImageUrl } from '@/utils/product-image';
 import { colors, radii, spacing } from '@/theme';
 
@@ -91,7 +92,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
           <Text style={styles.back}>← Geri</Text>
         </Pressable>
         <Image source={{ uri: productImageUrl(product) }} style={styles.hero} />
-        <Screen title={product.name} subtitle={product.shortDescription ?? product.description ?? undefined}>
+        <Screen title={productLabel(product)} subtitle={product.shortDescription ?? product.description ?? undefined}>
           <Text style={styles.price}>{formatTry(product.discountedPrice ?? product.price)}</Text>
           {(product.optionGroups ?? []).map((group) => (
             <View key={group.id} style={styles.group}>

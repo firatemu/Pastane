@@ -37,7 +37,8 @@
     "mobile:start": "pnpm --filter @pastane/mobile start",
     "mobile:android": "pnpm --filter @pastane/mobile android",
     "mobile:typecheck": "pnpm --filter @pastane/mobile typecheck",
-    "mobile:build:android": "pnpm --filter @pastane/mobile build:android"
+    "mobile:build:android": "pnpm --filter @pastane/mobile build:android",
+    "mobile:build:android:apk": "pnpm --filter @pastane/mobile build:android:apk"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",

@@ -10,9 +10,11 @@ import type {
   LoyaltyAccount,
   LoyaltyMovement,
   Order,
+  Payment,
   Product,
   Review,
   Store,
+  User,
 } from '../types';
 
 const AUTH_KEY = 'pastahane.auth';
@@ -20,6 +22,11 @@ const AUTH_KEY = 'pastahane.auth';
 type RequestOptions = RequestInit & { token?: string; skipAuthRefresh?: boolean };
 
 let refreshPromise: Promise<AuthState | null> | null = null;
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
 
 async function readAuth(): Promise<AuthState | null> {
   const raw = await AsyncStorage.getItem(AUTH_KEY);
@@ -76,8 +83,14 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
     ...(fetchInit.headers as Record<string, string> | undefined),
   };
 
-  let response = await fetch(`${getApiBaseUrl()}${path}`, { ...fetchInit, headers });
-  let payload: unknown = await response.json().catch(() => ({}));
+  let response: Response;
+  let payload: unknown;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, { ...fetchInit, headers });
+    payload = await response.json().catch(() => ({}));
+  } catch {
+    throw new Error(messageFromApi(0, {}, 'Sunucuya bağlanılamadı.'));
+  }
 
   if (response.status === 401 && token && !skipAuthRefresh) {
     const stored = await readAuth();
@@ -85,13 +98,21 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
       const refreshed = await refreshAuth(stored.refreshToken);
       if (refreshed) {
         headers.Authorization = `Bearer ${refreshed.accessToken}`;
-        response = await fetch(`${getApiBaseUrl()}${path}`, { ...fetchInit, headers });
-        payload = await response.json().catch(() => ({}));
+        try {
+          response = await fetch(`${getApiBaseUrl()}${path}`, { ...fetchInit, headers });
+          payload = await response.json().catch(() => ({}));
+        } catch {
+          throw new Error(messageFromApi(0, {}, 'Sunucuya bağlanılamadı.'));
+        }
       }
     }
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      await saveStoredAuth(null);
+      unauthorizedHandler?.();
+    }
     throw new Error(messageFromApi(response.status, payload as Parameters<typeof messageFromApi>[1], 'İstek tamamlanamadı.'));
   }
   return unwrapData<T>(payload);
@@ -173,6 +194,11 @@ export async function fetchCart(): Promise<CartItem[]> {
   return data.items ?? [];
 }
 
+export async function validateCartForCheckout(): Promise<CartItem[]> {
+  const data = await authedRequest<{ items: CartItem[] }>('/api/v1/cart/validate-checkout', { method: 'POST' });
+  return data.items ?? [];
+}
+
 export async function addCartItem(productId: string, quantity = 1, optionIds: string[] = [], customNote?: string): Promise<void> {
   await authedRequest('/api/v1/cart/items', {
     method: 'POST',
@@ -240,8 +266,37 @@ export async function cancelOrder(id: string): Promise<Order> {
 export async function initCheckoutForm(orderId: string): Promise<{ checkoutFormContent: string }> {
   return authedRequest<{ checkoutFormContent: string }>('/api/v1/payments/checkout-form-init', {
     method: 'POST',
+    headers: { 'idempotency-key': `${orderId}:iyzico-mobile` },
     body: JSON.stringify({ orderId }),
   });
+}
+
+export async function initiateDevCardPayment(orderId: string): Promise<Payment> {
+  return authedRequest<Payment>('/api/v1/payments/initiate', {
+    method: 'POST',
+    headers: { 'idempotency-key': `${orderId}:mobile-dev` },
+    body: JSON.stringify({
+      orderId,
+      cardHolderName: 'Demo Müşteri',
+      cardNumber: '5528790000000008',
+      expireMonth: '12',
+      expireYear: '30',
+      cvc: '123',
+    }),
+  });
+}
+
+export async function fetchPayments(orderId: string): Promise<Payment[]> {
+  const data = await authedRequest<Payment[] | Payment>(`/api/v1/payments/${orderId}`);
+  return Array.isArray(data) ? data : [data];
+}
+
+export async function fetchMe(): Promise<User> {
+  return authedRequest<User>('/api/v1/users/me');
+}
+
+export async function updateMe(body: Pick<User, 'firstName' | 'lastName'> & { email?: string | null }): Promise<User> {
+  return authedRequest<User>('/api/v1/users/me', { method: 'PATCH', body: JSON.stringify(body) });
 }
 
 export async function fetchProductReviews(productId: string): Promise<Review[]> {

@@ -70,6 +70,10 @@ export default function AccountScreen(): React.JSX.Element {
             <Text style={styles.linkTitle}>Adreslerim</Text>
             <Text style={styles.linkMeta}>Teslimat adreslerini yönet</Text>
           </Pressable>
+          <Pressable style={styles.linkCard} onPress={() => router.push('/profile' as never)}>
+            <Text style={styles.linkTitle}>Profil bilgilerim</Text>
+            <Text style={styles.linkMeta}>Ad, soyad ve e-posta bilgilerini güncelle</Text>
+          </Pressable>
 
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>Puanlarım</Text>

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { config } from 'dotenv';
-import { PrismaClient, RoleType, UserStatus, CourierStatus, ProductStatus, Prisma } from '@prisma/client';
+import { PrismaClient, RoleType, UserStatus, CourierStatus, ProductStatus, ProductUnitKind, Prisma } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
 /** pnpm --filter runs with cwd = packages/database; Prisma only auto-loads .env next to schema. Walk up to repo root. */
@@ -48,7 +48,7 @@ const permissions = [
   'roles.view','roles.create','roles.update','roles.delete','permissions.view','permissions.manage',
   'products.view','products.create','products.update','products.delete','products.manageImages','products.manageOptions','products.manageAllergens',
   'categories.view','categories.create','categories.update','categories.delete',
-  'allergens.view','media.upload','media.delete',
+  'allergens.view','productUnits.view','productUnits.manage','media.upload','media.delete',
   'orders.view','orders.viewOwn','orders.viewAll','orders.create','orders.updateStatus','orders.cancel','orders.assignCourier',
   'payments.view','payments.initiate','payments.refund','payments.viewAll',
   'couriers.view','couriers.create','couriers.update','couriers.performance',
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   const rolePermissions: Record<RoleType, string[]> = {
     ADMIN: permissions,
     ORDER_OPERATOR: ['orders.viewAll','orders.updateStatus','orders.assignCourier','orders.cancel','couriers.view','loyalty.scan','loyalty.redeem','reviews.view','notifications.send','reports.sales','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
-    PRODUCT_MANAGER: ['products.view','products.create','products.update','products.manageImages','products.manageOptions','products.manageAllergens','categories.view','categories.create','categories.update','allergens.view','media.upload','media.delete','reports.products','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
+    PRODUCT_MANAGER: ['products.view','products.create','products.update','products.manageImages','products.manageOptions','products.manageAllergens','categories.view','categories.create','categories.update','allergens.view','productUnits.view','productUnits.manage','media.upload','media.delete','reports.products','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
     COURIER: ['deliveries.viewOwn','deliveries.updateOwn','orders.viewOwn','notifications.viewOwn'],
     CUSTOMER: ['products.view','categories.view','cart.manageOwn','orders.create','orders.viewOwn','orders.cancel','payments.initiate','payments.view','addresses.manageOwn','loyalty.viewOwn','reviews.create','reviews.view','notifications.viewOwn'],
   };
@@ -142,33 +142,122 @@ async function main(): Promise<void> {
   void store;
   const allergenNames = ['Gluten','Süt','Yumurta','Fındık','Fıstık','Ceviz','Susam'];
   const allergenRows = await Promise.all(allergenNames.map((name) => prisma.allergen.upsert({ where: { name }, update: { deletedAt: null }, create: { name } })));
+  const unitDefs = [
+    ['00000000-0000-4000-8000-000000000301', 'Adet', 'adet', ProductUnitKind.COUNT, 1],
+    ['00000000-0000-4000-8000-000000000302', 'Tane', 'tane', ProductUnitKind.COUNT, 2],
+    ['00000000-0000-4000-8000-000000000303', 'Gram', 'gr', ProductUnitKind.WEIGHT, 3],
+    ['00000000-0000-4000-8000-000000000304', 'Kilogram', 'kg', ProductUnitKind.WEIGHT, 4],
+  ] as const;
+  const unitMap = new Map<string, { id: string }>();
+  for (const [id, name, symbol, kind, sortOrder] of unitDefs) {
+    const unit = await prisma.productUnit.upsert({
+      where: { id },
+      update: { name, symbol, kind, sortOrder, deletedAt: null, isActive: true },
+      create: { id, name, symbol, kind, sortOrder, isActive: true },
+    });
+    unitMap.set(symbol, unit);
+  }
+  const defaultUnitId = unitMap.get('adet')!.id;
+  const now = new Date();
+  await prisma.productImage.updateMany({ where: { deletedAt: null }, data: { deletedAt: now, isPrimary: false } });
+  await prisma.product.updateMany({ where: { deletedAt: null }, data: { deletedAt: now, status: ProductStatus.INACTIVE, isPublished: false } });
+  await prisma.category.updateMany({ where: { deletedAt: null }, data: { deletedAt: now, isActive: false } });
+
   const categoryDefs = [
-    ['Pastalar', null], ['Yaş Pastalar', null], ['Kuru Pastalar', null], ['Ekmekler', null], ['Simit & Poğaça', null], ['Tatlılar', null], ['İçecekler', null],
+    ['Poğaçalar', 'pogacalar', 'Sıcak, yumuşak ve günlük poğaça çeşitleri.', 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?auto=format&fit=crop&w=900&q=80'],
+    ['Simitler', 'simitler', 'Bol susamlı klasik ve özel simitler.', 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=900&q=80'],
+    ['Börekler', 'borekler', 'Tepsi ve porsiyon börek seçenekleri.', 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80'],
+    ['Sandviçler', 'sandvicler', 'Taze ekmekle hazırlanan doyurucu sandviçler.', 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=900&q=80'],
+    ['Kruvasanlar', 'kruvasanlar', 'Tereyağlı, kat kat kruvasan lezzetleri.', 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=900&q=80'],
+    ['Ekmekler', 'ekmekler', 'Günlük çıkan somun, ekşi maya ve tahıllı ekmekler.', 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=900&q=80'],
+    ['Dondurmalar', 'dondurmalar', 'Külah, kase ve paket dondurma çeşitleri.', 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=900&q=80'],
+    ['Kuru Pastalar', 'kuru-pastalar', 'Tatlı ve tuzlu kuru pasta çeşitleri.', 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=900&q=80'],
+    ['Yaş Pastalar', 'yas-pastalar', 'Kutlama ve günlük yaş pasta seçenekleri.', 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=900&q=80'],
+    ['Tatlılar', 'tatlilar', 'Şerbetli ve sütlü tatlılardan oluşan vitrin.', 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=900&q=80'],
   ] as const;
   const categoryMap = new Map<string, {id:string}>();
-  for (const [name] of categoryDefs) {
-    const slug = name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-    categoryMap.set(name, await prisma.category.upsert({ where: { slug }, update: { name, deletedAt: null, isActive: true }, create: { name, slug } }));
+  for (const [name, slug, description, imageUrl] of categoryDefs) {
+    categoryMap.set(name, await prisma.category.upsert({
+      where: { slug },
+      update: { name, description, imageUrl, parentId: null, deletedAt: null, isActive: true, sortOrder: categoryMap.size },
+      create: { name, slug, description, imageUrl, sortOrder: categoryMap.size },
+    }));
   }
+  const productImageUrl = (fileName: string) =>
+    `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(fileName)}?width=900`;
   const products = [
-    ['Çikolatalı Yaş Pasta','yas-pasta','Yaş Pastalar','650.00',60,['Gluten','Süt','Yumurta','Fındık']],
-    ['Susamlı Simit','susamli-simit','Simit & Poğaça','15.00',5,['Gluten','Susam']],
-    ['Peynirli Poğaça','peynirli-pogaca','Simit & Poğaça','25.00',5,['Gluten','Süt','Yumurta']],
-    ['Beyaz Ekmek','beyaz-ekmek','Ekmekler','12.50',5,['Gluten']],
-    ['Sütlaç','sutlac','Tatlılar','80.00',10,['Süt']],
+    ['Sade Poğaça','sade-pogaca','Poğaçalar','28.00',5,'Klasik yumuşak poğaça.',productImageUrl('Anne poğaçası.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Peynirli Poğaça','peynirli-pogaca','Poğaçalar','32.00',5,'Beyaz peynirli günlük poğaça.',productImageUrl('Peynirli poğaça.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Zeytinli Poğaça','zeytinli-pogaca','Poğaçalar','34.00',5,'Siyah zeytin ezmeli poğaça.',productImageUrl('Achma-Pogaca.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Susamlı Simit','susamli-simit','Simitler','18.00',5,'Bol susamlı çıtır simit.',productImageUrl('Simit, salah satu roti khas Turki.jpg'),['Gluten','Susam'],'adet',null],
+    ['Kaşarlı Simit','kasarli-simit','Simitler','38.00',8,'Eritilmiş kaşarlı sıcak simit.',productImageUrl('Turkish tea and simit.jpg'),['Gluten','Süt','Susam'],'adet',null],
+    ['Tereyağlı Simit','tereyagli-simit','Simitler','30.00',5,'Tereyağ aromalı gevrek simit.',productImageUrl('İzmir gevreği.jpg'),['Gluten','Süt','Susam'],'adet',null],
+    ['Peynirli Börek','peynirli-borek','Börekler','55.00',10,'İnce yufkadan peynirli börek.',productImageUrl('Börek mit Käse.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Ispanaklı Börek','ispanakli-borek','Börekler','58.00',10,'Ispanaklı ve baharatlı börek.',productImageUrl('Ispanaklı tepsi böreği.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Kıymalı Börek','kiymali-borek','Börekler','68.00',12,'Kıymalı sıcak tepsi böreği.',productImageUrl('20170402 Runder Fleischburek, Bielitz-Biala.jpg'),['Gluten','Yumurta'],'adet',null],
+    ['Hindi Füme Sandviç','hindi-fume-sandvic','Sandviçler','95.00',8,'Hindi füme ve mevsim yeşillikleri.',productImageUrl('Turkey sandwich.jpg'),['Gluten','Süt'],'adet',null],
+    ['Kaşarlı Tost Sandviç','kasarli-tost-sandvic','Sandviçler','75.00',8,'Kaşar peynirli sıcak sandviç.',productImageUrl('Grilled cheese sandwich.jpg'),['Gluten','Süt'],'adet',null],
+    ['Ton Balıklı Sandviç','ton-balikli-sandvic','Sandviçler','110.00',8,'Ton balığı, turşu ve yeşillik.',productImageUrl('Tuna sandwich.jpg'),['Gluten','Yumurta'],'adet',null],
+    ['Tereyağlı Kruvasan','tereyagli-kruvasan','Kruvasanlar','60.00',8,'Klasik Fransız kruvasanı.',productImageUrl('Butter Croissant (54408180656).jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Çikolatalı Kruvasan','cikolatali-kruvasan','Kruvasanlar','72.00',8,'Belçika çikolatalı kruvasan.',productImageUrl('Chocolate croissant Pret a Manger Bankside London England.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Bademli Kruvasan','bademli-kruvasan','Kruvasanlar','78.00',8,'Badem kremalı çıtır kruvasan.',productImageUrl('A Chocolate Milk and Almond Croissant.jpg'),['Gluten','Süt','Yumurta','Fındık'],'adet',null],
+    ['Beyaz Ekmek','beyaz-ekmek','Ekmekler','18.00',5,'Günlük klasik somun ekmek.',productImageUrl('White bread.jpg'),['Gluten'],'adet',null],
+    ['Ekşi Maya Ekmek','eksi-maya-ekmek','Ekmekler','70.00',5,'Uzun fermantasyonlu ekşi maya.',productImageUrl('Sourdough bread.jpg'),['Gluten'],'adet',null],
+    ['Çavdarlı Ekmek','cavdarli-ekmek','Ekmekler','48.00',5,'Çavdar unlu tok dokulu ekmek.',productImageUrl('Rye bread.jpg'),['Gluten'],'adet',null],
+    ['Vanilyalı Dondurma','vanilyali-dondurma','Dondurmalar','65.00',3,'Madagaskar vanilyalı dondurma.',productImageUrl('Vanilla ice cream.jpg'),['Süt'],'gr',250],
+    ['Çikolatalı Dondurma','cikolatali-dondurma','Dondurmalar','68.00',3,'Yoğun kakaolu dondurma.',productImageUrl('Chocolate ice cream.jpg'),['Süt'],'gr',250],
+    ['Antep Fıstıklı Dondurma','antep-fistikli-dondurma','Dondurmalar','78.00',3,'Fıstıklı kaymak dondurma.',productImageUrl('Pistachio ice cream.jpg'),['Süt','Fıstık'],'gr',250],
+    ['Tatlı Kuru Pasta','tatli-kuru-pasta','Kuru Pastalar','140.00',5,'Karışık tatlı kuru pasta.',productImageUrl('Cookies.jpg'),['Gluten','Süt','Yumurta'],'gr',500],
+    ['Tuzlu Kuru Pasta','tuzlu-kuru-pasta','Kuru Pastalar','130.00',5,'Susamlı ve çörek otlu tuzlu kuru pasta.',productImageUrl('Crackers.jpg'),['Gluten','Süt','Susam'],'gr',500],
+    ['Kavala Kurabiyesi','kavala-kurabiyesi','Kuru Pastalar','155.00',5,'Bademli pudra şekerli kurabiye.',productImageUrl('Kavala kurabiyesi.jpg'),['Gluten','Süt','Fındık'],'gr',500],
+    ['Çikolatalı Yaş Pasta','cikolatali-yas-pasta','Yaş Pastalar','720.00',45,'Çikolatalı krema ve pandispanya.',productImageUrl('Chocolate cake.jpg'),['Gluten','Süt','Yumurta','Fındık'],'kg',1],
+    ['Çilekli Yaş Pasta','cilekli-yas-pasta','Yaş Pastalar','760.00',45,'Taze çilekli krema pasta.',productImageUrl('Strawberry cake.jpg'),['Gluten','Süt','Yumurta'],'kg',1],
+    ['Muzlu Rulo Pasta','muzlu-rulo-pasta','Yaş Pastalar','520.00',35,'Muzlu rulo yaş pasta.',productImageUrl('Swiss roll.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Baklava','baklava','Tatlılar','180.00',5,'Fıstıklı şerbetli baklava.',productImageUrl('Baklava.jpg'),['Gluten','Süt','Fıstık'],'gr',500],
+    ['Sütlaç','sutlac','Tatlılar','90.00',5,'Fırınlanmış sütlaç.',productImageUrl('Fırın sütlaç.jpg'),['Süt'],'gr',500],
+    ['Profiterol','profiterol','Tatlılar','125.00',5,'Çikolata soslu profiterol.',productImageUrl('Chocolate-topped profiteroles, September 2006.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
   ] as const;
   const productMap = new Map<string,{id:string}>();
-  for (const [name,slug,category,price,preparationMinutes,allergens] of products) {
+  for (const [name,slug,category,price,preparationMinutes,shortDescription,imageUrl,allergens,unitSymbol,unitQuantity] of products) {
     const product = await prisma.product.upsert({
       where: { slug },
-      update: { name, deletedAt: null, status: ProductStatus.ACTIVE, isPublished: true },
-      create: { name, slug, categoryId: categoryMap.get(category)!.id, price: new Prisma.Decimal(price), preparationMinutes, isPublished: true },
+      update: {
+        name,
+        categoryId: categoryMap.get(category)!.id,
+        shortDescription,
+        description: shortDescription,
+        price: new Prisma.Decimal(price),
+        discountedPrice: null,
+        preparationMinutes,
+        deletedAt: null,
+        status: ProductStatus.ACTIVE,
+        isPublished: true,
+        saleWindowStart: null,
+        saleWindowEnd: null,
+        unitId: unitMap.get(unitSymbol)?.id ?? defaultUnitId,
+        unitQuantity: unitQuantity == null ? null : new Prisma.Decimal(unitQuantity),
+      },
+      create: {
+        name,
+        slug,
+        categoryId: categoryMap.get(category)!.id,
+        shortDescription,
+        description: shortDescription,
+        price: new Prisma.Decimal(price),
+        preparationMinutes,
+        isPublished: true,
+        unitId: unitMap.get(unitSymbol)?.id ?? defaultUnitId,
+        unitQuantity: unitQuantity == null ? null : new Prisma.Decimal(unitQuantity),
+      },
     });
     productMap.set(name, product);
+    await prisma.productAllergen.deleteMany({ where: { productId: product.id } });
     for (const allergenName of allergens) {
       const allergen = allergenRows.find((a) => a.name === allergenName)!;
-      await prisma.productAllergen.upsert({ where: { productId_allergenId: { productId: product.id, allergenId: allergen.id } }, update: {}, create: { productId: product.id, allergenId: allergen.id } });
+      await prisma.productAllergen.create({ data: { productId: product.id, allergenId: allergen.id } });
     }
+    await prisma.productImage.updateMany({ where: { productId: product.id }, data: { deletedAt: now, isPrimary: false } });
+    await prisma.productImage.create({ data: { productId: product.id, url: imageUrl, altText: name, sortOrder: 0, isPrimary: true } });
   }
   const cake = productMap.get('Çikolatalı Yaş Pasta')!;
   const groups = [
@@ -185,13 +274,6 @@ async function main(): Promise<void> {
       const existing = await prisma.productOption.findFirst({ where: { optionGroupId: group.id, name: optionName } });
       if (!existing) await prisma.productOption.create({ data: { optionGroupId: group.id, name: optionName } });
     }
-  }
-  const simit = productMap.get('Susamlı Simit');
-  if (simit) {
-    await prisma.product.update({
-      where: { id: simit.id },
-      data: { saleWindowStart: '08:00', saleWindowEnd: '12:00' },
-    });
   }
   const zones = [['Yenişehir','150.00','30.00',30],['Mezitli','200.00','40.00',40],['Akdeniz','200.00','45.00',45]] as const;
   for (const [name,minimumOrderPrice,deliveryFee,estimatedMinutes] of zones) {

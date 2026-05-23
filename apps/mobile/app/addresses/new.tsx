@@ -19,6 +19,14 @@ export default function NewAddressScreen(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
 
   async function submit(): Promise<void> {
+    if (!title.trim() || !city.trim() || !district.trim() || !fullAddress.trim()) {
+      setError('Başlık, il, ilçe ve açık adres zorunlu.');
+      return;
+    }
+    if (fullAddress.trim().length < 5) {
+      setError('Açık adres çok kısa.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { loadStoredAuth, login as apiLogin, logout as apiLogout, register as apiRegister, saveStoredAuth } from '../api/client';
+import { useRouter } from 'expo-router';
+import { loadStoredAuth, login as apiLogin, logout as apiLogout, register as apiRegister, saveStoredAuth, setUnauthorizedHandler } from '../api/client';
 import type { AuthState } from '../types';
 
 interface AuthContextValue {
@@ -14,6 +15,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
+  const router = useRouter();
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,6 +29,14 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setAuth(null);
+      router.replace('/login');
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [router]);
 
   const login = useCallback(async (phone: string, password: string) => {
     const next = await apiLogin(phone, password);

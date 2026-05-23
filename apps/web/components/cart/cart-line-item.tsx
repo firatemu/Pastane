@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { CartItem } from '../../lib/cart/types';
+import { productLabel } from '../../lib/catalog/product-label';
 import { stitchImages } from '../../lib/stitch-design';
 import { messageFromCustomerApiPayload, customerFacingMessageFromUnknownError, type ParsedCustomerApiPayload } from '../../lib/messages/customer-facing-errors';
 import { formatTry } from '../shared/price';
@@ -9,7 +10,7 @@ function primaryCartLineImage(item: CartItem): { src: string; alt: string } {
   const images = item.product.images ?? [];
   const image = images.find((i) => i.isPrimary) ?? images[0];
   const src = image?.url ?? stitchImages.tart;
-  const alt = image?.altText ?? item.product.name;
+  const alt = image?.altText ?? productLabel(item.product);
   return { src, alt };
 }
 
@@ -43,7 +44,7 @@ export function CartLineItem({ item, onChanged }: Readonly<{ item: CartItem; onC
       <img alt={imgAlt} className="h-full w-full object-cover" src={imgSrc} />
     </div>
     <div>
-      <div className="flex items-start justify-between gap-4"><div><h3 className="font-display text-xl font-semibold text-primary">{item.product.name}</h3><p className="mt-1 text-sm text-muted">{optionLines.length ? optionLines.map(({ option }) => `${option.name}${Number(option.priceModifier) ? ` (+${formatTry(option.priceModifier)})` : ''}`).join(', ') : 'Standart'}</p>{item.customNote ? <p className="mt-1 text-sm text-muted">Not: {item.customNote}</p> : null}</div><button className="text-sm font-semibold text-error" disabled={busy} onClick={() => void mutate('DELETE')} type="button">Sil</button></div>
+      <div className="flex items-start justify-between gap-4"><div><h3 className="font-display text-xl font-semibold text-primary">{productLabel(item.product)}</h3><p className="mt-1 text-sm text-muted">{optionLines.length ? optionLines.map(({ option }) => `${option.name}${Number(option.priceModifier) ? ` (+${formatTry(option.priceModifier)})` : ''}`).join(', ') : 'Standart'}</p>{item.customNote ? <p className="mt-1 text-sm text-muted">Not: {item.customNote}</p> : null}</div><button className="text-sm font-semibold text-error" disabled={busy} onClick={() => void mutate('DELETE')} type="button">Sil</button></div>
     <div className="mt-4 flex items-center justify-between gap-4"><div className="flex items-center rounded-full border border-outline-soft/60 bg-surface-lowest px-1.5 py-0.5"><button className="h-8 w-8 rounded-full text-primary text-sm disabled:text-muted/50" disabled={busy || item.quantity <= 1} onClick={() => void mutate('PATCH', item.quantity - 1)} type="button">-</button><span className="min-w-8 text-center text-sm font-semibold">{item.quantity}</span><button className="h-8 w-8 rounded-full text-primary text-sm" disabled={busy} onClick={() => void mutate('PATCH', item.quantity + 1)} type="button">+</button></div><div className="text-right"><p className="font-display text-xl font-semibold text-primary">{formatTry(lineTotal(item))}</p><p className="text-xs text-muted">Birim: {formatTry(item.unitPrice)}</p></div></div>
     </div>
     {error ? <p className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}

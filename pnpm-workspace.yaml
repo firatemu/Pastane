@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# EAS Android native builds need hoisted node_modules (pnpm isolated breaks Gradle paths).
+nodeLinker: hoisted

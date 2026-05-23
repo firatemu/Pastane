@@ -11,6 +11,7 @@ import { PrismaService } from '../database/prisma.service';
 import { QueuesService } from '../jobs/queues.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OrderStatusService } from '../orders/order-status.service';
+import { computeProductAvailability } from '../products/product-availability.util';
 import type { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import type { PaymentCallbackDto } from './dto/payment-callback.dto';
 import type { CheckoutFormRetrieveSdkResult } from './providers/iyzico.provider';
@@ -59,6 +60,24 @@ export class PaymentsService {
         HttpStatus.CONFLICT,
       );
     }
+  }
+
+  private assertOrderItemsPurchasable(
+    order: Order & { items?: Array<{ product: Parameters<typeof computeProductAvailability>[0] | null; productNameSnapshot: string }> },
+  ): void {
+    const unavailableItems = (order.items ?? []).filter((item) => !item.product || !computeProductAvailability(item.product).isPurchasable);
+    if (!unavailableItems.length) return;
+    throw new AppException(
+      ERROR_CODES.PRODUCT_NOT_AVAILABLE_FOR_SALE,
+      'Order contains products not available for sale',
+      HttpStatus.CONFLICT,
+      {
+        unavailableItems: unavailableItems.map((item) => ({
+          productName: item.productNameSnapshot,
+          reason: item.product ? computeProductAvailability(item.product).availabilityReason : 'INACTIVE',
+        })),
+      },
+    );
   }
 
   private formatBuyerGsm(phone: string): string {
@@ -158,10 +177,14 @@ export class PaymentsService {
   }
 
   async initiate(userId: string, dto: InitiatePaymentDto, idempotencyKey: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: dto.orderId, userId, deletedAt: null } });
+    const order = await this.prisma.order.findFirst({
+      where: { id: dto.orderId, userId, deletedAt: null },
+      include: { items: { include: { product: true } } },
+    });
     if (!order || order.status !== OrderStatus.PAYMENT_PENDING) {
       throw new AppException(ERROR_CODES.ORDER_NOT_FOUND, 'Order not payable', HttpStatus.BAD_REQUEST);
     }
+    this.assertOrderItemsPurchasable(order);
     const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
 
@@ -268,6 +291,7 @@ export class PaymentsService {
     if (!order || order.status !== OrderStatus.PAYMENT_PENDING) {
       throw new AppException(ERROR_CODES.ORDER_NOT_FOUND, 'Order not payable', HttpStatus.BAD_REQUEST);
     }
+    this.assertOrderItemsPurchasable(order);
 
     const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existing) {

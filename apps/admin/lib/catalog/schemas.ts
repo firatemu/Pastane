@@ -20,6 +20,17 @@ export const allergenSchema = z.object({
   name: z.string().min(1, requiredText),
 });
 
+export const productUnitSchema = z.object({
+  name: z.string().min(1, requiredText),
+  symbol: z
+    .string()
+    .min(1, requiredText)
+    .regex(/^[a-z0-9]+$/i, 'Kısaltma yalnızca harf ve rakam içerebilir.'),
+  kind: z.enum(['COUNT', 'WEIGHT', 'VOLUME']).default('COUNT'),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+  isActive: z.boolean().default(true),
+});
+
 export const productSchema = z
   .object({
     name: z.string().min(1, requiredText),
@@ -28,6 +39,8 @@ export const productSchema = z
     price: z.coerce.number().positive('Geçerli bir fiyat girin.'),
     discountedPrice: z.union([z.coerce.number().positive('Geçerli bir fiyat girin.'), z.literal('')]).optional(),
     categoryId: z.string().uuid(uuidMsg),
+    unitId: z.string().uuid(uuidMsg),
+    unitQuantity: z.union([z.coerce.number().positive('Geçerli bir miktar girin.'), z.literal('')]).optional(),
     status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
     isPublished: z.boolean().default(true),
     saleWindowStart: z.string().optional(),

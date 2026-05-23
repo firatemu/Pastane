@@ -4,12 +4,14 @@ import { PrismaService } from '../database/prisma.service';
 import { AppException } from '../common/exceptions/app.exception';
 import { ERROR_CODES } from '../common/constants/error-codes';
 import { computeProductAvailability } from '../products/product-availability.util';
+import { withProductPresentation } from '../products/product-presentation.util';
 import type { AddToCartDto } from './dto/add-to-cart.dto';
 import type { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
 /** Product relation shape for cart line JSON (gallery for storefront). */
 const cartProductInclude = {
   include: {
+    unit: true,
     images: {
       where: { deletedAt: null },
       orderBy: [
@@ -25,14 +27,15 @@ export class CartService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async get(userId: string) {
-    return this.prisma.cart.upsert({ where: { userId }, update: {}, create: { userId }, include: this.include() });
+    const cart = await this.prisma.cart.upsert({ where: { userId }, update: {}, create: { userId }, include: this.include() });
+    return this.mapCart(cart);
   }
 
   async add(userId: string, dto: AddToCartDto) {
     const product = await this.getProduct(dto.productId);
     await this.validateOptions(product.id, dto.optionIds ?? []);
     const cart = await this.prisma.cart.upsert({ where: { userId }, update: {}, create: { userId } });
-    return this.prisma.cartItem.create({
+    const item = await this.prisma.cartItem.create({
       data: {
         cartId: cart.id,
         productId: product.id,
@@ -41,8 +44,9 @@ export class CartService {
         customNote: dto.customNote,
         options: { create: (dto.optionIds ?? []).map((optionId) => ({ optionId })) },
       },
-      include: { options: true, product: cartProductInclude },
+      include: { options: { include: { option: true } }, product: cartProductInclude },
     });
+    return this.mapCartItem(item);
   }
 
   async update(userId: string, id: string, dto: UpdateCartItemDto) {
@@ -51,15 +55,16 @@ export class CartService {
       await this.validateOptions(item.productId, dto.optionIds);
       await this.prisma.cartItemOption.deleteMany({ where: { cartItemId: id } });
     }
-    return this.prisma.cartItem.update({
+    const updated = await this.prisma.cartItem.update({
       where: { id },
       data: {
         quantity: dto.quantity,
         customNote: dto.customNote,
         ...(dto.optionIds ? { options: { create: dto.optionIds.map((optionId) => ({ optionId })) } } : {}),
       },
-      include: { options: true, product: cartProductInclude },
+      include: { options: { include: { option: true } }, product: cartProductInclude },
     });
+    return this.mapCartItem(updated);
   }
 
   async remove(userId: string, id: string) {
@@ -73,6 +78,38 @@ export class CartService {
     return { cleared: true };
   }
 
+  async validateForCheckout(userId: string) {
+    const cart = await this.prisma.cart.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+      include: { items: { include: { product: cartProductInclude, options: { include: { option: true } } } } },
+    });
+    if (!cart.items.length) return this.mapCart(cart);
+
+    const unavailableItems = cart.items
+      .map((item) => ({ item, availability: computeProductAvailability(item.product) }))
+      .filter(({ availability }) => !availability.isPurchasable);
+
+    if (!unavailableItems.length) return this.mapCart(cart);
+
+    await this.prisma.cartItem.deleteMany({ where: { id: { in: unavailableItems.map(({ item }) => item.id) } } });
+
+    throw new AppException(
+      ERROR_CODES.CART_UNAVAILABLE_ITEMS_REMOVED,
+      'Unavailable cart items removed',
+      HttpStatus.CONFLICT,
+      {
+        removedItems: unavailableItems.map(({ item, availability }) => ({
+          cartItemId: item.id,
+          productId: item.productId,
+          productName: item.product.name,
+          reason: availability.availabilityReason,
+        })),
+      },
+    );
+  }
+
   private include() {
     return {
       items: {
@@ -80,6 +117,14 @@ export class CartService {
         include: { product: cartProductInclude, options: { include: { option: true } } },
       },
     };
+  }
+
+  private mapCartItem<T extends { product: Parameters<typeof withProductPresentation>[0] }>(item: T) {
+    return { ...item, product: withProductPresentation(item.product) };
+  }
+
+  private mapCart<T extends { items: Array<{ product: Parameters<typeof withProductPresentation>[0] }> }>(cart: T) {
+    return { ...cart, items: cart.items.map((item) => this.mapCartItem(item)) };
   }
 
   private async findItem(userId: string, id: string) {

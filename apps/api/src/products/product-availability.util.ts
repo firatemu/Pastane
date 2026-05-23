@@ -1,7 +1,7 @@
 import { ProductStatus } from '@prisma/client';
 import { isTimeWindowValid, timeFallsWithinWindow } from '../common/utils/time-window.util';
 
-export type ProductAvailabilityReason = 'UNPUBLISHED' | 'OUTSIDE_SALE_WINDOW' | 'INACTIVE';
+export type ProductAvailabilityReason = 'UNPUBLISHED' | 'OUTSIDE_SALE_WINDOW' | 'INACTIVE' | 'OUT_OF_STOCK';
 
 export type ProductAvailabilityInput = {
   status: ProductStatus;
@@ -32,6 +32,10 @@ export function computeProductAvailability(
 ): ProductAvailability {
   if (product.deletedAt || product.status === ProductStatus.INACTIVE) {
     return { isVisiblePublic: false, isPurchasable: false, availabilityReason: 'INACTIVE' };
+  }
+
+  if (product.status === ProductStatus.OUT_OF_STOCK) {
+    return { isVisiblePublic: true, isPurchasable: false, availabilityReason: 'OUT_OF_STOCK' };
   }
 
   if (!product.isPublished) {

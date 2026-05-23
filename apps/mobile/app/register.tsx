@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Field, PrimaryButton, Screen } from '@/components/ui';
 import { useAuth } from '@/context/auth-context';
@@ -18,13 +18,30 @@ export default function RegisterScreen(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
 
   async function submit(): Promise<void> {
+    const digits = phone.replace(/\D/g, '');
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('Ad ve soyad zorunlu.');
+      return;
+    }
+    if (digits.length < 10) {
+      setError('Geçersiz telefon.');
+      return;
+    }
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError('Geçersiz email.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Şifre en az 8 karakter olmalı.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await register({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        phone: phone.replace(/\D/g, ''),
+        phone: digits,
         email: email.trim() || undefined,
         password,
       });
@@ -38,7 +55,7 @@ export default function RegisterScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.pad}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.pad}>
         <Screen title="Kayıt ol" subtitle="Pastane müşteri hesabı oluşturun.">
           <Field label="Ad" value={firstName} onChangeText={setFirstName} />
           <Field label="Soyad" value={lastName} onChangeText={setLastName} />
@@ -48,7 +65,7 @@ export default function RegisterScreen(): React.JSX.Element {
           {error ? <Field error={error} /> : null}
           <PrimaryButton label="Kayıt ol" onPress={() => void submit()} busy={busy} />
         </Screen>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

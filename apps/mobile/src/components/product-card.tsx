@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { fallbackImages } from '@/data/fallback';
 import { formatTry } from '@/utils/format';
 import { productImageUrl } from '@/utils/product-image';
+import { productLabel } from '@/utils/product-label';
 import type { Product } from '@/types';
 import { colors, radii, shadow, spacing } from '@/theme';
 
@@ -14,11 +17,12 @@ export function ProductCard({
   onAdd?: () => void;
 }): React.JSX.Element {
   const finalPrice = product.discountedPrice ?? product.price;
+  const [imageUri, setImageUri] = useState(productImageUrl(product));
   return (
     <Pressable style={styles.card} onPress={onPress}>
-      <Image source={{ uri: productImageUrl(product) }} style={styles.image} />
+      <Image source={{ uri: imageUri }} style={styles.image} onError={() => setImageUri(fallbackImages.pastry)} />
       <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
+        <Text style={styles.name} numberOfLines={2}>{productLabel(product)}</Text>
         <Text style={styles.desc} numberOfLines={2}>{product.shortDescription ?? product.description ?? 'Günlük seçki'}</Text>
         <View style={styles.footer}>
           <Text style={styles.price}>{formatTry(finalPrice)}</Text>

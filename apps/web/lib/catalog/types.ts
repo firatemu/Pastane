@@ -6,6 +6,7 @@ export interface Category {
   description?: string | null;
   imageUrl?: string | null;
   children?: Category[];
+  productCount?: number;
 }
 
 export interface ProductImage {
@@ -37,21 +38,34 @@ export interface ProductAllergen {
   allergen: { id: string; name: string };
 }
 
+export interface ProductUnit {
+  id: string;
+  name: string;
+  symbol: string;
+  kind: 'COUNT' | 'WEIGHT' | 'VOLUME';
+  sortOrder: number;
+  isActive: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
+  displayName?: string;
   slug: string;
   description: string | null;
   shortDescription: string | null;
   price: string;
   discountedPrice: string | null;
+  unitId: string;
+  unitQuantity: string | null;
+  unit: ProductUnit;
   preparationMinutes: number | null;
   category: Category;
   images: ProductImage[];
   allergens: ProductAllergen[];
   optionGroups: ProductOptionGroup[];
   isPurchasable?: boolean;
-  availabilityReason?: 'UNPUBLISHED' | 'OUTSIDE_SALE_WINDOW' | 'INACTIVE' | null;
+  availabilityReason?: 'UNPUBLISHED' | 'OUTSIDE_SALE_WINDOW' | 'INACTIVE' | 'OUT_OF_STOCK' | null;
 }
 
 export interface PaginatedProducts {

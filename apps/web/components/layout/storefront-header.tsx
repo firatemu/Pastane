@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CustomerSession } from '../../lib/auth/types';
 import type { Cart } from '../../lib/cart/types';
+import type { Category } from '../../lib/catalog/types';
 import { fetchCart } from '../../lib/cart/queries';
 import { formatTry } from '../shared/price';
 
@@ -19,7 +20,7 @@ function cartTotal(cart: Cart | null): string {
   return total.toFixed(2);
 }
 
-export function StorefrontHeader({ session }: Readonly<{ session?: CustomerSession }>): React.JSX.Element {
+export function StorefrontHeader({ categories = [], session }: Readonly<{ categories?: Category[]; session?: CustomerSession | undefined }>): React.JSX.Element {
   const router = useRouter();
   const [cart, setCart] = useState<Cart | null>(null);
   const quantity = cartQuantity(cart);
@@ -55,11 +56,13 @@ export function StorefrontHeader({ session }: Readonly<{ session?: CustomerSessi
       <div className="stitch-container flex min-h-[88px] items-center justify-between gap-4 py-4">
         <div className="flex items-center gap-8">
           <a className="font-display text-2xl font-bold text-primary sm:text-3xl" href="/">Pasta-Hane</a>
-          <nav className="hidden items-center gap-6 text-xs font-bold uppercase tracking-[0.16em] text-muted md:flex">
-            <a className="hover:text-primary" href="/shop">Shop</a>
-            <a className="hover:text-primary" href="/kategori/pastalar">Pastalar</a>
-            <a className="hover:text-primary" href="/kategori/tatlilar">Tatlılar</a>
-            <a className="hover:text-primary" href="/kategori/unlu-mamuller">Unlu Mamuller</a>
+          <nav className="hidden max-w-[56vw] items-center gap-4 overflow-x-auto whitespace-nowrap text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted md:flex lg:gap-5">
+            <a className="hover:text-primary" href="/shop">Tüm ürünler</a>
+            {categories.map((category) => (
+              <a className="hover:text-primary" href={`/kategori/${category.slug}`} key={category.id}>
+                {category.name}
+              </a>
+            ))}
           </nav>
         </div>
         <nav className="flex items-center gap-1 text-sm sm:gap-2">

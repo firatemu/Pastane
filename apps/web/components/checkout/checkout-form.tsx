@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { checkoutDeliveryOnlySchema, checkoutSchema, type CheckoutValues } from '../../lib/checkout/schemas';
 import type { Address, Order, Payment, Store } from '../../lib/checkout/types';
 import type { Cart } from '../../lib/cart/types';
+import { fetchCart, validateCartForCheckout } from '../../lib/cart/queries';
 import { customerFacingMessageFromUnknownError, messageFromCustomerApiPayload, type ParsedCustomerApiPayload } from '../../lib/messages/customer-facing-errors';
 import { paymentStatusLabel } from '../../lib/orders/status';
 import { formatTry } from '../shared/price';
@@ -28,11 +29,23 @@ export function CheckoutForm(): React.JSX.Element {
   const regYear = register('expireYear');
   const regCvc = register('cvc');
   const deliveryType = watch('deliveryType');
-  useEffect(() => { void Promise.all([fetch('/api/addresses').then(r => r.json()), fetch('/api/stores').then(r => r.json()), fetch('/api/cart').then(r => r.json())]).then(([a, s, c]) => {
-    const storePayload = s.data as Store[] | { items?: Store[] } | undefined;
-    const storeList = Array.isArray(storePayload) ? storePayload : (storePayload?.items ?? []);
-    setAddresses(a.data ?? []); setStores(storeList); setCart(c.data ?? { id: '', items: [] });
-  }).catch(() => setError('Ödeme bilgileri yüklenemedi. Lütfen sayfayı yenileyin.')); }, []);
+  useEffect(() => {
+    async function loadCheckout(): Promise<void> {
+      const [a, s] = await Promise.all([fetch('/api/addresses').then(r => r.json()), fetch('/api/stores').then(r => r.json())]);
+      const storePayload = s.data as Store[] | { items?: Store[] } | undefined;
+      const storeList = Array.isArray(storePayload) ? storePayload : (storePayload?.items ?? []);
+      setAddresses(a.data ?? []);
+      setStores(storeList);
+      try {
+        setCart(await validateCartForCheckout());
+      } catch (err) {
+        setError(customerFacingMessageFromUnknownError(err, 'Sepet ödeme için doğrulanamadı.'));
+        setCart(await fetchCart().catch(() => ({ id: '', items: [] })));
+        window.dispatchEvent(new Event('cart:changed'));
+      }
+    }
+    void loadCheckout().catch(() => setError('Ödeme bilgileri yüklenemedi. Lütfen sayfayı yenileyin.'));
+  }, []);
   useEffect(() => {
     const orderId = searchParams.get('orderId');
     const status = searchParams.get('durum');
@@ -72,6 +85,13 @@ export function CheckoutForm(): React.JSX.Element {
     return orderPayload.data;
   }
 
+  async function refreshCartAfterCheckoutFailure(): Promise<void> {
+    const nextCart = await fetchCart().catch(() => null);
+    if (!nextCart) return;
+    setCart(nextCart);
+    window.dispatchEvent(new Event('cart:changed'));
+  }
+
   async function payWithIyzico(): Promise<void> {
     const parsed = checkoutDeliveryOnlySchema.safeParse(getValues());
     if (!parsed.success) {
@@ -100,6 +120,7 @@ export function CheckoutForm(): React.JSX.Element {
       }).catch(() => { /* özet isteğe bağlı */ });
       requestAnimationFrame(() => iyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
     } catch (e) {
+      await refreshCartAfterCheckoutFailure();
       setError(customerFacingMessageFromUnknownError(e, 'iyzico ödemesi başlatılamadı.'));
     } finally {
       setIyBusy(false);
@@ -169,6 +190,7 @@ export function CheckoutForm(): React.JSX.Element {
       const checkoutDone = freshOrderPayload.data?.status === 'CONFIRMED' || pay?.status === 'SUCCESS';
       router.replace(`/odeme?durum=${checkoutDone ? 'basarili' : 'beklemede'}&orderId=${orderToPay.id}`);
     } catch (e) {
+      await refreshCartAfterCheckoutFailure();
       setError(customerFacingMessageFromUnknownError(e, 'Ödeme adımı tamamlanamadı.'));
       router.replace(
         orderIdForRecovery ? `/odeme?durum=basarisiz&orderId=${orderIdForRecovery}` : '/odeme?durum=basarisiz',

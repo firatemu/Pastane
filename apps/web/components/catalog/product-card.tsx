@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Product } from '../../lib/catalog/types';
+import { productLabel } from '../../lib/catalog/product-label';
 import { stitchImages } from '../../lib/stitch-design';
 import { messageFromCustomerApiPayload, type ParsedCustomerApiPayload } from '../../lib/messages/customer-facing-errors';
 import { Price } from '../shared/price';
@@ -54,12 +55,12 @@ export function ProductCard({ product }: Readonly<{ product: Product }>): React.
       <div className="mt-auto space-y-2 p-4">
         <a className="block" href={`/urun/${product.slug}`}>
           <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-secondary">{product.category.name}</p>
-          <h2 className="mt-1 font-display text-lg font-semibold leading-tight text-primary">{product.name}</h2>
+          <h2 className="mt-1 font-body text-lg font-bold leading-snug text-primary">{productLabel(product)}</h2>
         </a>
         <div className="flex items-end justify-between gap-3">
-          <Price value={product.discountedPrice ?? product.price} previous={product.discountedPrice ? product.price : null} size="compact" />
+          <Price value={product.discountedPrice ?? product.price} previous={product.discountedPrice ? product.price : null} size="compact" tone="danger" />
           <button
-            aria-label={`${product.name} ürününü sepete ekle`}
+            aria-label={`${productLabel(product)} ürününü sepete ekle`}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-semibold leading-none text-white transition hover:bg-primary-container disabled:cursor-not-allowed disabled:bg-muted"
             disabled={busy || soldOut}
             onClick={() => void addToCart()}

@@ -9,6 +9,7 @@ import { useAuth } from '@/context/auth-context';
 import { useCart } from '@/context/cart-context';
 import { fallbackCategories, fallbackImages, fallbackProducts } from '@/data/fallback';
 import type { Category, HomeBanner, Product } from '@/types';
+import { productLabel } from '@/utils/product-label';
 import { colors, radii, shadow, spacing } from '@/theme';
 
 export default function HomeScreen(): React.JSX.Element {
@@ -39,7 +40,7 @@ export default function HomeScreen(): React.JSX.Element {
     }
     try {
       await addItem(product.id);
-      setNotice(`${product.name} sepete eklendi.`);
+      setNotice(`${productLabel(product)} sepete eklendi.`);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Sepete eklenemedi.');
     }

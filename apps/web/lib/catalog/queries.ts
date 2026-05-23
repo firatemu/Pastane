@@ -16,6 +16,11 @@ export async function getCategories(): Promise<Category[]> {
   }
 }
 
+export function categoriesHavingProducts(categories: Category[], products: Product[]): Category[] {
+  const categoryIds = new Set(products.map((product) => product.category.id));
+  return categories.filter((category) => categoryIds.has(category.id) || (category.children ?? []).some((child) => categoryIds.has(child.id)));
+}
+
 export async function getCategoryBySlug(slug: string): Promise<Category> {
   try {
     return await apiFetch<Category>(`/api/v1/categories/slug/${slug}`);

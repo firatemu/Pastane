@@ -1,11 +1,13 @@
 import type { ExpoConfig } from 'expo/config';
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3003';
-const webUrl = process.env.EXPO_PUBLIC_WEB_URL ?? 'http://localhost:3000';
+const isProd = process.env.NODE_ENV === 'production';
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? (isProd ? 'https://api.azem.cloud' : 'http://10.0.2.2:3003');
+const webUrl = process.env.EXPO_PUBLIC_WEB_URL ?? (isProd ? 'https://azem.cloud' : 'http://10.0.2.2:3000');
 
 const config: ExpoConfig = {
   name: 'Pasta-Hane',
   slug: 'pasta-hane-mobile',
+  owner: 'azemyazilim',
   version: '1.0.0',
   orientation: 'portrait',
   scheme: 'pastahane',
@@ -28,7 +30,7 @@ const config: ExpoConfig = {
   web: {
     bundler: 'metro',
   },
-  plugins: ['expo-router'],
+  plugins: ['expo-router', 'expo-font'],
   experiments: {
     typedRoutes: true,
   },
@@ -36,7 +38,7 @@ const config: ExpoConfig = {
     apiUrl,
     webUrl,
     eas: {
-      projectId: process.env.EAS_PROJECT_ID ?? '',
+      projectId: process.env.EAS_PROJECT_ID ?? 'bc619fe4-ae4d-444c-ab92-9b655aacd897',
     },
   },
 };

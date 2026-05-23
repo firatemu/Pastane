@@ -3,7 +3,7 @@ import { CategoryStrip } from '../../components/home/category-strip';
 import { FeaturedProducts } from '../../components/home/featured-products';
 import { HomeHero } from '../../components/home/hero';
 import { PublicStorefrontInfo } from '../../components/home/public-storefront-info';
-import { getActiveCampaigns, getCategories, getDeliveryZones, getHomeBanners, getProducts, getStores } from '../../lib/catalog/queries';
+import { categoriesHavingProducts, getActiveCampaigns, getCategories, getDeliveryZones, getHomeBanners, getProducts, getStores } from '../../lib/catalog/queries';
 import { absoluteUrl } from '../../lib/seo/metadata';
 import { organizationJsonLd } from '../../lib/seo/structured-data';
 
@@ -26,7 +26,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
     <main className="stitch-container">
       <script dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }} type="application/ld+json" />
       <HomeHero banners={banners} />
-      <CategoryStrip categories={categories} />
+      <CategoryStrip categories={categoriesHavingProducts(categories, products.items)} />
       <PublicStorefrontInfo campaigns={campaigns} stores={stores.items} deliveryZones={deliveryZones.items} />
       <FeaturedProducts products={products.items} />
     </main>

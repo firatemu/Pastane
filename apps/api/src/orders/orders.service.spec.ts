@@ -4,6 +4,7 @@ import { OrderStatusService } from './order-status.service';
 
 describe('OrdersService admin operations', () => {
   const baseDeps = [
+    { validateForCheckout: jest.fn() } as never,
     new OrderStatusService(),
     {} as never,
     { log: jest.fn() } as never,
@@ -57,7 +58,7 @@ describe('OrdersService admin operations', () => {
       orderStatusHistory: { create: jest.fn() },
     };
     const prisma = { $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)) } as never;
-    const service = new OrdersService(prisma, new OrderStatusService(), {} as never, audit as never, {} as never, notifications as never);
+    const service = new OrdersService(prisma, { validateForCheckout: jest.fn() } as never, new OrderStatusService(), {} as never, audit as never, {} as never, notifications as never);
     await expect(service.assignCourier('order-1', { courierId: 'new-courier' })).resolves.toEqual({ orderId: 'order-1', delivery: updatedDelivery });
     expect(tx.order.update).not.toHaveBeenCalled();
     expect(tx.orderStatusHistory.create).not.toHaveBeenCalled();
@@ -85,7 +86,7 @@ describe('OrdersService admin operations', () => {
       orderStatusHistory: { create: jest.fn() },
     };
     const prisma = { $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)) } as never;
-    const service = new OrdersService(prisma, new OrderStatusService(), {} as never, audit as never, {} as never, notifications as never);
+    const service = new OrdersService(prisma, { validateForCheckout: jest.fn() } as never, new OrderStatusService(), {} as never, audit as never, {} as never, notifications as never);
     await expect(service.assignCourier('order-1', { courierId: 'c2' })).rejects.toThrow(
       'Courier can only be reassigned before the delivery has started',
     );
@@ -119,7 +120,7 @@ describe('OrdersService admin operations', () => {
       cartItem: { deleteMany: jest.fn() },
     };
     const prisma = { $transaction: jest.fn((fn) => fn(tx)) } as never;
-    const service = new OrdersService(prisma, new OrderStatusService(), {} as never, { log: jest.fn() } as never, {} as never, { createOrderStatusNotification: jest.fn() } as never);
+    const service = new OrdersService(prisma, { validateForCheckout: jest.fn() } as never, new OrderStatusService(), {} as never, { log: jest.fn() } as never, {} as never, { createOrderStatusNotification: jest.fn() } as never);
     await service.create('customer-1', { deliveryType: DeliveryType.HOME_DELIVERY, addressId: 'address-1' });
     expect(tx.order.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ deliveryFee: expect.anything(), grandTotal: expect.anything() }) }));
     const data = tx.order.create.mock.calls[0]?.[0].data;

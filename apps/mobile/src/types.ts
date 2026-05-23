@@ -32,9 +32,19 @@ export interface ProductOptionGroup {
   options: ProductOption[];
 }
 
+export interface ProductUnit {
+  id: string;
+  name: string;
+  symbol: string;
+  kind: 'COUNT' | 'WEIGHT' | 'VOLUME';
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
+  displayName?: string;
   slug: string;
   description?: string | null;
   shortDescription?: string | null;
@@ -166,6 +176,7 @@ export interface Payment {
   status: string;
   amount?: string;
   failureReason?: string | null;
+  processingResult?: string | null;
 }
 
 export interface LoyaltyAccount {

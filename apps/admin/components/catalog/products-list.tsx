@@ -67,7 +67,7 @@ export function ProductsList({
                         )}
                       </div>
                       <div>
-                        <p className="font-semibold text-on-surface">{product.name}</p>
+                        <p className="font-semibold text-on-surface">{product.displayName ?? product.name}</p>
                         {product.shortDescription ? (
                           <p className="mt-0.5 line-clamp-1 text-sm text-on-surface-variant">{product.shortDescription}</p>
                         ) : null}

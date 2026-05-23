@@ -15,7 +15,8 @@ import type { CreateOptionGroupDto } from './dto/create-option-group.dto';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { QueryProductDto } from './dto/query-product.dto';
 import type { UpdateProductDto } from './dto/update-product.dto';
-import { computeProductAvailability, withProductAvailability } from './product-availability.util';
+import { computeProductAvailability } from './product-availability.util';
+import { withProductPresentation } from './product-presentation.util';
 
 @Injectable()
 export class ProductsService {
@@ -47,7 +48,7 @@ export class ProductsService {
       }),
       this.prisma.product.count({ where }),
     ]);
-    return { items: items.map((item) => withProductAvailability(item)), meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return { items: items.map((item) => withProductPresentation(item)), meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async adminList(query: QueryProductDto) {
@@ -68,7 +69,7 @@ export class ProductsService {
       }),
       this.prisma.product.count({ where }),
     ]);
-    return { items: items.map((item) => withProductAvailability(item)), meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return { items: items.map((item) => withProductPresentation(item)), meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async get(id: string, publicOnly = false) {
@@ -81,7 +82,7 @@ export class ProductsService {
       include: this.include(),
     });
     if (!x) throw new AppException(ERROR_CODES.PRODUCT_NOT_FOUND, 'Product not found', HttpStatus.NOT_FOUND);
-    return withProductAvailability(x);
+    return withProductPresentation(x);
   }
 
   async getBySlug(slug: string) {
@@ -90,11 +91,12 @@ export class ProductsService {
       include: this.include(),
     });
     if (!x) throw new AppException(ERROR_CODES.PRODUCT_NOT_FOUND, 'Product not found', HttpStatus.NOT_FOUND);
-    return withProductAvailability(x);
+    return withProductPresentation(x);
   }
 
   async create(dto: CreateProductDto, actor?: AuthUser) {
     await this.assertCategory(dto.categoryId);
+    await this.assertUnit(dto.unitId, dto.unitQuantity);
     this.assertDiscount(dto.price, dto.discountedPrice);
     this.assertSaleWindow(dto.saleWindowStart, dto.saleWindowEnd);
     await this.assertAllergens(dto.allergenIds ?? []);
@@ -107,6 +109,8 @@ export class ProductsService {
         price: new Prisma.Decimal(dto.price),
         discountedPrice: dto.discountedPrice === undefined ? undefined : new Prisma.Decimal(dto.discountedPrice),
         categoryId: dto.categoryId,
+        unitId: dto.unitId,
+        unitQuantity: dto.unitQuantity === undefined ? null : new Prisma.Decimal(dto.unitQuantity),
         status: dto.status,
         preparationMinutes: dto.preparationMinutes,
         isPublished: dto.isPublished ?? true,
@@ -118,12 +122,18 @@ export class ProductsService {
       include: this.include(),
     });
     await this.audit.log({ actorId: actor?.sub, action: 'products.create', entityType: 'Product', entityId: created.id, newValues: { name: created.name, slug: created.slug } });
-    return withProductAvailability(created);
+    return withProductPresentation(created);
   }
 
   async update(id: string, dto: UpdateProductDto, actor?: AuthUser) {
     const current = await this.get(id);
     if (dto.categoryId) await this.assertCategory(dto.categoryId);
+    if (dto.unitId !== undefined || dto.unitQuantity !== undefined) {
+      await this.assertUnit(
+        dto.unitId ?? current.unitId,
+        dto.unitQuantity !== undefined ? dto.unitQuantity : current.unitQuantity != null ? Number(current.unitQuantity) : undefined,
+      );
+    }
     this.assertDiscount(dto.price ?? Number(current.price), dto.discountedPrice);
     const nextStart = dto.saleWindowStart !== undefined ? dto.saleWindowStart : current.saleWindowStart;
     const nextEnd = dto.saleWindowEnd !== undefined ? dto.saleWindowEnd : current.saleWindowEnd;
@@ -131,7 +141,7 @@ export class ProductsService {
     const data = { ...this.productData(dto), ...(dto.name ? { slug: await this.uniqueSlug(dto.name, id) } : {}) };
     const updated = await this.prisma.product.update({ where: { id }, data, include: this.include() });
     await this.audit.log({ actorId: actor?.sub, action: 'products.update', entityType: 'Product', entityId: id, oldValues: { name: current.name, status: current.status }, newValues: { name: updated.name, status: updated.status } });
-    return withProductAvailability(updated);
+    return withProductPresentation(updated);
   }
 
   async remove(id: string, actor?: AuthUser) {
@@ -179,6 +189,7 @@ export class ProductsService {
   private include() {
     return {
       category: true,
+      unit: true,
       images: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
       allergens: { include: { allergen: true } },
       optionGroups: { where: { deletedAt: null }, include: { options: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
@@ -194,6 +205,25 @@ export class ProductsService {
     if (!ids.length) return;
     const count = await this.prisma.allergen.count({ where: { id: { in: ids }, deletedAt: null } });
     if (count !== ids.length) throw new AppException(ERROR_CODES.ALLERGEN_NOT_FOUND, 'Allergen not found', HttpStatus.NOT_FOUND);
+  }
+
+  private async assertUnit(unitId: string, unitQuantity?: number) {
+    const unit = await this.prisma.productUnit.findFirst({
+      where: { id: unitId, deletedAt: null, isActive: true },
+    });
+    if (!unit) {
+      throw new AppException(ERROR_CODES.PRODUCT_UNIT_NOT_FOUND, 'Product unit not found', HttpStatus.NOT_FOUND);
+    }
+    if (unit.kind !== 'COUNT') {
+      if (unitQuantity === undefined || unitQuantity <= 0) {
+        throw new AppException(
+          ERROR_CODES.VALIDATION_FAILED,
+          'Unit quantity is required for weight and volume products',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+    return unit;
   }
 
   private assertDiscount(price: number, discount?: number) {
@@ -214,6 +244,9 @@ export class ProductsService {
       ...rest,
       ...(rest.price !== undefined ? { price: new Prisma.Decimal(rest.price) } : {}),
       ...(rest.discountedPrice !== undefined ? { discountedPrice: new Prisma.Decimal(rest.discountedPrice) } : {}),
+      ...(rest.unitQuantity !== undefined
+        ? { unitQuantity: rest.unitQuantity === null ? null : new Prisma.Decimal(rest.unitQuantity) }
+        : {}),
       ...(rest.saleWindowStart !== undefined ? { saleWindowStart: rest.saleWindowStart || null } : {}),
       ...(rest.saleWindowEnd !== undefined ? { saleWindowEnd: rest.saleWindowEnd || null } : {}),
     };

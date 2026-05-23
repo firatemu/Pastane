@@ -25,6 +25,7 @@ import { OrdersModule } from './orders/orders.module';
 import { OtpModule } from './otp/otp.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { ProductUnitsModule } from './product-units/product-units.module';
 import { ProductsModule } from './products/products.module';
 import { RolesModule } from './roles/roles.module';
 import { StoresModule } from './stores/stores.module';
@@ -41,7 +42,7 @@ import { AddressesModule } from './addresses/addresses.module';
       // Turborepo / Docker: API cwd is often `apps/api`; repo-root `.env` still applies for local dev & compose `env_file`.
       envFilePath: ['.env.local', '.env', '../.env', '../../.env'],
     }), PrismaModule, AuditModule, AuthModule, OtpModule, UsersModule,
-    RolesModule, PermissionsModule, CategoriesModule, ProductsModule, AllergensModule, MediaModule,
+    RolesModule, PermissionsModule, CategoriesModule, ProductsModule, ProductUnitsModule, AllergensModule, MediaModule,
     StoresModule, DeliveryZonesModule, CartModule, OrdersModule, PaymentsModule,
     CouriersModule, DeliveriesModule, AddressesModule, ReviewsModule, LoyaltyModule, NotificationsModule, CampaignsModule, BannersModule, SettingsModule, ReportsModule, JobsModule, HealthModule,
   ],

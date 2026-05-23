@@ -9,6 +9,7 @@ export type CartItem = {
   product: {
     id: string;
     name: string;
+    displayName?: string;
     slug: string;
     price: string;
     discountedPrice?: string | null;

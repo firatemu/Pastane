@@ -10,6 +10,8 @@ export class CreateProductDto {
   @IsNumber() @Min(0.01) price!: number;
   @IsOptional() @IsNumber() @Min(0.01) discountedPrice?: number;
   @IsUUID() categoryId!: string;
+  @IsUUID() unitId!: string;
+  @IsOptional() @IsNumber() @Min(0.001) unitQuantity?: number;
   @IsOptional() @IsEnum(ProductStatus) status?: ProductStatus;
   @IsOptional() @IsInt() @Min(1) preparationMinutes?: number;
   @IsOptional() @IsBoolean() isPublished?: boolean;

@@ -8,7 +8,7 @@ import type { z } from 'zod';
 import { adminFetch, adminFetchEnvelope } from '../../lib/api/catalog';
 import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-errors';
 import { productSchema } from '../../lib/catalog/schemas';
-import type { Allergen, Category, Product } from '../../lib/catalog/types';
+import type { Allergen, Category, Product, ProductUnit } from '../../lib/catalog/types';
 import { can } from '../../lib/permissions/can';
 import { ErrorState, LoadingState } from '../shared/async-state';
 import { adminInputClass, adminPrimaryButtonClass, adminSelectClass } from '../shared/admin-form-controls';
@@ -36,6 +36,8 @@ const emptyForm: Form = {
   saleWindowStart: '',
   saleWindowEnd: '',
   preparationMinutes: '',
+  unitId: '',
+  unitQuantity: '',
   allergenIds: [],
 };
 
@@ -43,6 +45,7 @@ export function ProductsManager({ permissions }: { permissions: string[] }): Rea
   const [rows, setRows] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [allergens, setAllergens] = useState<Allergen[]>([]);
+  const [units, setUnits] = useState<ProductUnit[]>([]);
   const [selected, setSelected] = useState<Product | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -65,14 +68,16 @@ export function ProductsManager({ permissions }: { permissions: string[] }): Rea
   async function load(): Promise<void> {
     try {
       setError(null);
-      const [products, categoryRows, allergenRows] = await Promise.all([
+      const [products, categoryRows, allergenRows, unitRows] = await Promise.all([
         adminFetchEnvelope<Product[]>('/products/admin?limit=100'),
         adminFetch<Category[]>('/categories'),
         adminFetchEnvelope<Allergen[]>('/allergens?limit=100'),
+        adminFetchEnvelope<ProductUnit[]>('/product-units?limit=100&activeOnly=true'),
       ]);
       setRows(products.data);
       setCategories(flatten(categoryRows));
       setAllergens(allergenRows.data);
+      setUnits(unitRows.data);
       setSelected((prev) => (prev ? products.data.find((p) => p.id === prev.id) ?? null : null));
     } catch (caught) {
       setError(adminMessageFromUnknownError(caught, 'Ürün verileri yüklenemedi.'));
@@ -112,6 +117,7 @@ export function ProductsManager({ permissions }: { permissions: string[] }): Rea
         ...values,
         discountedPrice: values.discountedPrice === '' ? undefined : values.discountedPrice,
         preparationMinutes: values.preparationMinutes === '' ? undefined : values.preparationMinutes,
+        unitQuantity: values.unitQuantity === '' ? undefined : values.unitQuantity,
         saleWindowStart: values.saleWindowStart?.trim() ? values.saleWindowStart : undefined,
         saleWindowEnd: values.saleWindowEnd?.trim() ? values.saleWindowEnd : undefined,
       };
@@ -137,13 +143,14 @@ export function ProductsManager({ permissions }: { permissions: string[] }): Rea
 
   function openCreate(): void {
     setEditing(null);
-    form.reset(emptyForm);
+    const defaultUnit = units.find((unit) => unit.symbol === 'adet') ?? units[0];
+    form.reset({ ...emptyForm, unitId: defaultUnit?.id ?? '' });
     setFormOpen(true);
   }
 
   function openEdit(product: Product): void {
     setEditing(product);
-    setSelected(product);
+    setSelected(null);
     form.reset({
       name: product.name,
       description: product.description ?? '',
@@ -156,6 +163,8 @@ export function ProductsManager({ permissions }: { permissions: string[] }): Rea
       saleWindowStart: product.saleWindowStart ?? '',
       saleWindowEnd: product.saleWindowEnd ?? '',
       preparationMinutes: product.preparationMinutes ?? '',
+      unitId: product.unitId,
+      unitQuantity: product.unitQuantity ? Number(product.unitQuantity) : '',
       allergenIds: product.allergens.map((a) => a.allergen.id),
     });
     setFormOpen(true);
@@ -270,6 +279,7 @@ export function ProductsManager({ permissions }: { permissions: string[] }): Rea
           form={form}
           categories={categories}
           allergens={allergens}
+          units={units}
           permissions={permissions}
           onClose={closeForm}
           onSubmit={submit}
@@ -279,4 +289,3 @@ export function ProductsManager({ permissions }: { permissions: string[] }): Rea
     </section>
   );
 }
-

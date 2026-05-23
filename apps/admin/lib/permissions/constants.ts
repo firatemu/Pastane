@@ -12,6 +12,7 @@ export const NAV_ITEMS: readonly Nav[] = [
   { label: 'Ürünler', href: '/products', permissions: ['products.view'], enabled: true, group: 'Katalog' },
   { label: 'Kategoriler', href: '/categories', permissions: ['categories.view'], enabled: true, group: 'Katalog' },
   { label: 'Alerjenler', href: '/allergens', permissions: ['allergens.view'], enabled: true, group: 'Katalog' },
+  { label: 'Birimler', href: '/product-units', permissions: ['productUnits.view'], enabled: true, group: 'Katalog' },
   { label: 'Ana sayfa bannerları', href: '/banners', permissions: ['banners.view'], enabled: true, group: 'İçerik yönetimi' },
   { label: 'Kampanyalar', href: '/campaigns', permissions: ['campaigns.view'], enabled: true, group: 'İçerik yönetimi' },
   { label: 'Sadakat', href: '/loyalty', permissions: ['loyalty.manageSettings'], enabled: true, group: 'İçerik yönetimi' },

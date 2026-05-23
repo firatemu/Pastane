@@ -6,6 +6,7 @@ import { EmptyState, PrimaryButton, Screen } from '@/components/ui';
 import { useAuth } from '@/context/auth-context';
 import { useCart } from '@/context/cart-context';
 import { formatTry } from '@/utils/format';
+import { productLabel } from '@/utils/product-label';
 import { productImageUrl } from '@/utils/product-image';
 import { colors, radii, shadow, spacing } from '@/theme';
 
@@ -42,7 +43,7 @@ export default function CartScreen(): React.JSX.Element {
                 <View key={item.id} style={styles.row}>
                   <Image source={{ uri: productImageUrl(item.product) }} style={styles.thumb} />
                   <View style={styles.body}>
-                    <Text style={styles.name}>{item.product.name}</Text>
+                    <Text style={styles.name}>{productLabel(item.product)}</Text>
                     <Text style={styles.meta}>{formatTry(item.unitPrice)} · adet</Text>
                     <View style={styles.qtyRow}>
                       <Pressable
