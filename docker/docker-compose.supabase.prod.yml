@@ -51,7 +51,7 @@ services:
       - pastane_supabase
     environment:
       PGADMIN_DEFAULT_EMAIL: ${SUPABASE_STUDIO_EMAIL:-studio-admin@example.test}
-      PGADMIN_DEFAULT_PASSWORD: ${SUPABASE_STUDIO_PASSWORD:?Set SUPABASE_STUDIO_PASSWORD with studio profile}
+      PGADMIN_DEFAULT_PASSWORD: ${SUPABASE_STUDIO_PASSWORD:-studio-not-used-without-profile}
       PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "127.0.0.1:54323:80"
