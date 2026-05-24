@@ -8,6 +8,11 @@ cd "$ROOT"
 
 echo "=== verify-docker-lockfile ==="
 
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "[skip] pnpm not on host — Docker prod build (--frozen-lockfile) is authoritative"
+  exit 0
+fi
+
 echo "[1/5] root frozen-lockfile"
 pnpm install --frozen-lockfile >/dev/null
 
