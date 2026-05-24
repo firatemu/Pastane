@@ -55,9 +55,10 @@ set -a
 # shellcheck source=/dev/null
 source "$ENV_FILE"
 set +a
-bash "$ROOT/scripts/backup-prod.sh"
-OUT="${BACKUP_DIR:-/var/www/pastane-app/backups}"
-if [[ "$OUT" != /* ]]; then OUT="$ROOT/$OUT"; fi
+CUTOVER_BACKUP_DIR="${CUTOVER_BACKUP_DIR:-/var/www/pastane-app/backups}"
+mkdir -p "$CUTOVER_BACKUP_DIR"
+BACKUP_DIR="$CUTOVER_BACKUP_DIR" bash "$ROOT/scripts/backup-prod.sh"
+OUT="$CUTOVER_BACKUP_DIR"
 DUMP_FILE="$(ls -t "$OUT"/pastane-pg-*.dump | head -1)"
 echo "Using dump: $DUMP_FILE"
 
