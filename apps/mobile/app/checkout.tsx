@@ -63,6 +63,7 @@ export default function CheckoutScreen(): React.JSX.Element {
   const [webViewLoading, setWebViewLoading] = useState(false);
   const [webViewCanGoBack, setWebViewCanGoBack] = useState(false);
   const [paymentStartedAt, setPaymentStartedAt] = useState<number | null>(null);
+  const [deliverableDistricts, setDeliverableDistricts] = useState<Set<string>>(() => new Set());
   const pendingOrderIdRef = useRef<string | undefined>(undefined);
   const pendingOrderFormKeyRef = useRef<string | null>(null);
   const checkingRef = useRef(false);
@@ -85,6 +86,10 @@ export default function CheckoutScreen(): React.JSX.Element {
     ].join(':');
   }
 
+  function isDistrictDeliverable(district: string): boolean {
+    return deliverableDistricts.has(district.trim().toLocaleLowerCase('tr-TR'));
+  }
+
   useEffect(() => {
     if (!ready) return;
     setInitialLoading(true);
@@ -100,15 +105,15 @@ export default function CheckoutScreen(): React.JSX.Element {
         setAddresses(a);
         setStores(s);
         const zoneNames = new Set(zones.map((z) => z.name.trim().toLocaleLowerCase('tr-TR')));
+        setDeliverableDistricts(zoneNames);
         const isDeliverable = (district: string) => zoneNames.has(district.trim().toLocaleLowerCase('tr-TR'));
         const def =
-          a.find((x) => x.isDefault && isDeliverable(x.district)) ??
-          a.find((x) => isDeliverable(x.district)) ??
-          a.find((x) => x.isDefault) ??
-          a[0];
-        if (def) setAddressId(def.id);
-        if (a.length > 0 && def && !isDeliverable(def.district)) {
-          setError('Varsayılan adresiniz teslimat bölgesinde değil. Yenişehir, Mezitli veya Akdeniz ilçeli bir adres seçin.');
+          a.find((x) => x.isDefault && isDeliverable(x.district)) ?? a.find((x) => isDeliverable(x.district)) ?? null;
+        if (def) {
+          setAddressId(def.id);
+        } else if (a.length > 0) {
+          setAddressId(undefined);
+          setError('Teslimat için Yenişehir, Mezitli veya Akdeniz ilçeli bir adres seçin veya ekleyin.');
         }
         if (s[0]) setPickupStoreId(s[0].id);
         if (storedPending) {
@@ -226,6 +231,14 @@ export default function CheckoutScreen(): React.JSX.Element {
   async function startPayment(): Promise<void> {
     setBusy(true);
     setError(null);
+    if (deliveryType === 'HOME_DELIVERY') {
+      const selected = addresses.find((a) => a.id === addressId);
+      if (!selected || !isDistrictDeliverable(selected.district)) {
+        setBusy(false);
+        setError('Seçtiğiniz adres için teslimat yapılmıyor. İlçeyi Yenişehir, Mezitli veya Akdeniz olarak güncelleyin.');
+        return;
+      }
+    }
     // #region agent log
     fetch('http://127.0.0.1:7317/ingest/2fb3864b-34dc-4d52-b337-e3a2b59567ad', {
       method: 'POST',
@@ -450,6 +463,10 @@ export default function CheckoutScreen(): React.JSX.Element {
 
   const payment = payments[0];
   const checkoutComplete = pendingOrder?.status === 'CONFIRMED' || payment?.status === 'SUCCESS';
+  const selectedAddress = addresses.find((a) => a.id === addressId);
+  const homeDeliveryBlocked =
+    deliveryType === 'HOME_DELIVERY' &&
+    (!addressId || !selectedAddress || !isDistrictDeliverable(selectedAddress.district));
   const payLocked = busy || checkoutComplete;
   const payLabel = busy ? 'Yükleniyor…' : checkoutComplete ? 'Ödeme tamamlandı' : 'İyzico ile öde';
   const showPaymentCheck = Boolean(pendingOrder) && !checkoutComplete;
@@ -494,19 +511,34 @@ export default function CheckoutScreen(): React.JSX.Element {
               <Pressable style={styles.link} onPress={() => router.push('/addresses')}>
                 <Text style={styles.linkText}>Adresleri yönet</Text>
               </Pressable>
-              {addresses.map((a) => (
-                <Pressable
-                  key={a.id}
-                  style={[styles.choice, addressId === a.id && styles.choiceActive]}
-                  onPress={() => {
-                    clearPendingCheckout();
-                    setAddressId(a.id);
-                  }}
-                >
-                  <Text style={styles.choiceTitle}>{a.title}</Text>
-                  <Text style={styles.choiceMeta}>{a.district}, {a.city}</Text>
-                </Pressable>
-              ))}
+              {addresses.map((a) => {
+                const deliverable = isDistrictDeliverable(a.district);
+                return (
+                  <Pressable
+                    key={a.id}
+                    style={[
+                      styles.choice,
+                      addressId === a.id && styles.choiceActive,
+                      !deliverable && styles.choiceDisabled,
+                    ]}
+                    onPress={() => {
+                      clearPendingCheckout();
+                      setAddressId(a.id);
+                      if (!deliverable) {
+                        setError('Bu adres teslimat bölgesinde değil. İlçeyi Yenişehir, Mezitli veya Akdeniz yapın.');
+                      } else {
+                        setError(null);
+                      }
+                    }}
+                  >
+                    <Text style={styles.choiceTitle}>{a.title}</Text>
+                    <Text style={styles.choiceMeta}>{a.district}, {a.city}</Text>
+                    {!deliverable ? (
+                      <Text style={styles.choiceWarn}>Teslimat bölgesi dışı (Yenişehir, Mezitli, Akdeniz)</Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
             </>
           ) : (
             stores.map((s) => (
@@ -590,7 +622,7 @@ export default function CheckoutScreen(): React.JSX.Element {
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <PrimaryButton
             busy={busy}
-            disabled={!items.length || payLocked}
+            disabled={!items.length || payLocked || homeDeliveryBlocked}
             label={payLabel}
             onPress={() => void startPayment()}
           />
@@ -636,6 +668,8 @@ export default function CheckoutScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   choice: { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant, borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, marginBottom: spacing.sm, padding: spacing.md },
   choiceActive: { backgroundColor: colors.surfaceContainerLow, borderColor: colors.primary, borderWidth: 1 },
+  choiceDisabled: { opacity: 0.72 },
+  choiceWarn: { color: colors.error, fontSize: 11, marginTop: 4 },
   choiceMeta: { color: colors.onSurfaceVariant, fontSize: 12, marginTop: 4 },
   choiceTitle: { fontFamily: 'PlusJakartaSans_700Bold' },
   closePay: { padding: spacing.lg },

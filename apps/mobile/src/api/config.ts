@@ -45,7 +45,7 @@ function translateApiMessage(message: string): string {
   if (normalized.includes('order not payable')) return 'Sipariş ödeme için uygun değil.';
   if (normalized.includes('order not found')) return 'Sipariş bulunamadı.';
   if (normalized.includes('address not found')) return 'Adres bulunamadı.';
-  if (normalized.includes('iyzico')) return message;
+  if (normalized.includes('iyzico') || normalized.includes('ödeme sağlayıcısı')) return message;
   if (/unexpected token|not valid json|bad control character/i.test(message)) {
     return 'Ödeme sağlayıcısı geçici olarak yanıt veremedi. Lütfen tekrar deneyin.';
   }

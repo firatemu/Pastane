@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type { OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Order, Payment, Prisma } from '@prisma/client';
@@ -53,6 +53,8 @@ function agentDebugLog(
 
 @Injectable()
 export class PaymentsService implements OnModuleInit {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     @Inject(ConfigService) private readonly config: ConfigService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -453,11 +455,19 @@ export class PaymentsService implements OnModuleInit {
           : typeof sdkResult.errorCode === 'string'
             ? sdkResult.errorCode
             : undefined;
-      throw new AppException(
-        ERROR_CODES.VALIDATION_FAILED,
-        friendlyIyzicoInitError(raw),
-        HttpStatus.BAD_REQUEST,
+      const friendly = friendlyIyzicoInitError(raw);
+      // #region agent log
+      agentDebugLog(
+        'payments.service.ts:initiateCheckoutForm',
+        'iyzico sdk rejected init',
+        { orderId, channel: iyzicoChannel, raw: raw?.slice(0, 120), friendly: friendly.slice(0, 120) },
+        'H3',
       );
+      // #endregion
+      this.logger.warn(
+        `checkout-form-init rejected orderId=${orderId} channel=${iyzicoChannel} raw=${raw ?? 'n/a'}`,
+      );
+      throw new AppException(ERROR_CODES.VALIDATION_FAILED, friendly, HttpStatus.BAD_REQUEST);
     }
 
     const payment = await this.prisma.payment.create({
@@ -475,6 +485,16 @@ export class PaymentsService implements OnModuleInit {
       },
     });
     await this.queues.schedulePaymentTimeout(payment.id);
+
+    // #region agent log
+    agentDebugLog(
+      'payments.service.ts:initiateCheckoutForm',
+      'checkout form created',
+      { orderId, channel: iyzicoChannel, htmlLength: sdkResult.checkoutFormContent.length },
+      'H4',
+    );
+    // #endregion
+    this.logger.log(`checkout-form-init ok orderId=${orderId} channel=${iyzicoChannel}`);
 
     return { checkoutFormContent: sdkResult.checkoutFormContent };
   }
