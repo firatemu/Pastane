@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Restore sanitized production dump into staging Supabase DB. Does NOT modify production.
+# Restore sanitized production dump into staging Supabase full stack. Does NOT modify production.
 #
 # Usage:
 #   DUMP_FILE=/var/backups/pastane-staging/prod-source-XXX.dump bash scripts/staging/restore-to-staging.sh
-#   bash scripts/staging/restore-to-staging.sh   # uses .latest-prod-source-dump pointer
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 ENV_FILE="${ENV_FILE:-.env.staging}"
-COMPOSE_SUPABASE="${COMPOSE_SUPABASE:-docker/docker-compose.supabase.staging.yml}"
 PROJECT_SUPABASE="${PROJECT_SUPABASE:-supabase-staging}"
+RUNTIME_ENV="${RUNTIME_ENV:-docker/supabase/.runtime.staging.env}"
 SQL_SANITIZE="${SQL_SANITIZE:-scripts/staging/sanitize-staging-db.sql}"
+DB_SVC="${DB_SVC:-db}"
 
 # shellcheck source=scripts/staging/_load-env.sh
 source "$ROOT/scripts/staging/_load-env.sh"
@@ -31,47 +31,50 @@ if [[ ! -f "$DUMP_FILE" ]]; then
   exit 1
 fi
 
-echo "Ensuring staging Supabase DB is up..."
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" up -d supabase-db
+bash "$ROOT/scripts/generate-supabase-compose-env.sh" "$ENV_FILE" "$ROOT/$RUNTIME_ENV"
 
-echo "Waiting for supabase-db health..."
-for _ in $(seq 1 30); do
-  if docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-    exec -T supabase-db pg_isready -U "${STAGING_POSTGRES_USER:-$POSTGRES_USER}" -d "${STAGING_POSTGRES_DB:-$POSTGRES_DB}" >/dev/null 2>&1; then
+compose_staging() {
+  docker compose --project-name "$PROJECT_SUPABASE" \
+    --env-file "$ROOT/$RUNTIME_ENV" \
+    -f "$ROOT/docker/supabase/docker-compose.yml" \
+    -f "$ROOT/docker/supabase/docker-compose.pg17.yml" \
+    -f "$ROOT/docker/supabase/docker-compose.pastane.staging.yml" "$@"
+}
+
+echo "Ensuring staging Supabase stack is up..."
+compose_staging up -d
+
+DB_USER="${STAGING_POSTGRES_USER:-${POSTGRES_USER:-postgres}}"
+DB_NAME="${STAGING_POSTGRES_DB:-${POSTGRES_DB:-pastane_db_staging}}"
+
+echo "Waiting for db health..."
+for _ in $(seq 1 90); do
+  if compose_staging exec -T "$DB_SVC" pg_isready -U "$DB_USER" -d postgres >/dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 
-DB_USER="${STAGING_POSTGRES_USER:-$POSTGRES_USER}"
-DB_NAME="${STAGING_POSTGRES_DB:-$POSTGRES_DB}"
-
 echo "Recreating staging database ${DB_NAME}..."
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-  exec -T supabase-db psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c \
+compose_staging exec -T "$DB_SVC" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
   "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB_NAME}' AND pid <> pg_backend_pid();" || true
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-  exec -T supabase-db psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"${DB_NAME}\";"
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-  exec -T supabase-db psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${DB_NAME}\";"
+compose_staging exec -T "$DB_SVC" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
+  "DROP DATABASE IF EXISTS \"${DB_NAME}\";"
+compose_staging exec -T "$DB_SVC" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
+  "CREATE DATABASE \"${DB_NAME}\";"
 
 echo "Copying dump into staging container..."
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-  cp "$DUMP_FILE" "supabase-db:/tmp/restore.dump"
+compose_staging cp "$DUMP_FILE" "${DB_SVC}:/tmp/restore.dump"
 
 START_RESTORE=$(date +%s)
-echo "pg_restore started at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-  exec -T supabase-db pg_restore -U "$DB_USER" -d "$DB_NAME" --no-owner --role="$DB_USER" /tmp/restore.dump
+compose_staging exec -T "$DB_SVC" pg_restore -U postgres -d "$DB_NAME" --no-owner --role="$DB_USER" /tmp/restore.dump
 END_RESTORE=$(date +%s)
 RESTORE_SEC=$((END_RESTORE - START_RESTORE))
 echo "pg_restore duration: ${RESTORE_SEC}s"
 
 echo "Applying sanitize SQL..."
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-  cp "$SQL_SANITIZE" "supabase-db:/tmp/sanitize.sql"
-docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-  exec -T supabase-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f /tmp/sanitize.sql
+compose_staging cp "$SQL_SANITIZE" "${DB_SVC}:/tmp/sanitize.sql"
+compose_staging exec -T "$DB_SVC" psql -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1 -f /tmp/sanitize.sql
 
 bash "$ROOT/scripts/staging/set-staging-passwords.sh"
 

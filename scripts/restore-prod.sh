@@ -37,7 +37,7 @@ source "$ENV_FILE"
 set +a
 
 if [[ "$DB_SERVICE" == "supabase-db" ]]; then
-  SVC="supabase-db"
+  SVC="$(supabase_db_service)"
   COMPOSE_TARGET=(compose_supabase)
 else
   SVC="postgres"

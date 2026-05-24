@@ -1,73 +1,17 @@
-# Production Supabase DB stack — Faz 7+ (separate compose project from pastane-prod app stack).
-# Routine deploy (`deploy.sh`) ensures supabase-db is up before app services.
+# Pastane production Supabase — official self-hosted stack (Faz 8.0).
 #
-# Usage:
-#   docker compose --project-name supabase-prod --env-file .env.production \
-#     -f docker/docker-compose.supabase.prod.yml up -d
-#   docker compose ... --profile studio up -d   # optional pgAdmin on 127.0.0.1:54323 (Faz 7.2 nginx)
-name: supabase-prod
+# Usage (from repo root):
+#   bash scripts/lib/compose-prod.sh   # via ensure_supabase_stack_up
+#   docker compose --project-name supabase-prod \
+#     --env-file <generated-supabase-env> \
+#     -f docker/supabase/docker-compose.yml \
+#     -f docker/supabase/docker-compose.pg17.yml \
+#     -f docker/supabase/docker-compose.pastane.prod.yml up -d
+#
+# Env: scripts/generate-supabase-compose-env.sh builds a runtime file from .env.production
+# (maps SUPABASE_JWT_SECRET → JWT_SECRET for the stack without touching Pastane JWT_SECRET).
 
-x-logging: &json-logging
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "5"
-
-networks:
-  pastane_supabase:
-    name: pastane_supabase
-    driver: bridge
-
-services:
-  supabase-db:
-    image: postgres:16-alpine
-    container_name: pastane_supabase_db_prod
-    restart: unless-stopped
-    logging: *json-logging
-    networks:
-      - pastane_supabase
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-pastane_db}
-      POSTGRES_USER: ${POSTGRES_USER:-pastane_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-    expose:
-      - "5432"
-    volumes:
-      - supabase_prod_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  supabase-studio:
-    profiles: ["studio"]
-    image: dpage/pgadmin4:8
-    container_name: pastane_supabase_studio_prod
-    restart: unless-stopped
-    logging: *json-logging
-    networks:
-      - pastane_supabase
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${SUPABASE_STUDIO_EMAIL:-studio-admin@example.test}
-      PGADMIN_DEFAULT_PASSWORD: ${SUPABASE_STUDIO_PASSWORD:-studio-not-used-without-profile}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
-      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
-      POSTGRES_USER: ${POSTGRES_USER:-pastane_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-pastane_db}
-    entrypoint: ["/bin/sh", "/pgadmin-entrypoint.sh"]
-    volumes:
-      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
-      - ./pgadmin/docker-entrypoint-pgadmin.sh:/pgadmin-entrypoint.sh:ro
-    ports:
-      - "127.0.0.1:54323:80"
-    depends_on:
-      supabase-db:
-        condition: service_healthy
-
-volumes:
-  supabase_prod_db_data:
-    name: supabase_prod_db_data
+include:
+  - path: supabase/docker-compose.yml
+  - path: supabase/docker-compose.pg17.yml
+  - path: supabase/docker-compose.pastane.prod.yml

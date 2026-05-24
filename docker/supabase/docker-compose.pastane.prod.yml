@@ -1,0 +1,79 @@
+# Pastane production overrides for official Supabase self-hosted stack.
+# Layer: docker-compose.yml + docker-compose.pg17.yml + this file.
+# Project name: supabase-prod (set in compose-prod.sh)
+#
+# - pastane_supabase network (shared with pastane-prod API)
+# - db alias supabase-db (DATABASE_URL / validate-env unchanged)
+# - Studio on 127.0.0.1:54323 → nginx studio.azem.cloud
+# - Kong / pooler not exposed on host
+
+name: supabase-prod
+
+networks:
+  default:
+    name: pastane_supabase
+    external: true
+
+services:
+  studio:
+    container_name: pastane_supabase_studio_prod
+    ports: !override
+      - "127.0.0.1:54323:3000"
+
+  kong:
+    container_name: pastane_supabase_kong_prod
+    ports: !override []
+
+  auth:
+    container_name: pastane_supabase_auth_prod
+
+  rest:
+    container_name: pastane_supabase_rest_prod
+
+  realtime:
+    container_name: pastane_supabase_realtime_prod
+
+  storage:
+    container_name: pastane_supabase_storage_prod
+
+  imgproxy:
+    container_name: pastane_supabase_imgproxy_prod
+
+  meta:
+    container_name: pastane_supabase_meta_prod
+
+  functions:
+    container_name: pastane_supabase_functions_prod
+
+  analytics:
+    container_name: pastane_supabase_analytics_prod
+
+  db:
+    container_name: pastane_supabase_db_prod
+    networks:
+      default:
+        aliases:
+          - supabase-db
+    volumes: !override
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
+      - ./volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:Z
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
+      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
+      - supabase_prod_db_data:/var/lib/postgresql/data
+      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
+      - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
+      - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
+      - db-config:/etc/postgresql-custom
+
+  vector:
+    container_name: pastane_supabase_vector_prod
+
+  supavisor:
+    container_name: pastane_supabase_pooler_prod
+    ports: !override []
+
+volumes:
+  supabase_prod_db_data:
+    name: supabase_prod_db_data
+  db-config:
+    name: supabase_prod_db_config

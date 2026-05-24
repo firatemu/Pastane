@@ -12,7 +12,7 @@ flowchart LR
   api[Docker_api_3003_loopback]
   minio[Docker_minio_9000_loopback]
   supadb[supabase_db_pastane_supabase]
-  studio[pgAdmin_studio_54323]
+  studio[Supabase_Studio_54323]
   internet --> nginx
   nginx --> web
   nginx --> admin
@@ -28,14 +28,14 @@ flowchart LR
 
 | Project | Compose file | Services |
 |---------|--------------|----------|
-| `supabase-prod` | [`docker/docker-compose.supabase.prod.yml`](../docker/docker-compose.supabase.prod.yml) | `supabase-db`, `supabase-studio` (pgAdmin) |
+| `supabase-prod` | [`docker/supabase/`](../docker/supabase/) + Pastane overrides | Full Supabase stack (db, studio, kong, …) |
 | `pastane-prod` | [`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml) | api, web, admin, courier, redis, minio |
 
 - **PostgreSQL (production):** `supabase-db` on network `pastane_supabase` — **no** host port publish.
-- **Studio:** https://studio.azem.cloud → pgAdmin on `127.0.0.1:54323`. See [`supabase-production-complete.md`](supabase-production-complete.md).
+- **Studio:** https://studio.azem.cloud → Supabase Studio on `127.0.0.1:54323`. See [`supabase-full-self-host-faz-8.0.md`](supabase-full-self-host-faz-8.0.md).
 - **Legacy postgres:** stopped (Faz 7.2); volume retained. See [`supabase-legacy-rollback-window.md`](supabase-legacy-rollback-window.md).
 
-Deploy helper: [`deploy.sh`](../deploy.sh) — ensures **supabase-db** (+ **studio** when `SUPABASE_STUDIO_ENABLED=1`), build/up, migrate, health + smoke.
+Deploy helper: [`deploy.sh`](../deploy.sh) — ensures **supabase-prod** full stack, then app build/up, migrate, health + smoke.
 
 Shared compose helpers: [`scripts/lib/compose-prod.sh`](../scripts/lib/compose-prod.sh).
 
@@ -82,25 +82,27 @@ docker compose --project-name pastane-prod --env-file .env.production \
   -f docker/docker-compose.prod.yml logs --tail=200 api
 ```
 
-Supabase DB:
+Supabase stack:
 
 ```bash
-docker compose --project-name supabase-prod --env-file .env.production \
-  -f docker/docker-compose.supabase.prod.yml logs --tail=100 supabase-db
+bash scripts/generate-supabase-compose-env.sh .env.production
+docker compose --project-name supabase-prod --env-file docker/supabase/.runtime.env \
+  -f docker/supabase/docker-compose.yml \
+  -f docker/supabase/docker-compose.pg17.yml \
+  -f docker/supabase/docker-compose.pastane.prod.yml logs --tail=100 db
 ```
 
 ## Database migrations
 
 Production uses **`prisma migrate deploy` only**, invoked from `deploy.sh`. Requires **`DIRECT_URL`** pointing at `supabase-db`. Do **not** run `prisma migrate dev` on production.
 
-## Studio (pgAdmin)
+## Studio (Supabase Dashboard)
 
 ```bash
-# One-time VPS setup (cert + nginx + container)
 bash scripts/setup-studio-vps.sh
 ```
 
-URL: https://studio.azem.cloud — login via `SUPABASE_STUDIO_EMAIL` / `SUPABASE_STUDIO_PASSWORD`.
+URL: https://studio.azem.cloud — login via `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`.
 
 ## Backups
 

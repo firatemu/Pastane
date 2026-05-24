@@ -26,6 +26,11 @@ uploads/
 !.env.staging.example
 !.env.production.cutover.example
 
+# Supabase self-host runtime (generated)
+docker/supabase/.runtime.env
+docker/supabase/.runtime.staging.env
+docker/supabase/volumes/db/data/
+
 # Local VPS deploy overrides (see scripts/deploy-vps.env.example)
 scripts/deploy-vps.env.local
 

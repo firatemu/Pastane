@@ -164,7 +164,7 @@ curl -I https://storage.azem.cloud
 curl -I https://studio.azem.cloud
 ```
 
-## Supabase Studio (pgAdmin)
+## Supabase Studio (official self-host)
 
 One-time on VPS after DNS `studio.azem.cloud`:
 
@@ -173,9 +173,9 @@ cd /var/www/pastane-app/app
 bash scripts/setup-studio-vps.sh
 ```
 
-Set in `.env.production`: `SUPABASE_STUDIO_ENABLED=1`, `SUPABASE_STUDIO_EMAIL`, `SUPABASE_STUDIO_PASSWORD` (20+ chars).
+Set in `.env.production`: `SUPABASE_STUDIO_ENABLED=1`, `DASHBOARD_*`, `SUPABASE_*` (see `bash scripts/generate-supabase-secrets.sh`).
 
-See [`docs/supabase-production-complete.md`](supabase-production-complete.md).
+See [`docs/supabase-full-self-host-faz-8.0.md`](supabase-full-self-host-faz-8.0.md).
 
 ## Certbot renewal + reload Host Nginx
 

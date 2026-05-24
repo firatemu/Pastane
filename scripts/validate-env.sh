@@ -85,15 +85,32 @@ if [[ -z "${studio_enabled// }" ]]; then
   studio_enabled="1"
 fi
 if [[ "$studio_enabled" == "1" || "$studio_enabled" == "true" || "$studio_enabled" == "yes" ]]; then
-  require_nonblank SUPABASE_STUDIO_EMAIL
-  require_nonblank SUPABASE_STUDIO_PASSWORD
-  studio_pass=$(get_kv SUPABASE_STUDIO_PASSWORD)
-  if [[ "$studio_pass" == *change_me* ]] || [[ "$studio_pass" == *placeholder* ]]; then
-    echo "validate-env: SUPABASE_STUDIO_PASSWORD must not be a placeholder in $ENV_FILE" >&2
+  require_nonblank SUPABASE_PUBLIC_URL
+  require_nonblank DASHBOARD_USERNAME
+  require_nonblank DASHBOARD_PASSWORD
+  require_nonblank SUPABASE_JWT_SECRET
+  require_nonblank SUPABASE_ANON_KEY
+  require_nonblank SUPABASE_SERVICE_ROLE_KEY
+  require_nonblank SUPABASE_SECRET_KEY_BASE
+  require_nonblank SUPABASE_VAULT_ENC_KEY
+  require_nonblank SUPABASE_PG_META_CRYPTO_KEY
+  require_nonblank SUPABASE_LOGFLARE_PUBLIC_TOKEN
+  require_nonblank SUPABASE_LOGFLARE_PRIVATE_TOKEN
+
+  dashboard_pass=$(get_kv DASHBOARD_PASSWORD)
+  if [[ "$dashboard_pass" == *change_me* ]] || [[ "$dashboard_pass" == *placeholder* ]]; then
+    echo "validate-env: DASHBOARD_PASSWORD must not be a placeholder in $ENV_FILE" >&2
     exit 1
   fi
-  if [[ ${#studio_pass} -lt 20 ]]; then
-    echo "validate-env: SUPABASE_STUDIO_PASSWORD should be at least 20 characters in $ENV_FILE" >&2
+  if [[ ${#dashboard_pass} -lt 20 ]]; then
+    echo "validate-env: DASHBOARD_PASSWORD should be at least 20 characters in $ENV_FILE" >&2
+    exit 1
+  fi
+
+  supabase_jwt=$(get_kv SUPABASE_JWT_SECRET)
+  pastane_jwt=$(get_kv JWT_SECRET)
+  if [[ "$supabase_jwt" == "$pastane_jwt" ]]; then
+    echo "validate-env: SUPABASE_JWT_SECRET must differ from Pastane JWT_SECRET in $ENV_FILE" >&2
     exit 1
   fi
 fi

@@ -42,8 +42,9 @@ DUMP_FILE="$OUT_DIR/pastane-pg-${STAMP}.dump"
 
 if [[ "$DB_SERVICE" == "supabase-db" ]]; then
   echo "Writing Supabase PostgreSQL backup to $DUMP_FILE"
-  compose_supabase exec -T supabase-db pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc -f "/tmp/backup.dump"
-  compose_supabase cp "supabase-db:/tmp/backup.dump" "$DUMP_FILE"
+  SVC="$(supabase_db_service)"
+  compose_supabase exec -T "$SVC" pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc -f "/tmp/backup.dump"
+  compose_supabase cp "${SVC}:/tmp/backup.dump" "$DUMP_FILE"
 else
   echo "Writing legacy postgres backup to $DUMP_FILE (profile ${COMPOSE_LEGACY_PROFILE})"
   compose_prod_app --profile "$COMPOSE_LEGACY_PROFILE" exec -T postgres \

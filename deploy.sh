@@ -60,7 +60,7 @@ fi
 ensure_supabase_db_up
 
 if studio_enabled; then
-  ensure_supabase_studio_up
+  echo "Supabase Studio included in supabase-prod stack (127.0.0.1:54323)"
 fi
 
 echo "Validating compose config..."
