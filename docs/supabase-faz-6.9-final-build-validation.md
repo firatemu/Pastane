@@ -1,9 +1,8 @@
 # Faz 6.9 — Final Production Build Validation
 
-**Durum:** Tamamlandı (2026-05-24)  
-**Cutover image tag:** `v1.1.0-supabase-cutover`  
-**Ön koşul:** Faz 6.8 VPS staging dry-run yeşil  
-**Henüz yapılmadı:** Production cutover, `.env.production` değişikliği, `deploy.sh`, prod container restart
+**Durum:** Cutover tamamlandı (2026-05-24)  
+**Cutover image tag:** `v1.1.0-supabase-cutover` (canlı)  
+**DB backend:** `pastane_supabase_db_prod` (supabase-db)
 
 ---
 
