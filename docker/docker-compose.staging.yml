@@ -1,0 +1,194 @@
+# Staging application stack — Faz 6.8 dry-run. Parallel to prod on different ports/names/volumes.
+# Production compose MUST NOT be modified or stopped for this stack.
+#
+# Usage (VPS):
+#   docker compose --project-name pastane-staging --env-file .env.staging \
+#     -f docker/docker-compose.staging.yml up -d
+#
+# Loopback ports: api 3103 | web 3100 | admin 3101 | courier 3102 | minio 9100
+name: pastane-staging
+
+x-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+networks:
+  pastane_staging_internal:
+    name: pastane_staging_internal
+    driver: bridge
+  pastane_staging_edge:
+    name: pastane_staging_edge
+    driver: bridge
+  pastane_staging_supabase:
+    external: true
+    name: pastane_staging_supabase
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: pastane_redis_staging
+    restart: unless-stopped
+    logging: *json-logging
+    networks:
+      - pastane_staging_internal
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.staging}
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    expose:
+      - "6379"
+    volumes:
+      - staging_redis_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: pastane_minio_staging
+    restart: unless-stopped
+    logging: *json-logging
+    networks:
+      - pastane_staging_internal
+    command: server /data --console-address ":9101"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY}
+    expose:
+      - "9000"
+    ports:
+      - "127.0.0.1:9100:9000"
+      - "127.0.0.1:9101:9101"
+    volumes:
+      - staging_minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api.prod
+      args:
+        VERSION: ${IMAGE_TAG:-staging-dry-run}
+    image: ${REGISTRY:-pastane}/pastane-api:${IMAGE_TAG:-staging-dry-run}
+    container_name: pastane_api_staging
+    restart: unless-stopped
+    logging: *json-logging
+    env_file:
+      - ../.env.staging
+    networks:
+      - pastane_staging_internal
+      - pastane_staging_edge
+      - pastane_staging_supabase
+    expose:
+      - "3003"
+    ports:
+      - "127.0.0.1:3103:3003"
+    volumes:
+      - staging_uploads_data:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:'+(process.env.API_PORT||3003)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web.prod
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        VERSION: ${IMAGE_TAG:-staging-dry-run}
+    image: ${REGISTRY:-pastane}/pastane-web:${IMAGE_TAG:-staging-dry-run}
+    container_name: pastane_web_staging
+    restart: unless-stopped
+    logging: *json-logging
+    env_file:
+      - ../.env.staging
+    networks:
+      - pastane_staging_edge
+    expose:
+      - "3000"
+    ports:
+      - "127.0.0.1:3100:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  admin:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.admin.prod
+      args:
+        NEXT_PUBLIC_SITE_URL: ${ADMIN_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        VERSION: ${IMAGE_TAG:-staging-dry-run}
+    image: ${REGISTRY:-pastane}/pastane-admin:${IMAGE_TAG:-staging-dry-run}
+    container_name: pastane_admin_staging
+    restart: unless-stopped
+    logging: *json-logging
+    env_file:
+      - ../.env.staging
+    networks:
+      - pastane_staging_edge
+    expose:
+      - "3001"
+    ports:
+      - "127.0.0.1:3101:3001"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  courier:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.courier.prod
+      args:
+        NEXT_PUBLIC_SITE_URL: ${COURIER_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        VERSION: ${IMAGE_TAG:-staging-dry-run}
+    image: ${REGISTRY:-pastane}/pastane-courier:${IMAGE_TAG:-staging-dry-run}
+    container_name: pastane_courier_staging
+    restart: unless-stopped
+    logging: *json-logging
+    env_file:
+      - ../.env.staging
+    networks:
+      - pastane_staging_edge
+    expose:
+      - "3002"
+    ports:
+      - "127.0.0.1:3102:3002"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  staging_redis_data:
+    name: pastane_staging_redis_data
+  staging_minio_data:
+    name: pastane_staging_minio_data
+  staging_uploads_data:
+    name: pastane_staging_uploads_data

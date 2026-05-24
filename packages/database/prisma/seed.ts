@@ -28,19 +28,26 @@ loadDatabaseEnv();
 function rewriteDatabaseUrlForHostSeed(): void {
   if (process.env.DATABASE_URL_SEED === 'preserve') return;
   if (existsSync('/.dockerenv')) return;
-  const raw = process.env.DATABASE_URL;
-  if (!raw) return;
-  try {
-    const u = new URL(raw);
-    if (u.hostname === 'postgres') {
-      u.hostname = '127.0.0.1';
-      process.env.DATABASE_URL = u.toString();
+  for (const key of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+    const raw = process.env[key];
+    if (!raw) continue;
+    try {
+      const u = new URL(raw);
+      if (u.hostname === 'postgres' || u.hostname === 'host.docker.internal') {
+        u.hostname = '127.0.0.1';
+        process.env[key] = u.toString();
+      }
+    } catch {
+      /* keep original */
     }
-  } catch {
-    /* keep original */
   }
 }
 rewriteDatabaseUrlForHostSeed();
+
+/** Seed uses direct Postgres (migrations-style); pgBouncer transaction pool rejects some Prisma queries. */
+if (process.env.DIRECT_URL) {
+  process.env.DATABASE_URL = process.env.DIRECT_URL;
+}
 
 const prisma = new PrismaClient();
 const permissions = [
@@ -183,39 +190,76 @@ async function main(): Promise<void> {
       create: { name, slug, description, imageUrl, sortOrder: categoryMap.size },
     }));
   }
-  const productImageUrl = (fileName: string) =>
-    `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(fileName)}?width=900`;
+  // Ürün görsel URL'leri - Unsplash'tan kaliteli görseller
+  const productImages: Record<string, string> = {
+    'Anne poğaçası.jpg': '1608198093002-ad4e005484ec', // Poğaça
+    'Peynirli poğaça.jpg': '1558618666-fcd25c85cd64', // Peynirli poğaça
+    'Achma-Pogaca.jpg': '1500462918059-b1a0cb512f1e', // Zeytinli poğaça
+    'Simit, salah satu roti khas Turki.jpg': '1586444248902-2f64eddc13df', // Simit
+    'Turkish tea and simit.jpg': '1514432324607-a09d9b4aefdd', // Kaşarlı simit
+    'İzmir gevreği.jpg': '1558961363-fa8fdf82db84', // Tereyağlı simit
+    'Börek mit Käse.jpg': '1626082927389-6cd097cdc6ec', // Peynirli börek
+    'Ispanaklı tepsi böreği.jpg': '1623333748855-4f2d8ea1e134', // Ispanaklı börek
+    '20170402 Runder Fleischburek, Bielitz-Biala.jpg': '1601050690597-df0568f70950', // Kıymalı börek
+    'Turkey sandwich.jpg': '1528735602780-2552fd46c7af', // Hindi füme sandviç
+    'Grilled cheese sandwich.jpg': '1529059997568-3d847b1154f0', // Kaşarlı tost
+    'Tuna sandwich.jpg': '1519708223044-83f2dd8b38f5', // Ton balıklı sandviç
+    'Butter Croissant (54408180656).jpg': '1555507036-ab1f4038808a', // Kruvasan
+    'Chocolate croissant Pret a Manger Bankside London England.jpg': '1559305816-c71c07e92182', // Çikolatalı kruvasan
+    'A Chocolate Milk and Almond Croissant.jpg': '1586985289947-f3be0ab7a9c1', // Bademli kruvasan
+    'White bread.jpg': '1509440159596-0249088772ff', // Beyaz ekmek
+    'Sourdough bread.jpg': '1549931319-a545dcf3bc73', // Ekşi maya ekmek
+    'Rye bread.jpg': '1608198093002-ad4e005484ec', // Çavdarlı ekmek
+    'Vanilla ice cream.jpg': '1563805042-7684c019e1cb', // Vanilyalı dondurma
+    'Chocolate ice cream.jpg': '1488477181946-6428a0291777', // Çikolatalı dondurma
+    'Pistachio ice cream.jpg': '1570197788417-0e82375c9371', // Antepfıstıklı dondurma
+    'Cookies.jpg': '1499636136210-6f4ee915583e', // Tatlı kuru pasta
+    'Crackers.jpg': '1558961363-fa8fdf82db84', // Tuzlu kuru pasta
+    'Kavala kurabiyesi.jpg': '1555507036-ab1f4038808a', // Kavala kurabiyesi
+    'Chocolate cake.jpg': '1578985545062-69928b1d9587', // Çikolatalı pasta
+    'Strawberry cake.jpg': '1464349095431-e9b4125c8d18', // Çilekli pasta
+    'Swiss roll.jpg': '1563729784474-d4db9f876ad5', // Muzlu rulo pasta
+    'Baklava.jpg': '1513236992188-7fc7faa44a2c', // Baklava
+    'Fırın sütlaç.jpg': '1542807907-5249b47782a1', // Sütlaç
+    'Chocolate-topped profiteroles, September 2006.jpg': '1551024601-bec78aea704b5', // Profiterol
+  };
+
+  const getProductImage = (fileName: string): string => {
+    const photoId = productImages[fileName];
+    return photoId ? `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&w=900&q=80` : '';
+  };
+
   const products = [
-    ['Sade Poğaça','sade-pogaca','Poğaçalar','28.00',5,'Klasik yumuşak poğaça.',productImageUrl('Anne poğaçası.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Peynirli Poğaça','peynirli-pogaca','Poğaçalar','32.00',5,'Beyaz peynirli günlük poğaça.',productImageUrl('Peynirli poğaça.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Zeytinli Poğaça','zeytinli-pogaca','Poğaçalar','34.00',5,'Siyah zeytin ezmeli poğaça.',productImageUrl('Achma-Pogaca.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Susamlı Simit','susamli-simit','Simitler','18.00',5,'Bol susamlı çıtır simit.',productImageUrl('Simit, salah satu roti khas Turki.jpg'),['Gluten','Susam'],'adet',null],
-    ['Kaşarlı Simit','kasarli-simit','Simitler','38.00',8,'Eritilmiş kaşarlı sıcak simit.',productImageUrl('Turkish tea and simit.jpg'),['Gluten','Süt','Susam'],'adet',null],
-    ['Tereyağlı Simit','tereyagli-simit','Simitler','30.00',5,'Tereyağ aromalı gevrek simit.',productImageUrl('İzmir gevreği.jpg'),['Gluten','Süt','Susam'],'adet',null],
-    ['Peynirli Börek','peynirli-borek','Börekler','55.00',10,'İnce yufkadan peynirli börek.',productImageUrl('Börek mit Käse.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Ispanaklı Börek','ispanakli-borek','Börekler','58.00',10,'Ispanaklı ve baharatlı börek.',productImageUrl('Ispanaklı tepsi böreği.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Kıymalı Börek','kiymali-borek','Börekler','68.00',12,'Kıymalı sıcak tepsi böreği.',productImageUrl('20170402 Runder Fleischburek, Bielitz-Biala.jpg'),['Gluten','Yumurta'],'adet',null],
-    ['Hindi Füme Sandviç','hindi-fume-sandvic','Sandviçler','95.00',8,'Hindi füme ve mevsim yeşillikleri.',productImageUrl('Turkey sandwich.jpg'),['Gluten','Süt'],'adet',null],
-    ['Kaşarlı Tost Sandviç','kasarli-tost-sandvic','Sandviçler','75.00',8,'Kaşar peynirli sıcak sandviç.',productImageUrl('Grilled cheese sandwich.jpg'),['Gluten','Süt'],'adet',null],
-    ['Ton Balıklı Sandviç','ton-balikli-sandvic','Sandviçler','110.00',8,'Ton balığı, turşu ve yeşillik.',productImageUrl('Tuna sandwich.jpg'),['Gluten','Yumurta'],'adet',null],
-    ['Tereyağlı Kruvasan','tereyagli-kruvasan','Kruvasanlar','60.00',8,'Klasik Fransız kruvasanı.',productImageUrl('Butter Croissant (54408180656).jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Çikolatalı Kruvasan','cikolatali-kruvasan','Kruvasanlar','72.00',8,'Belçika çikolatalı kruvasan.',productImageUrl('Chocolate croissant Pret a Manger Bankside London England.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Bademli Kruvasan','bademli-kruvasan','Kruvasanlar','78.00',8,'Badem kremalı çıtır kruvasan.',productImageUrl('A Chocolate Milk and Almond Croissant.jpg'),['Gluten','Süt','Yumurta','Fındık'],'adet',null],
-    ['Beyaz Ekmek','beyaz-ekmek','Ekmekler','18.00',5,'Günlük klasik somun ekmek.',productImageUrl('White bread.jpg'),['Gluten'],'adet',null],
-    ['Ekşi Maya Ekmek','eksi-maya-ekmek','Ekmekler','70.00',5,'Uzun fermantasyonlu ekşi maya.',productImageUrl('Sourdough bread.jpg'),['Gluten'],'adet',null],
-    ['Çavdarlı Ekmek','cavdarli-ekmek','Ekmekler','48.00',5,'Çavdar unlu tok dokulu ekmek.',productImageUrl('Rye bread.jpg'),['Gluten'],'adet',null],
-    ['Vanilyalı Dondurma','vanilyali-dondurma','Dondurmalar','65.00',3,'Madagaskar vanilyalı dondurma.',productImageUrl('Vanilla ice cream.jpg'),['Süt'],'gr',250],
-    ['Çikolatalı Dondurma','cikolatali-dondurma','Dondurmalar','68.00',3,'Yoğun kakaolu dondurma.',productImageUrl('Chocolate ice cream.jpg'),['Süt'],'gr',250],
-    ['Antep Fıstıklı Dondurma','antep-fistikli-dondurma','Dondurmalar','78.00',3,'Fıstıklı kaymak dondurma.',productImageUrl('Pistachio ice cream.jpg'),['Süt','Fıstık'],'gr',250],
-    ['Tatlı Kuru Pasta','tatli-kuru-pasta','Kuru Pastalar','140.00',5,'Karışık tatlı kuru pasta.',productImageUrl('Cookies.jpg'),['Gluten','Süt','Yumurta'],'gr',500],
-    ['Tuzlu Kuru Pasta','tuzlu-kuru-pasta','Kuru Pastalar','130.00',5,'Susamlı ve çörek otlu tuzlu kuru pasta.',productImageUrl('Crackers.jpg'),['Gluten','Süt','Susam'],'gr',500],
-    ['Kavala Kurabiyesi','kavala-kurabiyesi','Kuru Pastalar','155.00',5,'Bademli pudra şekerli kurabiye.',productImageUrl('Kavala kurabiyesi.jpg'),['Gluten','Süt','Fındık'],'gr',500],
-    ['Çikolatalı Yaş Pasta','cikolatali-yas-pasta','Yaş Pastalar','720.00',45,'Çikolatalı krema ve pandispanya.',productImageUrl('Chocolate cake.jpg'),['Gluten','Süt','Yumurta','Fındık'],'kg',1],
-    ['Çilekli Yaş Pasta','cilekli-yas-pasta','Yaş Pastalar','760.00',45,'Taze çilekli krema pasta.',productImageUrl('Strawberry cake.jpg'),['Gluten','Süt','Yumurta'],'kg',1],
-    ['Muzlu Rulo Pasta','muzlu-rulo-pasta','Yaş Pastalar','520.00',35,'Muzlu rulo yaş pasta.',productImageUrl('Swiss roll.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
-    ['Baklava','baklava','Tatlılar','180.00',5,'Fıstıklı şerbetli baklava.',productImageUrl('Baklava.jpg'),['Gluten','Süt','Fıstık'],'gr',500],
-    ['Sütlaç','sutlac','Tatlılar','90.00',5,'Fırınlanmış sütlaç.',productImageUrl('Fırın sütlaç.jpg'),['Süt'],'gr',500],
-    ['Profiterol','profiterol','Tatlılar','125.00',5,'Çikolata soslu profiterol.',productImageUrl('Chocolate-topped profiteroles, September 2006.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Sade Poğaça','sade-pogaca','Poğaçalar','28.00',5,'Klasik yumuşak poğaça.',getProductImage('Anne poğaçası.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Peynirli Poğaça','peynirli-pogaca','Poğaçalar','32.00',5,'Beyaz peynirli günlük poğaça.',getProductImage('Peynirli poğaça.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Zeytinli Poğaça','zeytinli-pogaca','Poğaçalar','34.00',5,'Siyah zeytin ezmeli poğaça.',getProductImage('Achma-Pogaca.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Susamlı Simit','susamli-simit','Simitler','18.00',5,'Bol susamlı çıtır simit.',getProductImage('Simit, salah satu roti khas Turki.jpg'),['Gluten','Susam'],'adet',null],
+    ['Kaşarlı Simit','kasarli-simit','Simitler','38.00',8,'Eritilmiş kaşarlı sıcak simit.',getProductImage('Turkish tea and simit.jpg'),['Gluten','Süt','Susam'],'adet',null],
+    ['Tereyağlı Simit','tereyagli-simit','Simitler','30.00',5,'Tereyağ aromalı gevrek simit.',getProductImage('İzmir gevreği.jpg'),['Gluten','Süt','Susam'],'adet',null],
+    ['Peynirli Börek','peynirli-borek','Börekler','55.00',10,'İnce yufkadan peynirli börek.',getProductImage('Börek mit Käse.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Ispanaklı Börek','ispanakli-borek','Börekler','58.00',10,'Ispanaklı ve baharatlı börek.',getProductImage('Ispanaklı tepsi böreği.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Kıymalı Börek','kiymali-borek','Börekler','68.00',12,'Kıymalı sıcak tepsi böreği.',getProductImage('20170402 Runder Fleischburek, Bielitz-Biala.jpg'),['Gluten','Yumurta'],'adet',null],
+    ['Hindi Füme Sandviç','hindi-fume-sandvic','Sandviçler','95.00',8,'Hindi füme ve mevsim yeşillikleri.',getProductImage('Turkey sandwich.jpg'),['Gluten','Süt'],'adet',null],
+    ['Kaşarlı Tost Sandviç','kasarli-tost-sandvic','Sandviçler','75.00',8,'Kaşar peynirli sıcak sandviç.',getProductImage('Grilled cheese sandwich.jpg'),['Gluten','Süt'],'adet',null],
+    ['Ton Balıklı Sandviç','ton-balikli-sandvic','Sandviçler','110.00',8,'Ton balığı, turşu ve yeşillik.',getProductImage('Tuna sandwich.jpg'),['Gluten','Yumurta'],'adet',null],
+    ['Tereyağlı Kruvasan','tereyagli-kruvasan','Kruvasanlar','60.00',8,'Klasik Fransız kruvasanı.',getProductImage('Butter Croissant (54408180656).jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Çikolatalı Kruvasan','cikolatali-kruvasan','Kruvasanlar','72.00',8,'Belçika çikolatalı kruvasan.',getProductImage('Chocolate croissant Pret a Manger Bankside London England.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Bademli Kruvasan','bademli-kruvasan','Kruvasanlar','78.00',8,'Badem kremalı çıtır kruvasan.',getProductImage('A Chocolate Milk and Almond Croissant.jpg'),['Gluten','Süt','Yumurta','Fındık'],'adet',null],
+    ['Beyaz Ekmek','beyaz-ekmek','Ekmekler','18.00',5,'Günlük klasik somun ekmek.',getProductImage('White bread.jpg'),['Gluten'],'adet',null],
+    ['Ekşi Maya Ekmek','eksi-maya-ekmek','Ekmekler','70.00',5,'Uzun fermantasyonlu ekşi maya.',getProductImage('Sourdough bread.jpg'),['Gluten'],'adet',null],
+    ['Çavdarlı Ekmek','cavdarli-ekmek','Ekmekler','48.00',5,'Çavdar unlu tok dokulu ekmek.',getProductImage('Rye bread.jpg'),['Gluten'],'adet',null],
+    ['Vanilyalı Dondurma','vanilyali-dondurma','Dondurmalar','65.00',3,'Madagaskar vanilyalı dondurma.',getProductImage('Vanilla ice cream.jpg'),['Süt'],'gr',250],
+    ['Çikolatalı Dondurma','cikolatali-dondurma','Dondurmalar','68.00',3,'Yoğun kakaolu dondurma.',getProductImage('Chocolate ice cream.jpg'),['Süt'],'gr',250],
+    ['Antep Fıstıklı Dondurma','antep-fistikli-dondurma','Dondurmalar','78.00',3,'Fıstıklı kaymak dondurma.',getProductImage('Pistachio ice cream.jpg'),['Süt','Fıstık'],'gr',250],
+    ['Tatlı Kuru Pasta','tatli-kuru-pasta','Kuru Pastalar','140.00',5,'Karışık tatlı kuru pasta.',getProductImage('Cookies.jpg'),['Gluten','Süt','Yumurta'],'gr',500],
+    ['Tuzlu Kuru Pasta','tuzlu-kuru-pasta','Kuru Pastalar','130.00',5,'Susamlı ve çörek otlu tuzlu kuru pasta.',getProductImage('Crackers.jpg'),['Gluten','Süt','Susam'],'gr',500],
+    ['Kavala Kurabiyesi','kavala-kurabiyesi','Kuru Pastalar','155.00',5,'Bademli pudra şekerli kurabiye.',getProductImage('Kavala kurabiyesi.jpg'),['Gluten','Süt','Fındık'],'gr',500],
+    ['Çikolatalı Yaş Pasta','cikolatali-yas-pasta','Yaş Pastalar','720.00',45,'Çikolatalı krema ve pandispanya.',getProductImage('Chocolate cake.jpg'),['Gluten','Süt','Yumurta','Fındık'],'kg',1],
+    ['Çilekli Yaş Pasta','cilekli-yas-pasta','Yaş Pastalar','760.00',45,'Taze çilekli krema pasta.',getProductImage('Strawberry cake.jpg'),['Gluten','Süt','Yumurta'],'kg',1],
+    ['Muzlu Rulo Pasta','muzlu-rulo-pasta','Yaş Pastalar','520.00',35,'Muzlu rulo yaş pasta.',getProductImage('Swiss roll.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
+    ['Baklava','baklava','Tatlılar','180.00',5,'Fıstıklı şerbetli baklava.',getProductImage('Baklava.jpg'),['Gluten','Süt','Fıstık'],'gr',500],
+    ['Sütlaç','sutlac','Tatlılar','90.00',5,'Fırınlanmış sütlaç.',getProductImage('Fırın sütlaç.jpg'),['Süt'],'gr',500],
+    ['Profiterol','profiterol','Tatlılar','125.00',5,'Çikolata soslu profiterol.',getProductImage('Chocolate-topped profiteroles, September 2006.jpg'),['Gluten','Süt','Yumurta'],'adet',null],
   ] as const;
   const productMap = new Map<string,{id:string}>();
   for (const [name,slug,category,price,preparationMinutes,shortDescription,imageUrl,allergens,unitSymbol,unitQuantity] of products) {

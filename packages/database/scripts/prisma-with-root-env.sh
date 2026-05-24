@@ -17,8 +17,14 @@ if [[ -f "${REPO_ROOT}/.env" ]]; then
 fi
 set +a
 
-if [[ ! -f /.dockerenv ]] && [[ "${DATABASE_URL_SEED:-}" != preserve ]] && [[ -n "${DATABASE_URL:-}" ]]; then
-  export DATABASE_URL="${DATABASE_URL//@postgres:/@127.0.0.1:}"
+if [[ ! -f /.dockerenv ]] && [[ "${DATABASE_URL_SEED:-}" != preserve ]]; then
+  for var in DATABASE_URL DIRECT_URL; do
+    if [[ -n "${!var:-}" ]]; then
+      # Compose legacy hostname or Docker override → loopback for host-side Prisma CLI.
+      export "${var}=${!var//@postgres:/@127.0.0.1:}"
+      export "${var}=${!var//@host.docker.internal:/@127.0.0.1:}"
+    fi
+  done
 fi
 
 exec pnpm exec prisma "$@" --schema=schema.prisma

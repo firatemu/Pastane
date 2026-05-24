@@ -1,8 +1,12 @@
 name: pastane-dev
 # App services mount host source + use polling so Next/Nest pick up edits without rebuilding images.
 # After dependency or root workspace file changes, rebuild: docker compose ... build api (etc.).
+#
+# Database: default local dev uses Supabase CLI (`pnpm supabase:start`). Legacy Postgres container is
+# opt-in via profile `legacy-db` (rollback: `docker compose --profile legacy-db up -d postgres`).
 services:
   postgres:
+    profiles: ["legacy-db"]
     image: postgres:16-alpine
     container_name: pastane_postgres_dev
     restart: unless-stopped
@@ -48,17 +52,22 @@ services:
     container_name: pastane_api_dev
     restart: unless-stopped
     env_file: ["../.env"]
-    ports: ["3003:3003"]
+    # Eski `pastane_api_prod` `:3003`'ü tutuyorsa dev API map edilemez — `bash scripts/docker-stop-local-prod.sh`
+    # çalıştırın ya da kök `.env` içinde `HOST_DEV_API_PORT` (örn. `30033`) kullanın — içerde yine `:3003`.
+    ports:
+      - "${HOST_DEV_API_PORT:-3003}:3003"
     volumes:
       # Prisma + API kaynak: host değişiklikleri `nest start --watch` ile yenilenir (imaj yeniden build gerekmez).
       - ../packages/database:/app/packages/database
       - ../apps/api/src:/app/apps/api/src
     environment:
-      PUBLIC_API_URL: http://localhost:3003
+      PUBLIC_API_URL: http://localhost:${HOST_DEV_API_PORT:-3003}
       CHOKIDAR_USEPOLLING: "true"
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      DIRECT_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
   web:
@@ -76,8 +85,13 @@ services:
     restart: unless-stopped
     ports: ["3000:3000"]
     volumes:
-      # Bind-mounted `apps/web/node_modules` uses pnpm symlinks into `/app/node_modules/.pnpm`; mount workspace hoisted deps too.
+      # Çalışma anında görünür `node_modules` tamamen HOST kök dizininden gelir. `pnpm install` / hoist
+      # düzeni veya `.npmrc` değiştiğinde `apps/*/node_modules`'u ve `.next-docker` önbelleğini temizleyin
+      # (`pnpm fix:frontend-cache`). Aksi halde eski webpack çıktısı silinmiş `.pnpm/next@.../...`
+      # yollarına `ENOENT` ile düşebilir.
       - ../node_modules:/app/node_modules
+      - ../packages/ui:/app/packages/ui
+      - ../packages/tr-api-errors:/app/packages/tr-api-errors
       - ../apps/web:/app/apps/web
       - ../tsconfig.base.json:/app/tsconfig.base.json:ro
     depends_on: ["api"]
@@ -97,7 +111,10 @@ services:
     restart: unless-stopped
     ports: ["3001:3001"]
     volumes:
+      # `node_modules` ve `.next-docker` önbelleği: üstte `web` servisindeki notlara bakın (`pnpm fix:frontend-cache`).
       - ../node_modules:/app/node_modules
+      - ../packages/ui:/app/packages/ui
+      - ../packages/tr-api-errors:/app/packages/tr-api-errors
       - ../apps/admin:/app/apps/admin
       - ../tsconfig.base.json:/app/tsconfig.base.json:ro
     depends_on: ["api"]
@@ -116,7 +133,10 @@ services:
     restart: unless-stopped
     ports: ["3002:3002"]
     volumes:
+      # `node_modules` ve `.next-docker` önbelleği: üstte `web` servisindeki notlara bakın (`pnpm fix:frontend-cache`).
       - ../node_modules:/app/node_modules
+      - ../packages/ui:/app/packages/ui
+      - ../packages/tr-api-errors:/app/packages/tr-api-errors
       - ../apps/courier:/app/apps/courier
       - ../tsconfig.base.json:/app/tsconfig.base.json:ro
     depends_on: ["api"]

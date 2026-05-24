@@ -1,0 +1,33 @@
+# Supabase Studio — IP whitelist. Include from main nginx config on cutover day.
+#   include /etc/nginx/snippets/pastane-studio.conf;
+#
+# Replace ALLOWED_ADMIN_IP with your office/VPN egress IP.
+# Obtain cert: certbot certonly --nginx -d studio.azem.cloud
+
+geo $studio_allowed {
+    default 0;
+    127.0.0.1 1;
+    # ALLOWED_ADMIN_IP 1;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name studio.azem.cloud;
+  ssl_certificate /etc/letsencrypt/live/azem.cloud/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/azem.cloud/privkey.pem;
+
+  if ($studio_allowed = 0) {
+    return 403;
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:54323;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}

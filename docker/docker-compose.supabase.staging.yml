@@ -1,0 +1,72 @@
+# Staging Supabase DB stack — Faz 6.8 dry-run only.
+# Does NOT touch pastane-prod. Simulates production supabase-db (PG 16) on isolated network/volume.
+#
+# Usage (VPS):
+#   docker compose --project-name supabase-staging --env-file .env.staging \
+#     -f docker/docker-compose.supabase.staging.yml up -d
+#
+# Host tools (optional): 127.0.0.1:55432 → postgres
+name: supabase-staging
+
+x-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+networks:
+  pastane_staging_supabase:
+    name: pastane_staging_supabase
+    driver: bridge
+
+services:
+  supabase-db:
+    image: postgres:16-alpine
+    container_name: pastane_supabase_db_staging
+    restart: unless-stopped
+    logging: *json-logging
+    networks:
+      - pastane_staging_supabase
+    environment:
+      POSTGRES_DB: ${STAGING_POSTGRES_DB:-pastane_db_staging}
+      POSTGRES_USER: ${STAGING_POSTGRES_USER:-pastane_staging_user}
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?Set STAGING_POSTGRES_PASSWORD in .env.staging}
+    expose:
+      - "5432"
+    ports:
+      # Loopback only — prod postgres is NOT on host 5432 when internal; staging uses 55432 for psql/pg_restore from host.
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - supabase_staging_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional Studio-like admin UI (pgAdmin lightweight substitute). Enable with: --profile studio
+  supabase-studio:
+    profiles: ["studio"]
+    image: dpage/pgadmin4:8
+    container_name: pastane_supabase_studio_staging
+    restart: unless-stopped
+    logging: *json-logging
+    networks:
+      - pastane_staging_supabase
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${STAGING_PGADMIN_EMAIL:-staging-admin@example.test}
+      PGADMIN_DEFAULT_PASSWORD: ${STAGING_PGADMIN_PASSWORD:?Set STAGING_PGADMIN_PASSWORD when using studio profile}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "127.0.0.1:55323:80"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+
+volumes:
+  supabase_staging_db_data:
+    name: supabase_staging_db_data

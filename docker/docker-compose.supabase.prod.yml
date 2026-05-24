@@ -1,0 +1,64 @@
+# Production Supabase DB stack — Faz 7 cutover (Faz 6.5 prep).
+# Does NOT stop legacy postgres until cutover overlay is applied.
+#
+# Usage:
+#   docker compose --project-name supabase-prod --env-file .env.production \
+#     -f docker/docker-compose.supabase.prod.yml up -d
+#   docker compose ... --profile studio up -d   # optional pgAdmin on 127.0.0.1:54323
+name: supabase-prod
+
+x-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+networks:
+  pastane_supabase:
+    name: pastane_supabase
+    driver: bridge
+
+services:
+  supabase-db:
+    image: postgres:16-alpine
+    container_name: pastane_supabase_db_prod
+    restart: unless-stopped
+    logging: *json-logging
+    networks:
+      - pastane_supabase
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pastane_db}
+      POSTGRES_USER: ${POSTGRES_USER:-pastane_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    expose:
+      - "5432"
+    volumes:
+      - supabase_prod_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  supabase-studio:
+    profiles: ["studio"]
+    image: dpage/pgadmin4:8
+    container_name: pastane_supabase_studio_prod
+    restart: unless-stopped
+    logging: *json-logging
+    networks:
+      - pastane_supabase
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${SUPABASE_STUDIO_EMAIL:-studio-admin@example.test}
+      PGADMIN_DEFAULT_PASSWORD: ${SUPABASE_STUDIO_PASSWORD:?Set SUPABASE_STUDIO_PASSWORD with studio profile}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "127.0.0.1:54323:80"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+
+volumes:
+  supabase_prod_db_data:
+    name: supabase_prod_db_data
