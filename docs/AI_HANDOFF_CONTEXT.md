@@ -44,7 +44,7 @@ Accepted standards:
 - Backend: NestJS 11 + TypeScript
 - Frontend surfaces: Next.js 15 App Router
 - Mobile: React Native + Expo
-- Database: PostgreSQL 16
+- Database: PostgreSQL 17 (Supabase self-host in production; Supabase CLI locally)
 - ORM: Prisma
 - Queue/cache: Redis 7 + BullMQ
 - Object storage: MinIO
@@ -70,11 +70,11 @@ Accepted and closed:
 - Phase 5 — Courier panel
 - Phase 6 — Customer web storefront and commerce flow
 - Backend Completion Review and Final Backend Implementation
-- **Final pre-VPS coverage QA** — backend ↔ frontend alignment, operator seed fix, admin roles/permissions read-only UI — [`docs/final-system-acceptance-report.md`](final-system-acceptance-report.md), [`docs/final-backend-frontend-gap-report.md`](final-backend-frontend-gap-report.md)
+- **Supabase self-host on VPS** (Studio at https://studio.azem.cloud, PG 17) — see [`docs/OPERATIONS.md`](OPERATIONS.md)
 
 Current recommended next task:
 
-- Production deployment preparation
+- Mobile implementation (only when explicitly requested) or feature work per product backlog
 
 Do not start mobile implementation unless explicitly requested.
 
@@ -121,7 +121,7 @@ Known intentional backend limitations:
 
 ### Admin Panel
 
-Completed for Phase 4 **plus pre-VPS coverage pass** (see [`docs/phase-3-admin-acceptance-report.md`](phase-3-admin-acceptance-report.md)):
+Completed for Phase 4 **plus pre-VPS coverage pass**:
 
 - Admin auth/session shell
 - Permission-aware sidebar/layout (**OR** semantics on nav items; route-level `requirePermission`)
@@ -143,7 +143,7 @@ Completed for Phase 4 **plus pre-VPS coverage pass** (see [`docs/phase-3-admin-a
 
 ### Courier Panel
 
-Completed (core + **Phase 4 alignment** — see [`docs/phase-4-courier-gap-report.md`](phase-4-courier-gap-report.md)); **2026-05 operational enrichment** — [`docs/courier-enrichment-gap-report.md`](courier-enrichment-gap-report.md), [`docs/courier-enrichment-acceptance-report.md`](courier-enrichment-acceptance-report.md):
+Completed (core + Phase 4 alignment; 2026-05 operational enrichment):
 
 - Courier-only login/session guard; **valid JWT but non-COURIER role** → [`/access-denied`](../apps/courier/app/access-denied/page.tsx) (no silent treatment as logged-out).
 - Mobile-first shell
@@ -322,28 +322,29 @@ Critical no-optimistic-update policy:
 
 ## 14. Production Deployment Status
 
-**Readiness (in-repo):**
+**Live production (azem.cloud):**
 
-- [docs/production-deployment-plan.md](production-deployment-plan.md) — pipeline localhost → staging → production, image tagging, rollback, smoke tests  
-- [docs/production-checklist.md](production-checklist.md) — Ubuntu 24.04, UFW, sizing, PostgreSQL ops notes, Fail2ban (document only), log rotation  
-- [docs/nginx-production-example.md](nginx-production-example.md) — reverse proxy, rate limits, hosts-based staging hosts  
-- [docs/backup-and-restore.md](backup-and-restore.md) — PostgreSQL / MinIO backup and restore drills  
-- [docs/monitoring-and-observability.md](monitoring-and-observability.md) — health, log rotation, optional Sentry / Uptime Kuma  
-- [docs/production-risk-review.md](production-risk-review.md) — risks, single-server limits, external dependencies  
-- [docs/adr-polling-strategy.md](adr-polling-strategy.md) — polling vs WebSocket decision  
-- **Local prod QA / stabilization (pre-VPS):** [docs/qa-test-scenarios.md](qa-test-scenarios.md), [docs/regression-checklist.md](regression-checklist.md), [docs/runtime-recovery-tests.md](runtime-recovery-tests.md), [docs/local-qa-acceptance-report.md](local-qa-acceptance-report.md), [docs/human-ui-acceptance-report.md](human-ui-acceptance-report.md), [docs/final-pre-vps-checklist.md](final-pre-vps-checklist.md)  
-- [.env.prod.example](../.env.prod.example) — placeholder production/staging env (never commit real secrets)  
-- [docker/docker-compose.prod.yml](../docker/docker-compose.prod.yml) — full stack + internal `pastane_internal` network for data services; **Nginx** only publishes **80/443** on `pastane_edge`  
-- Production **multi-stage** Dockerfiles under [docker/](../docker/) and operational scripts: [`deploy.sh`](../deploy.sh), [rollback-prod.sh](../scripts/rollback-prod.sh), [backup-prod.sh](../scripts/backup-prod.sh), [restore-prod.sh](../scripts/restore-prod.sh)  
-- **`SWAGGER_ENABLED`:** default **false** in `.env.prod.example`; set `true` in local dev for OpenAPI UI
+- API: https://api.azem.cloud
+- Supabase Studio: https://studio.azem.cloud
+- Deploy: `pnpm push:vps` from `main` → VPS `./deploy.sh`
+- Data sync local → VPS: `scripts/sync-local-to-vps.sh`
 
-**Current posture:**
+**Canonical docs:** see [`docs/README.md`](README.md).
 
-- **No production domains** are assigned yet; examples use **localhost** and **`*.staging.local`** placeholders only.  
-- **Development** remains [docker/docker-compose.dev.yml](../docker/docker-compose.dev.yml) + `.env`.  
-- **Cutover** when DNS exists: real TLS, public URLs in `.env.prod`, provider keys (Iyzico, SMS, FCM, SMTP), bucket policy, and smoke/backup verification per deployment plan.
+**Key references:**
 
-**Next actions for operators:** rehearse `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config (VPS)` and `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build (VPS)`, run smoke tests through Nginx, complete external credential and DNS checklist in [production-risk-review.md](production-risk-review.md).
+- [docs/OPERATIONS.md](OPERATIONS.md) — day-to-day ops
+- [docs/azem-cloud-vps-deployment.md](azem-cloud-vps-deployment.md) — VPS runbook
+- [docs/backup-and-restore.md](backup-and-restore.md) — backup/restore
+- [docs/ROLLBACK_GUIDE.md](ROLLBACK_GUIDE.md) — app image rollback
+- [docs/nginx-production-example.md](nginx-production-example.md) — reverse proxy patterns
+- [docs/monitoring-and-observability.md](monitoring-and-observability.md) — health and logs
+- [docs/adr-polling-strategy.md](adr-polling-strategy.md) — polling vs WebSocket decision
+- [.env.production.example](../.env.production.example) — production env template (never commit secrets)
+- [docker/docker-compose.prod.yml](../docker/docker-compose.prod.yml) — app stack
+- Operational scripts: [`deploy.sh`](../deploy.sh), [rollback-prod.sh](../scripts/rollback-prod.sh), [backup-prod.sh](../scripts/backup-prod.sh), [restore-prod.sh](../scripts/restore-prod.sh), [sync-local-to-vps.sh](../scripts/sync-local-to-vps.sh)
+
+**Development:** [docker/docker-compose.dev.yml](../docker/docker-compose.dev.yml) + `.env`, or Supabase CLI for local DB.
 
 ## 15. Important Environment Variables
 
@@ -443,7 +444,7 @@ Before declaring completion, run relevant checks:
 - API health check
 - Smoke tests for new endpoints
 - Queue worker verification when BullMQ behavior changed
-- Role-based scenarios and recovery drills: [qa-test-scenarios.md](qa-test-scenarios.md), [runtime-recovery-tests.md](runtime-recovery-tests.md)
+- Role-based smoke: `pnpm e2e:smoke` when stack is up
 
 Backend-sensitive regression areas:
 

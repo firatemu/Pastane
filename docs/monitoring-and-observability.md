@@ -2,7 +2,7 @@
 
 Operational monitoring for the Pastane Docker Compose deployment on Ubuntu 24.04 LTS.
 
-**Related:** [production-checklist.md](production-checklist.md), [backup-and-restore.md](backup-and-restore.md).
+**Related:** [OPERATIONS.md](OPERATIONS.md), [backup-and-restore.md](backup-and-restore.md).
 
 ## Health checks
 

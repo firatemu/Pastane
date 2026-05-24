@@ -76,8 +76,6 @@ CONFIRM=YES DUMP_FILE=/path/to/pastane-pg-....dump bash scripts/restore-prod.sh
 
 **Destructive:** [scripts/restore-prod.sh](../scripts/restore-prod.sh) requires `CONFIRM=YES`.
 
-**Legacy DB rollback:** [supabase-legacy-rollback-window.md](supabase-legacy-rollback-window.md).
-
 ## Restore testing checklist
 
 - [ ] Quarterly **dry run** on a non-production clone.

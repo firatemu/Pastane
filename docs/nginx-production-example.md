@@ -2,7 +2,7 @@
 
 This file documents **example** reverse proxy patterns for the Pastane stack. **Do not** copy TLS certificate paths blindly—generate real certs for production or use mkcert/staging certs for lab.
 
-**Related:** [production-deployment-plan.md](production-deployment-plan.md), [production-checklist.md](production-checklist.md), [adr-polling-strategy.md](adr-polling-strategy.md).
+**Related:** [DEPLOYMENT_WORKFLOW.md](DEPLOYMENT_WORKFLOW.md), [OPERATIONS.md](OPERATIONS.md), [adr-polling-strategy.md](adr-polling-strategy.md).
 
 ## Upstream layout (Docker internal DNS)
 

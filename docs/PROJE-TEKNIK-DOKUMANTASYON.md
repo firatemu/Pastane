@@ -296,7 +296,7 @@ pnpm --filter @pastane/database prisma:migrate:deploy
 pnpm --filter @pastane/database prisma:seed
 ```
 
-Host’tan migrate/seed: kök `.env` yüklenir; Docker hostname `postgres` → `127.0.0.1` rewrite (bkz. [`development-workflow.md`](./development-workflow.md)).
+Host’tan migrate/seed: kök `.env` yüklenir; Docker hostname `postgres` → `127.0.0.1` rewrite (bkz. [`local-development.md`](./local-development.md)).
 
 ---
 
@@ -797,7 +797,7 @@ Prod URL’ler `eas.json` içinde: `EXPO_PUBLIC_API_URL=https://api.azem.cloud`
 | API unit/integration | `apps/api/src/**/*.spec.ts` | Jest |
 | Web/admin/courier | `**/*.spec.ts`, `**/*.test.ts` | Vitest |
 | tr-api-errors | `packages/tr-api-errors` | Vitest |
-| E2E | Planlanmış / manuel QA | [`qa-test-scenarios.md`](./qa-test-scenarios.md) |
+| E2E | Playwright smoke + full CI | `pnpm e2e` / `pnpm e2e:smoke` |
 
 ### 21.2 Kalite kapısı
 
@@ -807,11 +807,7 @@ Faz tamamlanmadan önce:
 pnpm lint && pnpm typecheck && pnpm test && pnpm build:ci
 ```
 
-Kritik akışlar için E2E önceliği: auth, ödeme callback, sepet, sipariş yaşam döngüsü, yetkilendirme ([`testing-quality-rules.mdc`](../.cursor/rules/testing-quality-rules.mdc)).
-
-### 21.3 Regresyon
-
-[`regression-checklist.md`](./regression-checklist.md), [`final-pre-vps-checklist.md`](./final-pre-vps-checklist.md)
+Kritik akışlar için E2E önceliği: auth, ödeme callback, sepet, sipariş yaşam döngüsü, yetkilendirme ([`testing-quality-rules.mdc`](../.cursor/rules/testing-quality-rules.mdc)). Üretim doğrulama: [`OPERATIONS.md`](./OPERATIONS.md).
 
 ---
 
@@ -859,11 +855,11 @@ Resmi sıra: [`development-phases.md`](./development-phases.md)
 | **5** | Kurye paneli | ✅ Tamamlandı |
 | **6** | Müşteri web | ✅ Tamamlandı |
 | **7** | Mobil uygulama | 🟡 Expo iskeleti + Phase 7 akışları; EAS/Play Store hazırlığı devam |
-| **8** | Loyalty/bildirim/kampanya/rapor | 🟡 Backend + kısmi UI; canlı FCM/SMS bekliyor |
+| **8** | Supabase self-host (production) | ✅ Tamamlandı — [`OPERATIONS.md`](./OPERATIONS.md) |
 
-**Önerilen sıradaki iş:** Production sertleştirme, E2E, canlı bildirim provider’ları.
+**Önerilen sıradaki iş:** Mobil (talep edilirse), canlı FCM/SMS provider’ları, ürün özellikleri.
 
-Eski durum raporu [`proje-durum-raporu.md`](./proje-durum-raporu.md) (2026-05-18) — faz durumu için **güncel değil**; [`AI_HANDOFF_CONTEXT.md`](./AI_HANDOFF_CONTEXT.md) kullanın.
+Güncel faz durumu için [`AI_HANDOFF_CONTEXT.md`](./AI_HANDOFF_CONTEXT.md) ve [`README.md`](./README.md) kullanın.
 
 ---
 
@@ -899,21 +895,18 @@ Eski durum raporu [`proje-durum-raporu.md`](./proje-durum-raporu.md) (2026-05-18
 
 | Belge | Konu |
 |-------|------|
-| [`README.md`](../README.md) | Hızlı başlangıç |
+| [`README.md`](./README.md) | **Belge indeksi** — güncel dokümantasyon girişi |
 | **Bu belge** | Kapsamlı teknik referans |
 | [`AI_HANDOFF_CONTEXT.md`](./AI_HANDOFF_CONTEXT.md) | Agent onboarding, güncel durum |
 | [`local-development.md`](./local-development.md) | Kurulum, Docker, sorun giderme |
-| [`development-workflow.md`](./development-workflow.md) | Geliştirme akışı |
+| [`DEPLOYMENT_WORKFLOW.md`](./DEPLOYMENT_WORKFLOW.md) | Geliştirme ve deploy komutları |
 | [`development-phases.md`](./development-phases.md) | Resmi faz planı |
-| [`project-standards.md`](./project-standards.md) | Teknoloji standartları |
 | [`OPERATIONS.md`](./OPERATIONS.md) | VPS operasyonları |
 | [`azem-cloud-vps-deployment.md`](./azem-cloud-vps-deployment.md) | azem.cloud deploy |
 | [`mobile-deploy-prep.md`](./mobile-deploy-prep.md) | Mobil/EAS |
 | [`apps/mobile/README.md`](../apps/mobile/README.md) | Mobil geliştirme |
 | [`adr-polling-strategy.md`](./adr-polling-strategy.md) | Polling kararı |
 | [`iyzico_sandbox_entegrasyon_v3_web.md`](./iyzico_sandbox_entegrasyon_v3_web.md) | İyzico |
-| [`qa-test-scenarios.md`](./qa-test-scenarios.md) | QA senaryoları |
-| [`final-system-acceptance-report.md`](./final-system-acceptance-report.md) | Sistem kabul raporu |
 
 ---
 

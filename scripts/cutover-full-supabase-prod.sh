@@ -113,4 +113,4 @@ echo "[8] Smoke checks..."
 bash "$ROOT/scripts/post-deploy-smoke-prod.sh"
 
 echo "Cutover complete. Open https://studio.azem.cloud (DASHBOARD_USERNAME / DASHBOARD_PASSWORD)."
-echo "Rollback: docs/supabase-full-self-host-faz-8.0.md"
+echo "Rollback: docs/OPERATIONS.md (Disaster recovery) + docs/backup-and-restore.md"

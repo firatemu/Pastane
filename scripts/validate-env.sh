@@ -48,7 +48,7 @@ direct_url=$(get_kv DIRECT_URL)
 
 if [[ "$postgres_host" != "supabase-db" ]]; then
   echo "validate-env: POSTGRES_HOST must be supabase-db in $ENV_FILE (got: ${postgres_host:-<empty>})." >&2
-  echo "validate-env: for legacy DB rollback during the 7-day window, use docs/supabase-legacy-rollback-window.md" >&2
+  echo "validate-env: POSTGRES_HOST must be supabase-db in $ENV_FILE (got: ${postgres_host:-<empty>}). See docs/OPERATIONS.md" >&2
   exit 1
 fi
 

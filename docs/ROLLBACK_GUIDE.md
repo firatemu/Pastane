@@ -19,7 +19,7 @@ Komutların hepsi `scripts/deploy-vps.env.local` tanımlandığında VPS’e SSH
 ## Veritabanı ve uyarılar
 
 - Prisma’nın **`migrate rollback` özelliği** üret akışına bağlanmıyordur — veri yüzünden zarar çıktığında klasik Postgres dump/restore yolunu izlemeniz gerekebilir (`docs/backup-and-restore.md`).
-- **Supabase cutover sonrası (Faz 7+):** normal deploy `supabase-db` kullanır. Legacy postgres'e dönmek yalnızca **7 günlük rollback penceresinde** ayrı runbook ile yapılır: [`supabase-legacy-rollback-window.md`](./supabase-legacy-rollback-window.md).
+- **Veritabanı:** production PostgreSQL yalnızca Supabase stack (`supabase-db`) üzerindedir; geri alma için yedek dump restore kullanın.
 - Mobil veya masaüstü istemcisinin eski sürümle uyumlu olduğundan da emin olun; yalın container geriye alınması bile yeterince olası değildir.
 - Yerel klasörümüz içinde oluşabilecek `./.pastane-deploy-previous-tag` dosya adı için `.gitignore` mevcuttur; **geri alma için doğru lokasyon VPS’tir.**
 
@@ -35,5 +35,4 @@ pnpm health:check
 
 - [Tam dağıtım akışı](./DEPLOYMENT_WORKFLOW.md)
 - [Felakete hazır yedekleme](./backup-and-restore.md)
-- [Legacy DB rollback penceresi](./supabase-legacy-rollback-window.md)
 - [Örnek VPS yazısı](./azem-cloud-vps-deployment.md)

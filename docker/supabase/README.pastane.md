@@ -21,7 +21,7 @@ Pinned upstream: [supabase/supabase `docker/`](https://github.com/supabase/supab
 ## Upgrade upstream
 
 1. Re-vendor `docker/` from a tagged Supabase release (do not blindly track `master`).
-2. Re-run staging dry-run ([`docs/supabase-full-self-host-faz-8.0.md`](../../docs/supabase-full-self-host-faz-8.0.md)).
+2. Test locally with Supabase CLI, then backup → pull → `up -d` → smoke ([`docs/OPERATIONS.md`](../../docs/OPERATIONS.md)).
 3. Production: backup → `docker compose pull` → `up -d` → smoke.
 
 ## Generate runtime env

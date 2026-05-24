@@ -173,9 +173,16 @@ cd /var/www/pastane-app/app
 bash scripts/setup-studio-vps.sh
 ```
 
-Set in `.env.production`: `SUPABASE_STUDIO_ENABLED=1`, `DASHBOARD_*`, `SUPABASE_*` (see `bash scripts/generate-supabase-secrets.sh`).
+Set in `.env.production`: `SUPABASE_STUDIO_ENABLED=1`, `DASHBOARD_*`, `SUPABASE_*` (see `bash scripts/generate-supabase-secrets.sh`). Details: [`OPERATIONS.md`](OPERATIONS.md) — Studio / Supabase env sections.
 
-See [`docs/supabase-full-self-host-faz-8.0.md`](supabase-full-self-host-faz-8.0.md).
+## VPS sizing (reference)
+
+| Tier | vCPU | RAM | Root disk |
+|------|------|-----|-----------|
+| **MVP** | 4 | 8 GB | 120 GB NVMe |
+| **Growth** | 8+ | 16+ GB | Larger NVMe; separate data volume if possible |
+
+Plan disk for MinIO object growth and PostgreSQL backups (temporary space during `pg_dump`).
 
 ## Certbot renewal + reload Host Nginx
 

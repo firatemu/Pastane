@@ -40,5 +40,3 @@ After changing `.cursor/mcp.json` or `.env`, **restart Cursor** so MCP servers r
 
 ## Current helper scripts
 - `scripts/repo-status.sh` — workspace inventory
-- `scripts/verify-structure.sh` — confirms the foundation stays implementation-free
-- `scripts/docker-health.sh` — quick Compose status check

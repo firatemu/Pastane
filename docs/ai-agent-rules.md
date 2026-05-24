@@ -3,7 +3,7 @@
 AI agents must preserve architecture, phase boundaries, and verification discipline.
 
 ## Before coding
-- Read the docs.
+- Read [`docs/README.md`](./README.md) and [`AI_HANDOFF_CONTEXT.md`](./AI_HANDOFF_CONTEXT.md).
 - Confirm the current phase.
 - State intended file changes.
 - Explain the plan.
