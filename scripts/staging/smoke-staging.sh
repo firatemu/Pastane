@@ -29,7 +29,7 @@ check "GET /health" 200 "$code"
 login_token() {
   local phone="$1" pass="$2"
   curl -s -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
-    -d "{\"phone\":\"$phone\",\"password\":\"$pass\"}" | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).data?.accessToken||''"
+    -d "{\"phone\":\"$phone\",\"password\":\"$pass\"}" | jq -r '.data.accessToken // empty'
 }
 
 ADMIN_TOKEN=$(login_token "$ADMIN_PHONE" "$ADMIN_PASS")
@@ -41,7 +41,7 @@ if [[ -z "$ADMIN_TOKEN" ]]; then echo "FAIL admin login (token empty — passwor
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/products")
 check "GET /products" 200 "$code"
 
-PRODUCT_ID=$(curl -s "$BASE/products" | node -pe "const j=JSON.parse(require('fs').readFileSync(0,'utf8')); (j.data?.items?.[0]?.id)||(j.data?.[0]?.id)||''" 2>/dev/null || echo "")
+PRODUCT_ID=$(curl -s "$BASE/products" | jq -r '.data.items[0].id // .data[0].id // empty' 2>/dev/null || echo "")
 
 if [[ -n "$CUST_TOKEN" && -n "$PRODUCT_ID" ]]; then
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/cart/items" \

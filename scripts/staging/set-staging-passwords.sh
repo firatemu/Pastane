@@ -18,7 +18,19 @@ set +a
 DB_USER="${STAGING_POSTGRES_USER:-$POSTGRES_USER}"
 DB_NAME="${STAGING_POSTGRES_DB:-$POSTGRES_DB}"
 
-HASH=$(node -e "const {hashSync}=require('bcryptjs'); process.stdout.write(hashSync(process.argv[1],12));" "$PASSWORD")
+hash_password() {
+  local plain="$1"
+  if command -v node >/dev/null 2>&1; then
+    node -e "const {hashSync}=require('bcryptjs'); process.stdout.write(hashSync(process.argv[1],12));" "$plain"
+  elif python3 -c "import bcrypt" >/dev/null 2>&1; then
+    python3 -c "import bcrypt, sys; print(bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt(12)).decode())" "$plain"
+  else
+    echo "error: need node or python3+bcrypt to hash staging passwords" >&2
+    exit 1
+  fi
+}
+
+HASH=$(hash_password "$PASSWORD")
 
 docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
   exec -T supabase-db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c \

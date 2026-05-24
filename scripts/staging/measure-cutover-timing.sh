@@ -59,20 +59,26 @@ done
 APP_START_SEC=$(($(date +%s) - T3))
 TOTAL_SEC=$(($(date +%s) - START_TOTAL))
 
-node -e "
-const r = {
-  measuredAt: new Date().toISOString(),
-  seconds: {
-    supabaseDbStartup: ${DB_START_SEC},
-    pgRestoreAndSanitize: ${RESTORE_SEC},
-    prismaMigrateDeploy: ${MIGRATE_SEC},
-    stagingAppStartup: ${APP_START_SEC},
-    totalEstimate: ${TOTAL_SEC},
-  },
-  notes: 'Run on VPS after restore-to-staging. pg_restore=0 if no dump pointer.',
-};
-require('fs').writeFileSync(process.argv[1], JSON.stringify(r, null, 2));
-" "$REPORT"
+python3 - <<PY "$REPORT"
+import json, sys
+from datetime import datetime, timezone
+
+report_path = sys.argv[1]
+payload = {
+    "measuredAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    "seconds": {
+        "supabaseDbStartup": ${DB_START_SEC},
+        "pgRestoreAndSanitize": ${RESTORE_SEC},
+        "prismaMigrateDeploy": ${MIGRATE_SEC},
+        "stagingAppStartup": ${APP_START_SEC},
+        "totalEstimate": ${TOTAL_SEC},
+    },
+    "notes": "Run on VPS after restore-to-staging. pg_restore=0 if no dump pointer.",
+}
+with open(report_path, "w", encoding="utf-8") as fh:
+    json.dump(payload, fh, indent=2)
+    fh.write("\n")
+PY
 
 echo "Timing report → $REPORT"
 cat "$REPORT"
