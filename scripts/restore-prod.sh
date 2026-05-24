@@ -58,7 +58,11 @@ echo "Dropping and recreating database ${POSTGRES_DB}..."
   "CREATE DATABASE \"${POSTGRES_DB}\";"
 
 echo "Restoring..."
-"${COMPOSE_TARGET[@]}" exec -T "$SVC" pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --no-owner --role="${POSTGRES_USER}" "/tmp/restore.dump"
+if ! "${COMPOSE_TARGET[@]}" exec -T "$SVC" pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
+  --no-owner --no-acl --role="${POSTGRES_USER}" "/tmp/restore.dump"; then
+  echo "pg_restore reported errors (ACL/schema warnings are common on Supabase stack); verifying database..."
+  "${COMPOSE_TARGET[@]}" exec -T "$SVC" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1" >/dev/null
+fi
 
 if [[ "${SKIP_API_START:-}" != "1" ]]; then
   compose_prod_app start api

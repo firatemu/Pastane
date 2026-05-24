@@ -49,11 +49,26 @@ DUMP_LOCAL="/tmp/pastane-local-${STAMP}.dump"
 DUMP_NAME="pastane-local-${STAMP}.dump"
 
 echo "[1] Local pg_dump (public schema only) from ${LOCAL_URL%%@*}@..."
+run_pg_dump() {
+  local image="$1"
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  docker run --rm --network host -v "${tmpdir}:/out" "$image" \
+    pg_dump -Fc -n public "$LOCAL_URL" -f /out/dump.dump
+  mv "${tmpdir}/dump.dump" "$DUMP_LOCAL"
+  rmdir "$tmpdir"
+}
+
+PG_DUMP_IMAGE="${PG_DUMP_IMAGE:-postgres:17-alpine}"
 if command -v pg_dump >/dev/null 2>&1; then
-  pg_dump -Fc -n public "$LOCAL_URL" -f "$DUMP_LOCAL"
+  if pg_dump -Fc -n public "$LOCAL_URL" -f "$DUMP_LOCAL" 2>/dev/null && [[ -s "$DUMP_LOCAL" ]]; then
+    :
+  else
+    echo "Host pg_dump failed (version mismatch?) — using ${PG_DUMP_IMAGE}..."
+    run_pg_dump "$PG_DUMP_IMAGE"
+  fi
 else
-  docker run --rm --network host -v "$DUMP_LOCAL:/dump.out" postgres:16-alpine \
-    pg_dump -Fc -n public "$LOCAL_URL" -f /dump.out
+  run_pg_dump "$PG_DUMP_IMAGE"
 fi
 echo "Wrote $DUMP_LOCAL ($(du -h "$DUMP_LOCAL" | cut -f1))"
 
