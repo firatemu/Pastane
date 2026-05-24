@@ -121,4 +121,4 @@ SERVICE_ROLE_KEY_ASYMMETRIC=
 EOF
 
 chmod 600 "$OUT"
-echo "Wrote $OUT"
+echo "Wrote $OUT" >&2

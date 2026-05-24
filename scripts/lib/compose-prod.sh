@@ -50,15 +50,21 @@ wait_supabase_db_healthy() {
 
   for ((i = 1; i <= tries; i++)); do
     if compose_supabase exec -T db pg_isready -U postgres -d postgres >/dev/null 2>&1; then
-      cid="$(compose_supabase ps -q db 2>/dev/null || true)"
+      cid="$(compose_supabase ps -q db 2>/dev/null | tr -d '\r' | awk 'NF { id=$0 } END { print id }')"
       status="unknown"
       if [[ -n "$cid" ]]; then
-        status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$cid" 2>/dev/null || echo '')"
+        status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$cid" 2>/dev/null || echo 'unknown')"
       fi
-      if [[ "$status" == "healthy" || "$status" == "unknown" ]]; then
-        echo "supabase db ready (health=${status:-n/a})"
-        return 0
-      fi
+      case "$status" in
+        healthy | unknown | starting | '')
+          echo "supabase db ready (pg_isready, health=${status:-n/a})"
+          return 0
+          ;;
+        unhealthy)
+          echo "warning: supabase db pg_isready OK but Docker health=unhealthy; continuing" >&2
+          return 0
+          ;;
+      esac
     fi
     echo "waiting for supabase db (${i}/${tries})..."
     sleep "$delay"
