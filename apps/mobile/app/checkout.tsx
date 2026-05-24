@@ -117,11 +117,34 @@ export default function CheckoutScreen(): React.JSX.Element {
             if (typeof parsed.orderId === 'string' && typeof parsed.startedAt === 'number') {
               const order = await fetchOrder(parsed.orderId);
               if (order.status === 'PAYMENT_PENDING') {
+                setDeliveryType(order.deliveryType);
+                if (order.deliveryType === 'PICKUP' && order.pickupStoreId) {
+                  setPickupStoreId(order.pickupStoreId);
+                }
+                let restoredAddressId = '';
+                if (order.deliveryType === 'HOME_DELIVERY') {
+                  const snap = order.addressSnapshot;
+                  const matched =
+                    a.find(
+                      (addr) =>
+                        snap?.district &&
+                        addr.district.trim().toLocaleLowerCase('tr-TR') ===
+                          snap.district.trim().toLocaleLowerCase('tr-TR') &&
+                        (!snap.title || addr.title === snap.title),
+                    ) ??
+                    a.find((addr) => addr.isDefault) ??
+                    a[0];
+                  if (matched) {
+                    restoredAddressId = matched.id;
+                    setAddressId(matched.id);
+                  }
+                }
                 setPendingOrder(order);
                 pendingOrderFormKeyRef.current = [
                   order.deliveryType,
-                  order.deliveryType === 'HOME_DELIVERY' ? 'stored' : '',
+                  order.deliveryType === 'HOME_DELIVERY' ? (restoredAddressId ?? '') : '',
                   order.deliveryType === 'PICKUP' ? (order.pickupStoreId ?? '') : '',
+                  '',
                 ].join(':');
                 setPaymentStartedAt(parsed.startedAt);
                 setError('Bekleyen ödeme oturumu bulundu. Sonucu kontrol edebilirsiniz.');
@@ -203,17 +226,82 @@ export default function CheckoutScreen(): React.JSX.Element {
   async function startPayment(): Promise<void> {
     setBusy(true);
     setError(null);
+    // #region agent log
+    fetch('http://127.0.0.1:7317/ingest/2fb3864b-34dc-4d52-b337-e3a2b59567ad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'af6185' },
+      body: JSON.stringify({
+        sessionId: 'af6185',
+        location: 'checkout.tsx:startPayment',
+        message: 'payment start',
+        data: {
+          deliveryType,
+          addressId: addressId ?? null,
+          pickupStoreId: pickupStoreId ?? null,
+          cartItems: items.length,
+          pendingOrderId: pendingOrder?.id ?? null,
+          formKey: checkoutFormKey(),
+          pendingFormKey: pendingOrderFormKeyRef.current,
+        },
+        timestamp: Date.now(),
+        hypothesisId: 'H2',
+      }),
+    }).catch(() => undefined);
+    // #endregion
     try {
       await validateCartForCheckout();
       await reloadCart();
       const order = await resolveOrder();
+      // #region agent log
+      fetch('http://127.0.0.1:7317/ingest/2fb3864b-34dc-4d52-b337-e3a2b59567ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'af6185' },
+        body: JSON.stringify({
+          sessionId: 'af6185',
+          location: 'checkout.tsx:startPayment',
+          message: 'order resolved, init checkout',
+          data: { orderId: order.id, orderNumber: order.orderNumber, grandTotal: order.grandTotal },
+          timestamp: Date.now(),
+          hypothesisId: 'H2',
+        }),
+      }).catch(() => undefined);
+      // #endregion
       const { checkoutFormContent } = await initCheckoutForm(order.id);
       const startedAt = Date.now();
       setPaymentStartedAt(startedAt);
       await AsyncStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, JSON.stringify({ orderId: order.id, startedAt } satisfies StoredPendingPayment));
       setCheckoutHtml(checkoutFormContent);
+      // #region agent log
+      fetch('http://127.0.0.1:7317/ingest/2fb3864b-34dc-4d52-b337-e3a2b59567ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'af6185' },
+        body: JSON.stringify({
+          sessionId: 'af6185',
+          location: 'checkout.tsx:startPayment',
+          message: 'checkout form ready',
+          data: { orderId: order.id, htmlLength: checkoutFormContent.length },
+          timestamp: Date.now(),
+          hypothesisId: 'H4',
+        }),
+      }).catch(() => undefined);
+      // #endregion
     } catch (e) {
       await reloadCart();
+      const errMsg = e instanceof Error ? e.message : String(e);
+      // #region agent log
+      fetch('http://127.0.0.1:7317/ingest/2fb3864b-34dc-4d52-b337-e3a2b59567ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'af6185' },
+        body: JSON.stringify({
+          sessionId: 'af6185',
+          location: 'checkout.tsx:startPayment',
+          message: 'payment start failed',
+          data: { errMsg: errMsg.slice(0, 200) },
+          timestamp: Date.now(),
+          hypothesisId: 'H4',
+        }),
+      }).catch(() => undefined);
+      // #endregion
       setError(mapUnknownErrorToTurkish('customer', e, 'Ödeme başlatılamadı.'));
     } finally {
       setBusy(false);

@@ -3,6 +3,7 @@ import type { OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Order, Payment, Prisma } from '@prisma/client';
 import { DeliveryType, OrderStatus, PaymentStatus } from '@prisma/client';
+import { appendFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { AppException } from '../common/exceptions/app.exception';
@@ -23,6 +24,32 @@ import {
 import { friendlyIyzicoInitError, sanitizeIyzicoText } from './iyzico-text.util';
 import { IyzicoProvider } from './providers/iyzico.provider';
 import { assertForbiddenPaymentDevAutoSuccessWithConfig } from './assert-payment-env';
+
+// #region agent log
+function agentDebugLog(
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+  hypothesisId: string,
+): void {
+  try {
+    appendFileSync(
+      '/home/azem/projects/Pastane/.cursor/debug-af6185.log',
+      `${JSON.stringify({
+        sessionId: 'af6185',
+        timestamp: Date.now(),
+        location,
+        message,
+        data,
+        hypothesisId,
+        runId: process.env.DEBUG_RUN_ID ?? 'pre-fix',
+      })}\n`,
+    );
+  } catch {
+    /* local debug log only */
+  }
+}
+// #endregion
 
 @Injectable()
 export class PaymentsService implements OnModuleInit {
@@ -346,6 +373,14 @@ export class PaymentsService implements OnModuleInit {
 
   async initiateCheckoutForm(userId: string, orderId: string, idempotencyKey: string): Promise<{ checkoutFormContent: string }> {
     const iyzicoChannel = idempotencyKey.includes('iyzico-mobile') ? ('mobile' as const) : ('web' as const);
+    // #region agent log
+    agentDebugLog(
+      'payments.service.ts:initiateCheckoutForm',
+      'checkout init entry',
+      { orderId, channel: iyzicoChannel, idempotencySuffix: idempotencyKey.slice(-24) },
+      'H1',
+    );
+    // #endregion
     this.provider.assertCheckoutConfigured(iyzicoChannel);
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId, deletedAt: null },
@@ -369,21 +404,14 @@ export class PaymentsService implements OnModuleInit {
 
     const reusableSession = await this.reconcilePendingPaymentsForCheckout(order.id, idempotencyKey);
     if (reusableSession) {
-      const payment = await this.prisma.payment.create({
-        data: {
-          orderId: order.id,
-          idempotencyKey,
-          providerPaymentId: null,
-          conversationId: reusableSession.conversationId,
-          providerToken: reusableSession.providerToken,
-          amount: order.grandTotal,
-          responsePayload: {
-            checkoutFormContent: reusableSession.checkoutFormContent,
-            reusedCheckoutSession: true,
-          } as Prisma.InputJsonValue,
-        },
-      });
-      await this.queues.schedulePaymentTimeout(payment.id);
+      // #region agent log
+      agentDebugLog(
+        'payments.service.ts:initiateCheckoutForm',
+        'reusing existing checkout form (no duplicate payment row)',
+        { orderId, idempotencySuffix: idempotencyKey.slice(-24) },
+        'H1',
+      );
+      // #endregion
       return { checkoutFormContent: reusableSession.checkoutFormContent };
     }
 
@@ -403,6 +431,14 @@ export class PaymentsService implements OnModuleInit {
       sdkResult = await this.provider.checkoutFormInitialize(sdkRequest, iyzicoChannel);
     } catch (err) {
       const detail = err instanceof Error ? err.message : undefined;
+      // #region agent log
+      agentDebugLog(
+        'payments.service.ts:initiateCheckoutForm',
+        'iyzico sdk init threw',
+        { orderId, channel: iyzicoChannel, detail: detail?.slice(0, 120) },
+        'H3',
+      );
+      // #endregion
       throw new AppException(
         ERROR_CODES.INTERNAL_SERVER_ERROR,
         friendlyIyzicoInitError(detail ?? 'iyzico bağlantı hatası'),

@@ -1,5 +1,5 @@
 import type { ConfigService } from '@nestjs/config';
-import { DeliveryType, OrderStatus, PaymentStatus, type Order } from '@prisma/client';
+import { DeliveryType, OrderStatus, PaymentStatus, ProductStatus, type Order } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { AppException } from '../common/exceptions/app.exception';
 import { ERROR_CODES } from '../common/constants/error-codes';
@@ -241,5 +241,89 @@ describe('PaymentsService initiate', () => {
     } finally {
       process.env.NODE_ENV = prev;
     }
+  });
+});
+
+describe('PaymentsService initiateCheckoutForm', () => {
+  const checkoutForm = '<form>iyzico</form>';
+
+  function payableOrder() {
+    return {
+      id: 'order-1',
+      orderNumber: 'PN-1',
+      userId: 'user-1',
+      deliveryType: DeliveryType.HOME_DELIVERY,
+      status: OrderStatus.PAYMENT_PENDING,
+      addressSnapshot: { district: 'Yenişehir', city: 'Mersin', title: 'ev', fullAddress: 'Test' },
+      pickupStoreId: null,
+      scheduledAt: null,
+      subtotal: new Decimal('125'),
+      deliveryFee: new Decimal('40'),
+      serviceFee: new Decimal('0'),
+      loyaltyDiscount: new Decimal('0'),
+      loyaltyPointsUsed: 0,
+      grandTotal: new Decimal('165'),
+      note: null,
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      user: {
+        id: 'user-1',
+        firstName: 'Test',
+        lastName: 'User',
+        phone: '905550000010',
+        email: 'test@example.com',
+      },
+      pickupStore: null,
+      items: [
+        {
+          productNameSnapshot: 'Profiterol',
+          product: { status: ProductStatus.ACTIVE, isPublished: true, deletedAt: null, saleWindowStart: null, saleWindowEnd: null },
+        },
+      ],
+    };
+  }
+
+  it('reuses checkout form from another pending payment without creating a duplicate conversationId row', async () => {
+    const config = { get: jest.fn() } as unknown as ConfigService;
+    const paymentCreate = jest.fn();
+    const prismaMock = {
+      order: { findFirst: jest.fn().mockResolvedValue(payableOrder()) },
+      payment: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'pay-web',
+            orderId: 'order-1',
+            status: PaymentStatus.PENDING,
+            idempotencyKey: 'order-1:iyzico-web',
+            conversationId: 'conv-shared',
+            providerToken: 'token-1',
+            responsePayload: { checkoutFormContent: checkoutForm },
+          },
+        ]),
+        create: paymentCreate,
+      },
+    };
+    const prisma = prismaMock as unknown as PrismaService;
+    const provider = {
+      assertCheckoutConfigured: jest.fn(),
+      checkoutFormInitialize: jest.fn(),
+    };
+
+    const service = new PaymentsService(
+      config,
+      prisma,
+      new OrderStatusService(),
+      provider as never,
+      { schedulePaymentTimeout: jest.fn() } as never,
+      { log: jest.fn() } as never,
+      { createOrderStatusNotification: jest.fn() } as never,
+    );
+
+    const result = await service.initiateCheckoutForm('user-1', 'order-1', 'order-1:iyzico-mobile');
+    expect(result.checkoutFormContent).toBe(checkoutForm);
+    expect(paymentCreate).not.toHaveBeenCalled();
+    expect(provider.checkoutFormInitialize).not.toHaveBeenCalled();
   });
 });
