@@ -12,6 +12,25 @@ describe('OrdersService admin operations', () => {
     { createOrderStatusNotification: jest.fn() } as never,
   ] as const;
 
+  it('filters customer orders by Istanbul calendar day when tarih is set', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = { order: { findMany } } as never;
+    const service = new OrdersService(prisma, ...baseDeps);
+    await service.mine('customer-1', { tarih: '2026-05-19' });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'customer-1',
+          deletedAt: null,
+          createdAt: {
+            gte: new Date('2026-05-19T00:00:00.000+03:00'),
+            lt: new Date('2026-05-20T00:00:00.000+03:00'),
+          },
+        },
+      }),
+    );
+  });
+
   it('keeps customer order detail owner-scoped without viewAll permission', async () => {
     const findFirst = jest.fn().mockResolvedValue({ id: 'order-1' });
     const prisma = { order: { findFirst } } as never;

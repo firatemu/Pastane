@@ -13,6 +13,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EXPO_NO_DEPLOY": "1",
+        "NODE_OPTIONS": "--max-old-space-size=8192",
         "EXPO_PUBLIC_API_URL": "http://10.0.2.2:3003",
         "EXPO_PUBLIC_WEB_URL": "http://10.0.2.2:3000"
       }
@@ -24,16 +26,21 @@
         "buildType": "apk"
       },
       "env": {
+        "EXPO_NO_DEPLOY": "1",
+        "NODE_OPTIONS": "--max-old-space-size=8192",
         "EXPO_PUBLIC_API_URL": "https://api.azem.cloud",
         "EXPO_PUBLIC_WEB_URL": "https://azem.cloud"
       }
     },
     "production": {
       "extends": "base",
+      "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
+        "EXPO_NO_DEPLOY": "1",
+        "NODE_OPTIONS": "--max-old-space-size=8192",
         "EXPO_PUBLIC_API_URL": "https://api.azem.cloud",
         "EXPO_PUBLIC_WEB_URL": "https://azem.cloud"
       }

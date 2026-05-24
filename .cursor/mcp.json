@@ -17,8 +17,10 @@
       "args": ["-y", "@playwright/mcp@latest"]
     },
     "stitch": {
-      "command": "bash",
-      "args": ["scripts/mcp/stitch.sh"]
+      "url": "https://stitch.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "${env:STITCH_GOOGLE_API_KEY}"
+      }
     },
     "shadcn": {
       "command": "bash",

@@ -26,6 +26,7 @@ export const CUSTOMER_OVERRIDES: Partial<Record<string, string>> = {
   PRODUCT_NOT_AVAILABLE_FOR_SALE: 'Ürün tükendi veya şu an satışa kapalı.',
   INSUFFICIENT_LOYALTY_POINTS: 'Yetersiz puan.',
   LOYALTY_ACCOUNT_NOT_FOUND: 'Puan hesabı bulunamadı.',
+  NETWORK_ERROR: 'Bağlantı zaman aşımına uğradı veya ağ kullanılamıyor. Lütfen tekrar deneyin.',
   BANNER_NOT_FOUND: 'Kayıt bulunamadı.',
   ALLERGEN_NOT_FOUND: 'Alerjen bilgisi bulunamadı.',
 };

@@ -5,6 +5,7 @@ import { urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { assertForbiddenPaymentDevAutoSuccessBootstrap } from './payments/assert-payment-env';
 
 const DEFAULT_PRODUCTION_ORIGINS = [
   'https://azem.cloud',
@@ -23,9 +24,7 @@ function corsOrigins(): string[] {
 }
 
 async function bootstrap(): Promise<void> {
-  if (process.env.NODE_ENV === 'production' && process.env.PAYMENT_DEV_AUTO_SUCCESS === 'true') {
-    throw new Error('PAYMENT_DEV_AUTO_SUCCESS must not be enabled when NODE_ENV is production');
-  }
+  assertForbiddenPaymentDevAutoSuccessBootstrap();
   const app = await NestFactory.create(AppModule);
   app.use(urlencoded({ extended: true, limit: '1mb' }));
   app.enableCors({

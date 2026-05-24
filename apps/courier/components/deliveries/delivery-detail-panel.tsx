@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useAdaptivePolling } from '@pastane/ui';
+import type { AdaptivePollOutcome } from '@pastane/ui';
+
 import { getDelivery } from '../../lib/api/deliveries';
 import { courierMessageFromUnknownError } from '../../lib/deliveries/courier-api-error';
 import { parseAddressSnapshotLngLat } from '../../lib/deliveries/address-snapshot-coords';
@@ -88,21 +91,23 @@ export function DeliveryDetailPanel({ id }: { id: string }): React.JSX.Element {
     setPollWarning(null);
   }, [id]);
 
-  const load = useCallback(async () => {
+  const pollTick = useCallback(async (): Promise<AdaptivePollOutcome> => {
     const gen = fetchGeneration.current;
     try {
       setPollWarning(null);
       setError(null);
       const next = await getDelivery(id);
-      if (gen !== fetchGeneration.current) return;
+      if (gen !== fetchGeneration.current) return 'ok';
       setDelivery(next);
       setLastRefreshedAt(new Date());
+      return 'ok';
     } catch (caught) {
-      if (gen !== fetchGeneration.current) return;
+      if (gen !== fetchGeneration.current) return 'ok';
       setError(courierMessageFromUnknownError(caught, 'Teslimat yüklenemedi.'));
       if (deliveryRef.current != null) {
         setPollWarning('Güncelleme başarısız. Bilgiler son başarılı yüklemeye göre.');
       }
+      return 'error';
     } finally {
       if (gen === fetchGeneration.current) {
         setLoading(false);
@@ -110,11 +115,11 @@ export function DeliveryDetailPanel({ id }: { id: string }): React.JSX.Element {
     }
   }, [id]);
 
-  useEffect(() => {
-    void load();
-    const timer = setInterval(() => void load(), 15_000);
-    return () => clearInterval(timer);
-  }, [load]);
+  useAdaptivePolling({ poll: pollTick, immediate: true, baseIntervalMs: 15_000 });
+
+  const load = useCallback(async () => {
+    await pollTick();
+  }, [pollTick]);
 
   if (loading && !delivery) return <LoadingState label="Teslimat yükleniyor…" />;
   if (error && !delivery) return <ErrorState message={error} />;

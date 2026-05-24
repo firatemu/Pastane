@@ -1,11 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SECURE_STORE_ACCESS_TOKEN_KEY, SECURE_STORE_REFRESH_TOKEN_KEY } from '@pastane/constants';
+import { messageForCode } from '@pastane/tr-api-errors';
 import { getApiBaseUrl, messageFromApi, unwrapData, unwrapList } from './config';
 import type {
   Address,
   AppNotification,
   AuthState,
+  Campaign,
   CartItem,
   Category,
+  DeliveryZone,
   HomeBanner,
   LoyaltyAccount,
   LoyaltyMovement,
@@ -16,11 +20,37 @@ import type {
   Store,
   User,
 } from '../types';
+import { deleteAuthTokenSecure, getAuthTokenSecure, setAuthTokenSecure } from '@/utils/auth-token-storage';
 
-const AUTH_KEY = 'pastahane.auth';
+const NETWORK_ERROR_CODE = 'NETWORK_ERROR';
+const REQUEST_TIMEOUT_MS = 10_000;
+const FETCH_MAX_ATTEMPTS = 3;
+const LEGACY_AUTH_KEY = 'pastahane.auth';
+const RESPONSE_NOT_JSON_MESSAGE_TR = 'Sunucudan beklenen yanıt alınamadı.';
+
+function parseApiJsonStrict(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed) return {};
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    throw new Error(RESPONSE_NOT_JSON_MESSAGE_TR);
+  }
+}
+
+function parseApiJsonLenient(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed) return {};
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return {};
+  }
+}
 
 type RequestOptions = RequestInit & { token?: string; skipAuthRefresh?: boolean };
 
+let legacyMigrated = false;
 let refreshPromise: Promise<AuthState | null> | null = null;
 let unauthorizedHandler: (() => void) | null = null;
 
@@ -28,15 +58,86 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
 
-async function readAuth(): Promise<AuthState | null> {
-  const raw = await AsyncStorage.getItem(AUTH_KEY);
-  if (!raw) return null;
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function networkFailureMessage(): string {
+  return messageForCode(NETWORK_ERROR_CODE, 'customer') ?? 'Bağlantı kullanılamıyor. Lütfen tekrar deneyin.';
+}
+
+async function resilientFetch(url: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt += 1) {
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (caught) {
+      clearTimeout(timeoutId);
+      lastError = caught;
+      const aborted =
+        caught instanceof DOMException
+          ? caught.name === 'AbortError'
+          : typeof caught === 'object' &&
+            caught !== null &&
+            'name' in caught &&
+            String((caught as { name?: string }).name) === 'AbortError';
+      const maybeNetwork = caught instanceof TypeError || aborted;
+      if (attempt < FETCH_MAX_ATTEMPTS && maybeNetwork) {
+        await sleep(100 * 2 ** (attempt - 1));
+        continue;
+      }
+      break;
+    }
+  }
+  void lastError;
+  throw new Error(networkFailureMessage());
+}
+
+async function clearSecureAuth(): Promise<void> {
+  await Promise.all([
+    deleteAuthTokenSecure(SECURE_STORE_ACCESS_TOKEN_KEY),
+    deleteAuthTokenSecure(SECURE_STORE_REFRESH_TOKEN_KEY),
+  ]);
+  await AsyncStorage.removeItem(LEGACY_AUTH_KEY).catch(() => undefined);
+}
+
+async function migrateLegacyAuthOnce(): Promise<void> {
+  if (legacyMigrated) return;
+  legacyMigrated = true;
+  const raw = await AsyncStorage.getItem(LEGACY_AUTH_KEY);
+  if (!raw) return;
   try {
-    return JSON.parse(raw) as AuthState;
+    const parsed = JSON.parse(raw) as Partial<AuthState>;
+    const access = typeof parsed.accessToken === 'string' ? parsed.accessToken.trim() : '';
+    const refresh = typeof parsed.refreshToken === 'string' ? parsed.refreshToken.trim() : '';
+    if (!access || !refresh) {
+      await AsyncStorage.removeItem(LEGACY_AUTH_KEY);
+      return;
+    }
+    await setAuthTokenSecure(SECURE_STORE_ACCESS_TOKEN_KEY, access);
+    await setAuthTokenSecure(SECURE_STORE_REFRESH_TOKEN_KEY, refresh);
+    await AsyncStorage.removeItem(LEGACY_AUTH_KEY);
   } catch {
-    await AsyncStorage.removeItem(AUTH_KEY);
+    await AsyncStorage.removeItem(LEGACY_AUTH_KEY).catch(() => undefined);
+    await clearSecureAuth();
+  }
+}
+
+async function readAuth(): Promise<AuthState | null> {
+  await migrateLegacyAuthOnce();
+  const accessRaw = await getAuthTokenSecure(SECURE_STORE_ACCESS_TOKEN_KEY);
+  const refreshRaw = await getAuthTokenSecure(SECURE_STORE_REFRESH_TOKEN_KEY);
+  const accessToken = accessRaw?.trim() ?? '';
+  const refreshToken = refreshRaw?.trim() ?? '';
+  if (!accessToken || !refreshToken) {
+    await clearSecureAuth();
     return null;
   }
+  return { accessToken, refreshToken };
 }
 
 export async function loadStoredAuth(): Promise<AuthState | null> {
@@ -45,22 +146,24 @@ export async function loadStoredAuth(): Promise<AuthState | null> {
 
 export async function saveStoredAuth(auth: AuthState | null): Promise<void> {
   if (!auth) {
-    await AsyncStorage.removeItem(AUTH_KEY);
+    await clearSecureAuth();
     return;
   }
-  await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+  await setAuthTokenSecure(SECURE_STORE_ACCESS_TOKEN_KEY, auth.accessToken.trim());
+  await setAuthTokenSecure(SECURE_STORE_REFRESH_TOKEN_KEY, auth.refreshToken.trim());
 }
 
 async function refreshAuth(refreshToken: string): Promise<AuthState | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
+        const url = `${getApiBaseUrl()}/api/v1/auth/refresh`;
+        const response = await resilientFetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
         });
-        const payload = await response.json().catch(() => ({}));
+        const payload = parseApiJsonLenient(await response.text());
         if (!response.ok) return null;
         const data = unwrapData<AuthState>(payload);
         await saveStoredAuth(data);
@@ -86,10 +189,14 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
   let response: Response;
   let payload: unknown;
   try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, { ...fetchInit, headers });
-    payload = await response.json().catch(() => ({}));
-  } catch {
-    throw new Error(messageFromApi(0, {}, 'Sunucuya bağlanılamadı.'));
+    const url = `${getApiBaseUrl()}${path}`;
+    response = await resilientFetch(url, { ...fetchInit, headers });
+    payload = parseApiJsonStrict(await response.text());
+  } catch (caught) {
+    if (caught instanceof Error && caught.message === RESPONSE_NOT_JSON_MESSAGE_TR) {
+      throw caught;
+    }
+    throw new Error(networkFailureMessage());
   }
 
   if (response.status === 401 && token && !skipAuthRefresh) {
@@ -99,10 +206,13 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
       if (refreshed) {
         headers.Authorization = `Bearer ${refreshed.accessToken}`;
         try {
-          response = await fetch(`${getApiBaseUrl()}${path}`, { ...fetchInit, headers });
-          payload = await response.json().catch(() => ({}));
-        } catch {
-          throw new Error(messageFromApi(0, {}, 'Sunucuya bağlanılamadı.'));
+          response = await resilientFetch(`${getApiBaseUrl()}${path}`, { ...fetchInit, headers });
+          payload = parseApiJsonStrict(await response.text());
+        } catch (caught) {
+          if (caught instanceof Error && caught.message === RESPONSE_NOT_JSON_MESSAGE_TR) {
+            throw caught;
+          }
+          throw new Error(networkFailureMessage());
         }
       }
     }
@@ -171,9 +281,10 @@ export async function fetchCategories(): Promise<Category[]> {
   return unwrapList<Category>(await request('/api/v1/categories?page=1&limit=50'));
 }
 
-export async function fetchProducts(params: { categoryId?: string; page?: number; limit?: number } = {}): Promise<Product[]> {
+export async function fetchProducts(params: { categoryId?: string; page?: number; limit?: number; search?: string } = {}): Promise<Product[]> {
   const search = new URLSearchParams({ page: String(params.page ?? 1), limit: String(params.limit ?? 50) });
   if (params.categoryId) search.set('categoryId', params.categoryId);
+  if (params.search) search.set('search', params.search);
   return unwrapList<Product>(await request(`/api/v1/products?${search.toString()}`));
 }
 
@@ -221,12 +332,44 @@ export async function fetchAddresses(): Promise<Address[]> {
   return authedRequest<Address[]>('/api/v1/addresses');
 }
 
+const ADDRESS_WRITE_KEYS = [
+  'title',
+  'city',
+  'district',
+  'neighborhood',
+  'fullAddress',
+  'building',
+  'floor',
+  'apartment',
+  'directions',
+  'mapAddress',
+  'latitude',
+  'longitude',
+  'isDefault',
+] as const;
+
+/** PATCH gövdesinde yalnızca DTO alanları; `id` veya API'nin döndürdüğü ek alanlar `forbidNonWhitelisted` ile 400 üretmesin diye çıkarılır. */
+function pickAddressWriteBody(body: Partial<Address> & Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of ADDRESS_WRITE_KEYS) {
+    const v = body[key];
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
+}
+
 export async function createAddress(body: Omit<Address, 'id'>): Promise<Address> {
-  return authedRequest<Address>('/api/v1/addresses', { method: 'POST', body: JSON.stringify(body) });
+  return authedRequest<Address>('/api/v1/addresses', {
+    method: 'POST',
+    body: JSON.stringify(pickAddressWriteBody(body as Partial<Address> & Record<string, unknown>)),
+  });
 }
 
 export async function updateAddress(id: string, body: Partial<Address>): Promise<Address> {
-  return authedRequest<Address>(`/api/v1/addresses/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  return authedRequest<Address>(`/api/v1/addresses/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(pickAddressWriteBody(body as Partial<Address> & Record<string, unknown>)),
+  });
 }
 
 export async function deleteAddress(id: string): Promise<void> {
@@ -247,12 +390,14 @@ export async function createOrder(body: {
   addressId?: string;
   pickupStoreId?: string;
   note?: string;
+  scheduledAt?: string;
 }): Promise<Order> {
   return authedRequest<Order>('/api/v1/orders', { method: 'POST', body: JSON.stringify(body) });
 }
 
-export async function fetchOrders(): Promise<Order[]> {
-  return authedRequest<Order[]>('/api/v1/orders/my');
+export async function fetchOrders(params?: { tarih?: string }): Promise<Order[]> {
+  const qs = params?.tarih ? `?tarih=${encodeURIComponent(params.tarih)}` : '';
+  return authedRequest<Order[]>(`/api/v1/orders/my${qs}`);
 }
 
 export async function fetchOrder(id: string): Promise<Order> {
@@ -271,18 +416,15 @@ export async function initCheckoutForm(orderId: string): Promise<{ checkoutFormC
   });
 }
 
-export async function initiateDevCardPayment(orderId: string): Promise<Payment> {
+export async function initiateCardPayment(
+  orderId: string,
+  card: { cardHolderName: string; cardNumber: string; expireMonth: string; expireYear: string; cvc: string },
+  idempotencyKeySuffix: string,
+): Promise<Payment> {
   return authedRequest<Payment>('/api/v1/payments/initiate', {
     method: 'POST',
-    headers: { 'idempotency-key': `${orderId}:mobile-dev` },
-    body: JSON.stringify({
-      orderId,
-      cardHolderName: 'Demo Müşteri',
-      cardNumber: '5528790000000008',
-      expireMonth: '12',
-      expireYear: '30',
-      cvc: '123',
-    }),
+    headers: { 'idempotency-key': `${orderId}:${idempotencyKeySuffix}` },
+    body: JSON.stringify({ orderId, ...card }),
   });
 }
 
@@ -297,6 +439,27 @@ export async function fetchMe(): Promise<User> {
 
 export async function updateMe(body: Pick<User, 'firstName' | 'lastName'> & { email?: string | null }): Promise<User> {
   return authedRequest<User>('/api/v1/users/me', { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export async function changePassword(body: { currentPassword: string; newPassword: string }): Promise<{ changed: true }> {
+  return authedRequest<{ changed: true }>('/api/v1/users/me/password', { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export async function fetchActiveCampaigns(): Promise<Campaign[]> {
+  try {
+    return unwrapList<Campaign>(await request('/api/v1/campaigns/active'));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchDeliveryZones(): Promise<DeliveryZone[]> {
+  try {
+    const data = await request<{ items: DeliveryZone[] }>('/api/v1/delivery-zones?page=1&limit=10');
+    return data.items ?? unwrapList<DeliveryZone>(data);
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchProductReviews(productId: string): Promise<Review[]> {
@@ -326,6 +489,14 @@ export async function fetchLoyaltyMovements(): Promise<LoyaltyMovement[]> {
 
 export async function fetchNotifications(): Promise<AppNotification[]> {
   return authedRequest<AppNotification[]>('/api/v1/notifications/me');
+}
+
+export async function markNotificationRead(id: string): Promise<AppNotification> {
+  return authedRequest<AppNotification>(`/api/v1/notifications/me/${id}/read`, { method: 'PATCH' });
+}
+
+export async function markAllNotificationsRead(): Promise<{ updated: number }> {
+  return authedRequest<{ updated: number }>('/api/v1/notifications/me/read-all', { method: 'PATCH' });
 }
 
 export { readAuth as getStoredAuth };

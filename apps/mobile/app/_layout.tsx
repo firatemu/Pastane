@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/context/auth-context';
 import { CartProvider } from '@/context/cart-context';
 import { colors } from '@/theme';
+import { PaymentDeepLinkHandler } from './deep-link-handler';
 
 export default function RootLayout(): React.JSX.Element {
   const [fontsLoaded] = useFonts({
@@ -29,6 +30,7 @@ export default function RootLayout(): React.JSX.Element {
     <SafeAreaProvider>
       <AuthProvider>
         <CartProvider>
+          <PaymentDeepLinkHandler />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="login" options={{ presentation: 'modal' }} />
@@ -37,6 +39,7 @@ export default function RootLayout(): React.JSX.Element {
             <Stack.Screen name="checkout" />
             <Stack.Screen name="payment-result" />
             <Stack.Screen name="profile" />
+            <Stack.Screen name="notifications" />
             <Stack.Screen name="orders/[id]" />
             <Stack.Screen name="addresses/index" />
             <Stack.Screen name="addresses/new" />

@@ -334,7 +334,7 @@ Critical no-optimistic-update policy:
 - **Local prod QA / stabilization (pre-VPS):** [docs/qa-test-scenarios.md](qa-test-scenarios.md), [docs/regression-checklist.md](regression-checklist.md), [docs/runtime-recovery-tests.md](runtime-recovery-tests.md), [docs/local-qa-acceptance-report.md](local-qa-acceptance-report.md), [docs/human-ui-acceptance-report.md](human-ui-acceptance-report.md), [docs/final-pre-vps-checklist.md](final-pre-vps-checklist.md)  
 - [.env.prod.example](../.env.prod.example) — placeholder production/staging env (never commit real secrets)  
 - [docker/docker-compose.prod.yml](../docker/docker-compose.prod.yml) — full stack + internal `pastane_internal` network for data services; **Nginx** only publishes **80/443** on `pastane_edge`  
-- Production **multi-stage** Dockerfiles under [docker/](../docker/) and operational scripts: [scripts/deploy-prod.sh](../scripts/deploy-prod.sh), [rollback-prod.sh](../scripts/rollback-prod.sh), [backup-prod.sh](../scripts/backup-prod.sh), [restore-prod.sh](../scripts/restore-prod.sh)  
+- Production **multi-stage** Dockerfiles under [docker/](../docker/) and operational scripts: [`deploy.sh`](../deploy.sh), [rollback-prod.sh](../scripts/rollback-prod.sh), [backup-prod.sh](../scripts/backup-prod.sh), [restore-prod.sh](../scripts/restore-prod.sh)  
 - **`SWAGGER_ENABLED`:** default **false** in `.env.prod.example`; set `true` in local dev for OpenAPI UI
 
 **Current posture:**
@@ -343,7 +343,7 @@ Critical no-optimistic-update policy:
 - **Development** remains [docker/docker-compose.dev.yml](../docker/docker-compose.dev.yml) + `.env`.  
 - **Cutover** when DNS exists: real TLS, public URLs in `.env.prod`, provider keys (Iyzico, SMS, FCM, SMTP), bucket policy, and smoke/backup verification per deployment plan.
 
-**Next actions for operators:** rehearse `pnpm docker:prod:config` and `pnpm docker:prod:build`, run smoke tests through Nginx, complete external credential and DNS checklist in [production-risk-review.md](production-risk-review.md).
+**Next actions for operators:** rehearse `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config (VPS)` and `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build (VPS)`, run smoke tests through Nginx, complete external credential and DNS checklist in [production-risk-review.md](production-risk-review.md).
 
 ## 15. Important Environment Variables
 
@@ -525,7 +525,7 @@ Currently out of scope unless explicitly approved:
 
 ## 22. Next Recommended Task
 
-**Operational go-live:** assign DNS/TLS and production credentials, run `scripts/deploy-prod.sh` (or CI equivalent), execute smoke tests and backup drill, then monitor per [monitoring-and-observability.md](monitoring-and-observability.md).
+**Operational go-live:** assign DNS/TLS and production credentials, run [`./deploy.sh`](../deploy.sh) on the VPS (or CI equivalent), execute smoke tests and backup drill, then monitor per [monitoring-and-observability.md](monitoring-and-observability.md).
 
 **Product / engineering:** React Native + Expo mobile app remains **out of scope** until explicitly approved.
 

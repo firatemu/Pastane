@@ -1,15 +1,11 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-declarations -- Metro CJS yapılandırması */
 const { getDefaultConfig } = require('expo/metro-config');
-const path = require('node:path');
 
-/** @type {import('expo/metro-config').MetroConfig} */
-const config = getDefaultConfig(__dirname);
-const workspaceRoot = path.resolve(__dirname, '../..');
-
-config.watchFolders = [path.resolve(workspaceRoot, 'node_modules')];
-config.resolver.nodeModulesPaths = [
-  path.resolve(__dirname, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
-];
-
-module.exports = config;
+/**
+ * Expo SDK 52+ monorepodaki workspace çözümlemesini `@expo/metro-config` otomatik yapar.
+ * Manuel `watchFolders` / `nodeModulesPaths` EAS `export:embed` sırasında hatalara yol açabildiği için kaldırıldı.
+ * @see https://docs.expo.dev/guides/monorepos/
+ *
+ * @type {import('expo/metro-config').MetroConfig}
+ */
+module.exports = getDefaultConfig(__dirname);

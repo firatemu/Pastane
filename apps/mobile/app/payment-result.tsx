@@ -1,12 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fetchOrder, fetchPayments } from '@/api/client';
-import { PrimaryButton, Screen } from '@/components/ui';
+import { ProductGridSkeleton } from '@/components/feedback/skeleton';
+import { SafeScreen } from '@/components/layout/safe-screen';
+import { PrimaryButton, Screen, SecondaryButton } from '@/components/ui';
+import { typography } from '@/design-tokens';
 import type { Order, Payment } from '@/types';
 import { formatTry } from '@/utils/format';
-import { statusLabel } from '@/utils/order-status';
+import { hapticError, hapticSuccess } from '@/utils/haptics';
+import { paymentStatusLabel, statusLabel } from '@/utils/order-status';
 import { colors, radii, spacing } from '@/theme';
 
 export default function PaymentResultScreen(): React.JSX.Element {
@@ -16,6 +20,7 @@ export default function PaymentResultScreen(): React.JSX.Element {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hapticDone, setHapticDone] = useState(false);
 
   async function load(): Promise<void> {
     if (!orderId) {
@@ -39,36 +44,63 @@ export default function PaymentResultScreen(): React.JSX.Element {
     void load();
   }, [orderId]);
 
-  const success = order?.status === 'CONFIRMED' || payment?.status === 'SUCCESS' || status === 'success';
+  const explicitFail =
+    status === 'failure' ||
+    status === 'failed' ||
+    payment?.status === 'FAILED' ||
+    order?.status === 'CANCELLED';
+
+  const success =
+    !explicitFail &&
+    (order?.status === 'CONFIRMED' || payment?.status === 'SUCCESS' || status === 'success');
+
+  useEffect(() => {
+    if (loading || hapticDone || !order) return;
+    if (success) void hapticSuccess().then(() => setHapticDone(true));
+    else if (explicitFail) void hapticError().then(() => setHapticDone(true));
+  }, [loading, order, success, explicitFail, hapticDone]);
+
+  const titleText = explicitFail ? 'Ödeme tamamlanamadı' : success ? 'Ödeme başarılı' : 'Ödeme durumu';
+  const subtitleText = explicitFail
+    ? payment?.failureReason ?? 'Ödeme başarısız veya iptal edildi. Gerekirse tekrar deneyin.'
+    : success
+      ? 'Siparişiniz alındı.'
+      : 'Ödeme sonucunu kontrol edin.';
+
+  const iconName = success ? 'check-circle' : explicitFail ? 'close-circle' : 'clock-outline';
+  const iconColor = success ? '#2e7d4f' : explicitFail ? colors.error : colors.secondary;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeScreen edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Screen title={success ? 'Ödeme başarılı' : 'Ödeme durumu'} subtitle={success ? 'Siparişiniz alındı.' : 'Ödeme sonucunu kontrol edin.'}>
-          {loading ? <ActivityIndicator color={colors.accent} /> : null}
+        <Screen subtitle={subtitleText} title={titleText}>
+          {loading && !order ? <ProductGridSkeleton /> : null}
+          <View style={styles.iconWrap}>
+            <MaterialCommunityIcons color={iconColor} name={iconName} size={72} />
+          </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {order ? (
             <View style={styles.card}>
               <Text style={styles.orderNo}>{order.orderNumber}</Text>
-              <Text style={styles.meta}>Sipariş durumu: {statusLabel(order.status)}</Text>
-              <Text style={styles.meta}>Ödeme durumu: {payment?.status ?? 'Bekleniyor'}</Text>
+              <Text style={styles.meta}>Sipariş: {statusLabel(order.status)}</Text>
+              <Text style={styles.meta}>Ödeme: {paymentStatusLabel(payment?.status)}</Text>
               <Text style={styles.total}>{formatTry(order.grandTotal)}</Text>
             </View>
           ) : null}
-          <PrimaryButton label="Sipariş detayına git" onPress={() => orderId && router.replace(`/orders/${orderId}`)} disabled={!orderId} />
-          <PrimaryButton label="Ödemeyi tekrar kontrol et" onPress={() => void load()} busy={loading} disabled={!orderId} />
+          <PrimaryButton disabled={!orderId} label="Sipariş detayına git" onPress={() => orderId && router.replace(`/orders/${orderId}`)} />
+          <SecondaryButton busy={loading} disabled={!orderId} label="Ödemeyi tekrar kontrol et" onPress={() => void load()} />
         </Screen>
       </ScrollView>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderRadius: radii.xl, marginBottom: spacing.lg, padding: spacing.lg },
-  error: { color: colors.error, fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: spacing.md },
-  meta: { color: colors.textMuted, fontFamily: 'PlusJakartaSans_400Regular', marginTop: spacing.sm },
-  orderNo: { color: colors.primary, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 },
-  safe: { backgroundColor: colors.background, flex: 1 },
-  scroll: { padding: spacing.xl, paddingBottom: 40 },
-  total: { color: colors.accent, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 24, marginTop: spacing.lg },
+  card: { backgroundColor: colors.surfaceContainerLowest, borderColor: `${colors.outlineVariant}40`, borderRadius: radii.xl, borderWidth: 1, marginBottom: spacing.lg, padding: spacing.lg },
+  error: { color: colors.error, fontFamily: typography.bodySemi.fontFamily, marginBottom: spacing.md, textAlign: 'center' },
+  iconWrap: { alignItems: 'center', marginBottom: spacing.lg, marginTop: spacing.md },
+  meta: { ...typography.bodyMd, color: colors.onSurfaceVariant, marginTop: spacing.sm },
+  orderNo: { ...typography.headlineSm, color: colors.primary },
+  scroll: { paddingBottom: 40, paddingHorizontal: spacing.screenHorizontal },
+  total: { ...typography.headlineMd, color: colors.secondary, marginTop: spacing.lg },
 });

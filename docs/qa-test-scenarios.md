@@ -21,7 +21,7 @@ Add static mappings (adjust if you use another loopback):
 ### Stack
 
 ```bash
-pnpm docker:prod:config
+docker compose --env-file .env.production -f docker/docker-compose.prod.yml config
 docker compose --env-file .env.prod -f docker/docker-compose.prod.yml up -d
 ```
 

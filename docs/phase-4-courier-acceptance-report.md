@@ -50,7 +50,7 @@
 | `pnpm typecheck` | Pass |
 | `pnpm test` | Pass |
 | `pnpm build` | **Fail** at monorepo level — `EACCES` on `apps/web/.next` (host ownership). **`pnpm --filter @pastane/courier build`** **Pass** after clearing root-owned `apps/courier/.next` (warnings on cache mkdir only). |
-| `pnpm docker:prod:config` | Pass |
+| `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config` | Pass |
 
 ## Smoke (operator)
 

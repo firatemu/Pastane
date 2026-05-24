@@ -74,8 +74,7 @@ For local device testing, `localhost` will not work from a phone/emulator unless
 - Configure TLS for nginx before real public production.
 - Run compose validation before deploy:
   - `docker compose --env-file .env.prod -f docker/docker-compose.prod.yml config`
-- Deploy with:
-  - `bash scripts/deploy-prod.sh`
+- Deploy with **`./deploy.sh`** on the VPS (see [azem-cloud-vps-deployment.md](azem-cloud-vps-deployment.md)).
 - Verify health:
   - API health through nginx
   - storefront loads

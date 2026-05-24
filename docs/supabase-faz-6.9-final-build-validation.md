@@ -209,3 +209,15 @@ bash scripts/staging/run-staging-dry-run.sh --skip-dump --skip-build
 - Prod DB şu an **~92 KB** dump — cutover downtime kısa; büyüme olursa restore süresini yeniden ölç.
 - Staging smoke cart fix: paginated API `{ data: [...], meta }` envelope — [`smoke-staging.sh`](../scripts/staging/smoke-staging.sh).
 - Cutover’da **pooler/pgBouncer kullanma** — direct `DATABASE_URL` / `DIRECT_URL` (Faz 6.5 planı).
+
+---
+
+## Faz 7.1 — Post-cutover stabilize (repo)
+
+After Faz 7 production cutover:
+
+- **Merged** cutover overlay into [`docker-compose.prod.yml`](../docker/docker-compose.prod.yml) (`legacy-db` profile, `pastane_supabase` network).
+- [`deploy.sh`](../deploy.sh) ensures `supabase-prod` / `supabase-db` before app stack; runs health + smoke.
+- Default backup/restore target: **`supabase-db`** ([`backup-prod.sh`](../scripts/backup-prod.sh)).
+- Legacy postgres rollback window: [`supabase-legacy-rollback-window.md`](supabase-legacy-rollback-window.md) (~7 days from 2026-05-24).
+- Routine deploy: `pnpm push:vps` or VPS `./deploy.sh`.

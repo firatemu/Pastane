@@ -29,6 +29,10 @@ EXPO_PUBLIC_WEB_URL=https://azem.cloud
 
 Mobil uygulama VPS Docker yığınına deploy edilmez; prod, build sırasında gömülen `EXPO_PUBLIC_*` değerleridir.
 
+## Güvenlik (oturum)
+
+Erişim ve yenileme token’ları **`expo-secure-store`** ile Android Keystore / iOS Keychain üzerinden şifreli tutulur. Eski sürümdeki `pastahane.auth` AsyncStorage anahtarı ilk açılışta güvenli depoya taşınır ve silinir.
+
 ## Çalıştırma (dev)
 
 Docker API ayaktayken:
@@ -79,9 +83,29 @@ npx eas init    # projectId → app.config.ts; commit + push
 
 4. Expo dashboard veya GitHub entegrasyonundan **Build** → profil `production` (AAB) veya `preview` (APK).
 
-`eas.json` `base.installCommand` kökten `pnpm install --filter @pastane/mobile...` çalıştırır.
+EAS bir monorepoda iki şekilde bağımlılık kurabilir: (a) gönderimden önce kök dizinde **`pnpm install`** ile workspace’yi hazırlamak; (b) `eas.json` içinde seçilen profile `"installCommand"` ekleyerek Expo’nun kod arşivinden önce (örn. `cd ../.. && pnpm install --frozen-lockfile`) kurulum yapmasını istemek. Bu repoda sık kullanılan yöntem: kökten `pnpm install` ve project root’un `apps/mobile` olması.
 
-## Play Store — Android AAB
+## Push bildirimi (FCM) ve `google-services.json`
+
+Firebase Cloud Messaging için Play Console’a bağlı Google projesinden **`google-services.json`** indirin ve `apps/mobile/google-services.json` konumuna koyun. Bu dosyayı **asla Git’e commit etmeyin** (`.gitignore`’da yer alır); şema için kökten `apps/mobile/google-services.example.json` referansını kullanın.
+
+## Ödeme deep link (`MOBILE_PAYMENT_SCHEME`)
+
+İyzico mobil checkout için API, uygun ödeme isteklerinde yönlendirmeyi `pastahane://…` vb. şemaya çevirir. Varsayılan şema **`pastahane`**; üretimde farklı bir şema kullanıyorsanız VPS `.env.production` içinde `MOBILE_PAYMENT_SCHEME=` ile API ile aynı değeri verin (`apps/mobile` içindeki `scheme` ile eşleşmeli).
+
+Yerelde Android’de derin bağlantıyı test etmek için (emülatör):
+
+```bash
+adb shell am start -a android.intent.action.VIEW -d "pastahane://payment-complete"
+```
+
+(IOS Simulator’da `xcrun simctl openurl …` kullanılabilir.)
+
+## API istemci ağı (`NETWORK_ERROR`)
+
+Mobil istemci, kısa süreli bağlantı sorunlarında **yeniden deneme + backoff** uygular; kullanıcıya Türkçe mesaj olarak `@pastane/tr-api-errors` içindeki `NETWORK_ERROR` kodu döner. Bu beklenenden farklıysa önce emülatör/cihaz ağını ve `EXPO_PUBLIC_API_URL` değerini doğrulayın.
+
+## Doğrulama
 
 1. İlk kurulum (bir kez):
 

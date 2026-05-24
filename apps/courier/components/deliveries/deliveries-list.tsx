@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { useAdaptivePolling } from '@pastane/ui';
+import type { AdaptivePollOutcome } from '@pastane/ui';
 
 import { courierFetchEnvelope } from '../../lib/api/deliveries';
 import { formatAddressSnapshot } from '../../lib/deliveries/address-format';
@@ -47,7 +50,7 @@ export function DeliveriesList(): React.JSX.Element {
     rowsRef.current = rows;
   }, [rows]);
 
-  async function load(): Promise<void> {
+  const pollTick = useCallback(async (): Promise<AdaptivePollOutcome> => {
     try {
       setPollWarning(null);
       setError(null);
@@ -55,21 +58,19 @@ export function DeliveriesList(): React.JSX.Element {
       setRows(envelope.data);
       setMeta(envelope.meta);
       setLastRefreshedAt(new Date());
+      return 'ok';
     } catch (caught) {
       setError(courierMessageFromUnknownError(caught, 'Teslimatlar yüklenemedi.'));
       if (rowsRef.current.length > 0) {
         setPollWarning('Güncelleme başarısız. Liste son başarılı yüklemeye göre.');
       }
+      return 'error';
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    void load();
-    const id = setInterval(() => void load(), 15_000);
-    return () => clearInterval(id);
   }, []);
+
+  useAdaptivePolling({ poll: pollTick, immediate: true, baseIntervalMs: 15_000 });
 
   const groups = useMemo(() => groupDeliveries(rows), [rows]);
   const report = useMemo(() => buildReport(rows), [rows]);

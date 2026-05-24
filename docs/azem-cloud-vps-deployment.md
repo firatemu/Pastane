@@ -2,7 +2,9 @@
 
 This runbook prepares the Pastane platform for production on **azem.cloud** using:
 
-- **Docker Compose** (`docker/docker-compose.prod.yml`) — API, PostgreSQL, Redis, MinIO, Next.js surfaces.
+- **Docker Compose** — two projects:
+  - `supabase-prod` ([`docker/docker-compose.supabase.prod.yml`](../docker/docker-compose.supabase.prod.yml)) — production PostgreSQL (`supabase-db`)
+  - `pastane-prod` ([`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml)) — API, Redis, MinIO, Next.js surfaces
 - **Host Nginx on the VPS** — public **80/443** termination and reverse proxy to **loopback-bound** Docker ports (**not** Docker’s `nginx` image).
 
 Operational overview: [`OPERATIONS.md`](OPERATIONS.md)  
@@ -140,17 +142,20 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ```bash
 cd /var/www/pastane-app/app
-chmod +x deploy.sh backup-db.sh
+chmod +x deploy.sh
 ./deploy.sh
 ```
 
-This runs **`prisma migrate deploy`** (never `migrate dev`).
+`deploy.sh` ensures **supabase-db** is running, then builds/starts the app stack and runs **`prisma migrate deploy`** (never `migrate dev`) using **`DIRECT_URL`**.
+
+Post-deploy checks run automatically (health + read-only smoke). Skip with `SKIP_POST_DEPLOY_CHECKS=1 ./deploy.sh` if needed.
 
 ## Smoke checks
 
 ```bash
 curl -fsS http://127.0.0.1:3003/health
 curl -fsS https://api.azem.cloud/health
+PROD_API_URL=https://api.azem.cloud bash scripts/post-deploy-smoke-prod.sh
 curl -I https://azem.cloud
 curl -I https://admin.azem.cloud
 curl -I https://courier.azem.cloud
@@ -176,10 +181,11 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-pastane-host-nginx
 
 ## Backups & updates
 
-See [`OPERATIONS.md`](OPERATIONS.md) and upstream [`production-deployment-plan.md`](production-deployment-plan.md).
+See [`OPERATIONS.md`](OPERATIONS.md) and [`backup-and-restore.md`](backup-and-restore.md).
+
 ```bash
 cd /var/www/pastane-app/app
-./backup-db.sh
+bash scripts/backup-prod.sh
 ./deploy.sh
 curl -fsS https://api.azem.cloud/health
 ```

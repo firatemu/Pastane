@@ -2,6 +2,8 @@
 
 Production exposes **Docker app ports only on `127.0.0.1`** (see `docker/docker-compose.prod.yml`). Traffic from the Internet hits **nginx on the VPS** (ports **80 / 443**), which proxies to those loopback ports.
 
+**Developer workstation:** Yerelde üretim stack’i çalıştırılmaz (`localhost:3000` doğrudan **docker-compose.dev** vitrinidir). Eskiden `:3000` için çakışmayı gidermek `WEB_PROD_HOST_WEB_PORT` ile VPS Compose’ta yapılabilir — **geliştiricide prod Compose kullanılmıyorsa etkisiz**.
+
 ## Files
 
 | File | Purpose |

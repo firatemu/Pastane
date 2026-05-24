@@ -49,22 +49,16 @@ export function ProductOptionsForm({ product }: Readonly<{ product: Product }>):
           <p className="mt-1">Bu ürün şu an satışa kapalı. Daha sonra tekrar kontrol edebilirsiniz.</p>
         </div>
       ) : null}
-      <div className="max-w-36">
-        <label className="space-y-2 text-sm font-medium">
+      <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+        <label className="w-16 shrink-0 space-y-2 text-sm font-medium sm:w-20">
           <span>Adet</span>
-          <input
-            className="stitch-input"
-            min={1}
-            type="number"
-            {...quantityField}
-          />
-          {errors.quantity ? <span className="block text-red-700">{errors.quantity.message}</span> : null}
+          <input className="stitch-input w-full px-2 text-center" min={1} type="number" {...quantityField} />
+          {errors.quantity ? <span className="block text-xs text-red-700">{errors.quantity.message}</span> : null}
         </label>
-      </div>
-      <div className="rounded-2xl bg-surface-low p-4">
-        <p className="text-sm text-muted">Ön izleme toplamı</p>
-        <p className="mt-1 font-body text-3xl font-extrabold text-error">{formatTry(previewTotal)}</p>
-        <p className="mt-2 text-xs text-muted/80">Nihai fiyat doğrulaması ödeme akışında sunucu tarafından yapılır.</p>
+        <div className="min-w-[10rem] flex-1 rounded-2xl bg-surface-low px-4 py-3 sm:flex-none">
+          <p className="text-sm text-muted">Ön izleme toplamı</p>
+          <p className="mt-1 font-body text-lg font-bold text-error sm:text-xl">{formatTry(previewTotal)}</p>
+        </div>
       </div>
       <button className="stitch-button w-full disabled:opacity-60" disabled={busy || soldOut} type="submit">{soldOut ? 'Satışa kapalı' : busy ? 'Ekleniyor...' : 'Sepete ekle'}</button>
       {ready ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Ürün sepete eklendi.</p> : null}

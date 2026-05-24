@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import type { OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Order, Payment, Prisma } from '@prisma/client';
 import { DeliveryType, OrderStatus, PaymentStatus } from '@prisma/client';
@@ -16,9 +17,10 @@ import type { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import type { PaymentCallbackDto } from './dto/payment-callback.dto';
 import type { CheckoutFormRetrieveSdkResult } from './providers/iyzico.provider';
 import { IyzicoProvider } from './providers/iyzico.provider';
+import { assertForbiddenPaymentDevAutoSuccessWithConfig } from './assert-payment-env';
 
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit {
   constructor(
     @Inject(ConfigService) private readonly config: ConfigService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -28,6 +30,10 @@ export class PaymentsService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
+
+  onModuleInit(): void {
+    assertForbiddenPaymentDevAutoSuccessWithConfig(this.config);
+  }
 
   private isPaymentDevAutoSuccessEnabled(): boolean {
     if (process.env.NODE_ENV === 'production') return false;
@@ -405,20 +411,30 @@ export class PaymentsService {
 
   async finalizeCheckoutFormReturnRedirectUrl(token: string | undefined): Promise<string> {
     const web = this.getStorefrontBaseUrl();
-    const failUrl = (orderId?: string) =>
+
+    const failWeb = (orderId?: string) =>
       orderId
         ? `${web}/odeme?durum=basarisiz&orderId=${encodeURIComponent(orderId)}`
         : `${web}/odeme?durum=basarisiz`;
 
-    if (!token?.length) return failUrl();
+    if (!token?.length) return failWeb();
 
     const pay0 = await this.prisma.payment.findFirst({ where: { providerToken: token } });
-    if (!pay0) return failUrl();
+    if (!pay0) return failWeb();
+
+    const mobScheme = (this.config.get<string>('MOBILE_PAYMENT_SCHEME') ?? process.env.MOBILE_PAYMENT_SCHEME ?? 'pastahane').replace(/\/$/, '');
+    const isMobileCheckout = pay0.idempotencyKey.includes('iyzico-mobile');
+    const mobileResult = (orderId: string, outcome: 'success' | 'failure'): string =>
+      `${mobScheme}://payment-result?${new URLSearchParams({ orderId, status: outcome }).toString()}`;
+    const failRedirect = (orderId?: string) =>
+      isMobileCheckout ? mobileResult(orderId ?? pay0.orderId, 'failure') : failWeb(orderId);
+    const successListRedirect = () => (isMobileCheckout ? mobileResult(pay0.orderId, 'success') : `${web}/siparisler`);
+
     if (pay0.status === PaymentStatus.SUCCESS) {
-      return `${web}/siparisler`;
+      return successListRedirect();
     }
-    if (pay0.status !== PaymentStatus.PENDING) return failUrl(pay0.orderId);
-    if (!pay0.conversationId) return failUrl(pay0.orderId);
+    if (pay0.status !== PaymentStatus.PENDING) return failRedirect(pay0.orderId);
+    if (!pay0.conversationId) return failRedirect(pay0.orderId);
 
     let retrieve: CheckoutFormRetrieveSdkResult;
     try {
@@ -428,18 +444,18 @@ export class PaymentsService {
         conversationId: pay0.conversationId,
       });
     } catch {
-      return failUrl(pay0.orderId);
+      return failRedirect(pay0.orderId);
     }
 
     if (retrieve.conversationId && retrieve.conversationId !== pay0.conversationId) {
-      return failUrl(pay0.orderId);
+      return failRedirect(pay0.orderId);
     }
 
     const paymentSuccess = retrieve.status === 'success' && retrieve.paymentStatus === 'SUCCESS';
     const dtoStatus = paymentSuccess ? ('SUCCESS' as const) : ('FAILED' as const);
 
     const raw = retrieve as unknown as Record<string, unknown>;
-    if (!this.provider.verifyCallback(raw)) return failUrl(pay0.orderId);
+    if (!this.provider.verifyCallback(raw)) return failRedirect(pay0.orderId);
 
     const safePayload = this.provider.sanitize(raw);
     const payloadHash = createHash('sha256').update(JSON.stringify(safePayload)).digest('hex');
@@ -511,9 +527,9 @@ export class PaymentsService {
 
     const refreshed = await this.prisma.payment.findFirst({ where: { id: pay0.id } });
     if (refreshed?.status === PaymentStatus.SUCCESS) {
-      return `${web}/siparisler`;
+      return successListRedirect();
     }
-    return failUrl(pay0.orderId);
+    return failRedirect(pay0.orderId);
   }
 
   async findOwn(userId: string, orderId: string) {

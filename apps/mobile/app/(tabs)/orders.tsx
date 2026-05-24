@@ -1,91 +1,145 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { cancelOrder, fetchOrders } from '@/api/client';
+import { ProductGridSkeleton } from '@/components/feedback/skeleton';
+import { AppHeader } from '@/components/layout/app-header';
+import { SafeScreen } from '@/components/layout/safe-screen';
+import { OrderRow } from '@/components/orders/order-row';
 import { EmptyState, PrimaryButton, Screen } from '@/components/ui';
 import { useAuth } from '@/context/auth-context';
+import { typography } from '@/design-tokens';
+import { useMobileAdaptivePolling } from '@/hooks/use-mobile-adaptive-polling';
 import type { Order } from '@/types';
-import { formatDate, formatTry } from '@/utils/format';
-import { CANCELLABLE_STATUSES, statusLabel } from '@/utils/order-status';
-import { colors, radii, shadow, spacing } from '@/theme';
+import { ACTIVE_ORDER_STATUSES, CANCELLABLE_STATUSES } from '@/utils/order-status';
+import { colors, radii, spacing } from '@/theme';
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function OrdersScreen(): React.JSX.Element {
   const router = useRouter();
   const { auth } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const ordersRef = useRef<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tarih, setTarih] = useState('');
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
 
   const load = useCallback(async () => {
     if (!auth) return;
     setLoading(true);
     setError(null);
     try {
-      setOrders(await fetchOrders());
+      setOrders(await fetchOrders(tarih ? { tarih } : undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Siparişler yüklenemedi.');
     } finally {
       setLoading(false);
     }
-  }, [auth]);
+  }, [auth, tarih]);
 
+  const pollTick = useCallback(async () => {
+    if (!(auth && ordersRef.current.some((o) => ACTIVE_ORDER_STATUSES.has(o.status)))) return 'ok' as const;
+    try {
+      setOrders(await fetchOrders(tarih ? { tarih } : undefined));
+      return 'ok' as const;
+    } catch {
+      return 'error' as const;
+    }
+  }, [auth, tarih]);
+
+  useMobileAdaptivePolling({ poll: pollTick, immediate: false, baseIntervalMs: 25_000, enabled: Boolean(auth) });
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   if (!auth) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.pad}>
-          <Screen title="Siparişlerim" subtitle="Sipariş geçmişinizi görmek için giriş yapın.">
-            <PrimaryButton label="Giriş yap" onPress={() => router.push('/login')} />
-          </Screen>
-        </View>
-      </SafeAreaView>
+      <SafeScreen edges={['top']}>
+        <Screen title="Siparişlerim" subtitle="Sipariş geçmişinizi görmek için giriş yapın.">
+          <PrimaryButton label="Giriş yap" onPress={() => router.push('/login')} />
+        </Screen>
+      </SafeScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />}>
-        <Screen title="Siparişlerim" subtitle="Aktif ve geçmiş siparişleriniz.">
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {loading && !orders.length ? <ActivityIndicator color={colors.accent} /> : null}
-          {!orders.length && !loading ? <EmptyState message="Henüz siparişiniz yok." /> : null}
-          {orders.map((order) => (
-            <Pressable key={order.id} style={styles.card} onPress={() => router.push(`/orders/${order.id}`)}>
-              <View style={styles.head}>
-                <Text style={styles.no}>{order.orderNumber}</Text>
-                <Text style={styles.status}>{statusLabel(order.status)}</Text>
-              </View>
-              <Text style={styles.meta}>{formatDate(order.createdAt)} · {formatTry(order.grandTotal)}</Text>
-              <Text style={styles.meta}>{order.deliveryType === 'HOME_DELIVERY' ? 'Adrese teslim' : 'Mağazadan teslim'}</Text>
-              {CANCELLABLE_STATUSES.has(order.status) ? (
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    void cancelOrder(order.id).then(load).catch(() => setError('Sipariş iptal edilemedi.'));
-                  }}
-                >
-                  <Text style={styles.cancel}>İptal et</Text>
+    <SafeScreen edges={['top']} padded={false}>
+      <AppHeader title="SİPARİŞLER" />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl onRefresh={load} refreshing={loading} tintColor={colors.primary} />}
+      >
+        <View style={styles.pad}>
+          <Screen title="Siparişlerim" subtitle="Aktif ve geçmiş siparişleriniz.">
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Tarih</Text>
+              <TextInput
+                placeholder="YYYY-AA-GG"
+                placeholderTextColor={colors.muted}
+                style={styles.dateInput}
+                value={tarih}
+                onChangeText={setTarih}
+              />
+              {tarih ? (
+                <Pressable onPress={() => setTarih('')}>
+                  <Text style={styles.clearFilter}>Temizle</Text>
                 </Pressable>
-              ) : null}
-            </Pressable>
-          ))}
-        </Screen>
+              ) : (
+                <Pressable onPress={() => setTarih(todayIso())}>
+                  <Text style={styles.clearFilter}>Bugün</Text>
+                </Pressable>
+              )}
+            </View>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {loading && !orders.length ? <ProductGridSkeleton /> : null}
+            {!orders.length && !loading ? (
+              <EmptyState message={tarih ? 'Bu tarihte sipariş bulunamadı.' : 'Henüz siparişiniz yok.'} actionLabel="Vitrine git" onAction={() => router.push('/products')} />
+            ) : null}
+            {orders.map((order) => (
+              <Pressable key={order.id} onPress={() => router.push(`/orders/${order.id}`)}>
+                <View style={styles.card}>
+                  <OrderRow order={order} />
+                  {CANCELLABLE_STATUSES.has(order.status) ? (
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        void cancelOrder(order.id).then(load).catch(() => setError('Sipariş iptal edilemedi.'));
+                      }}
+                    >
+                      <Text style={styles.cancel}>İptal et</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))}
+          </Screen>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  cancel: { color: colors.error, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, marginTop: spacing.sm },
-  card: { ...shadow, backgroundColor: colors.surface, borderRadius: radii.xl, marginBottom: spacing.md, padding: spacing.lg },
-  error: { color: colors.error, fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: spacing.md },
-  head: { flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between' },
-  meta: { color: colors.textMuted, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, marginTop: 6 },
-  no: { color: colors.text, fontFamily: 'PlusJakartaSans_700Bold' },
-  pad: { flex: 1, padding: spacing.xl },
-  safe: { backgroundColor: colors.background, flex: 1 },
-  scroll: { padding: spacing.xl, paddingBottom: 40 },
-  status: { color: colors.accent, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12 },
+  cancel: { ...typography.bodySemi, color: colors.error, fontSize: 12, marginTop: spacing.sm },
+  card: { marginBottom: spacing.md },
+  clearFilter: { ...typography.labelSm, color: colors.primary, textTransform: 'none' },
+  dateInput: {
+    ...typography.bodyMd,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.md,
+    color: colors.onSurface,
+    flex: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  error: { color: colors.error, fontFamily: typography.bodySemi.fontFamily, marginBottom: spacing.md },
+  filterLabel: { ...typography.bodyMd, color: colors.onSurfaceVariant, marginRight: spacing.sm },
+  filterRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  pad: { paddingHorizontal: spacing.screenHorizontal },
+  scroll: { paddingBottom: 40, paddingTop: spacing.md },
 });

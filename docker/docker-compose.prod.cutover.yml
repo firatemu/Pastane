@@ -1,12 +1,11 @@
-# Faz 7 cutover overlay — use ONLY on maintenance day with supabase-prod stack running.
-# Production file docker-compose.prod.yml stays unchanged until this merge is applied.
+# DEPRECATED (Faz 7.1): merged into docker/docker-compose.prod.yml — do not use for routine deploy.
+# Kept temporarily for reference during the legacy postgres rollback window (~7 days after cutover).
+# Historical one-shot cutover: scripts/cutover-prod-supabase.sh
 #
 #   docker compose --project-name pastane-prod --env-file .env.production \
 #     -f docker/docker-compose.prod.yml \
 #     -f docker/docker-compose.prod.cutover.yml \
 #     up -d
-#
-# Effects: legacy postgres → profile; API joins pastane_supabase network; no postgres depends_on.
 name: pastane-prod
 
 networks:

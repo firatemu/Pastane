@@ -9,8 +9,11 @@ fi
 cd "$APP_DIR"
 
 ENV_FILE="${ENV_FILE:-.env.production}"
-COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.prod.yml}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-pastane-prod}"
+
+# shellcheck source=scripts/lib/compose-prod.sh
+source "$APP_DIR/scripts/lib/compose-prod.sh"
+COMPOSE_PROD_ROOT="$APP_DIR"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "error: $ENV_FILE not found. Copy .env.production.example to .env.production and fill production secrets." >&2
@@ -21,6 +24,9 @@ if grep -qE 'change_me|placeholder' "$ENV_FILE"; then
   echo "error: $ENV_FILE still contains placeholder values. Replace secrets before production deploy." >&2
   exit 1
 fi
+
+echo "Validating required production env variables..."
+bash "$APP_DIR/scripts/validate-env.sh" "$ENV_FILE"
 
 echo "Deploying Pastane from $APP_DIR"
 GIT_REF="${DEPLOY_GIT_REF:-main}"
@@ -35,24 +41,55 @@ else
   git reset --hard "origin/$GIT_REF"
 fi
 
+CID="$(compose_prod_app ps -q api 2>/dev/null || true)"
+if [[ -n "$CID" ]]; then
+  PREV_IMG="$(docker inspect -f '{{.Config.Image}}' "$CID" 2>/dev/null || echo '')"
+  if [[ -n "$PREV_IMG" ]]; then
+    PREV_TAG="${PREV_IMG##*:}"
+    printf '%s\n' "$PREV_TAG" > "$APP_DIR/.pastane-deploy-previous-tag"
+    echo "Recorded previous api image tag: $PREV_TAG"
+  fi
+else
+  PREV_FALLBACK="$(grep -E '^[[:space:]]*IMAGE_TAG=' "$ENV_FILE" | tail -n1 | cut -d= -f2-)"
+  if [[ -n "${PREV_FALLBACK// /}" ]]; then
+    printf '%s\n' "$PREV_FALLBACK" > "$APP_DIR/.pastane-deploy-previous-tag"
+    echo "No running api container; recorded IMAGE_TAG from env file for rollback fallback: ${PREV_FALLBACK}"
+  fi
+fi
+
+ensure_supabase_db_up
+
 echo "Validating compose config..."
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config >/dev/null
+compose_prod_app config >/dev/null
 
 echo "Building production images..."
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build
+compose_prod_app build
 
 echo "Starting services..."
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
+compose_prod_app up -d
 
 echo "Running Prisma migrate deploy..."
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T api \
+compose_prod_app exec -T api \
   sh -lc 'cd /app/packages/database && npx prisma migrate deploy --schema=schema.prisma'
 
 echo "Service status:"
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
+compose_prod_app ps
 
 echo "Recent logs:"
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" logs --tail=80 api web admin courier
+compose_prod_app logs --tail=80 api web admin courier
+
+if [[ "${SKIP_POST_DEPLOY_CHECKS:-}" != "1" ]]; then
+  echo "Post-deploy health (loopback)..."
+  API_HEALTH_URL="http://127.0.0.1:3003/health" \
+    API_HEALTH_TRIES="${API_HEALTH_TRIES:-30}" \
+    API_HEALTH_DELAY_SEC="${API_HEALTH_DELAY_SEC:-5}" \
+    bash "$APP_DIR/scripts/post-deploy-health.sh"
+
+  echo "Post-deploy smoke (public read-only)..."
+  PROD_API_URL="${PROD_API_URL:-http://127.0.0.1:3003}" \
+    ENV_FILE="$ENV_FILE" \
+    bash "$APP_DIR/scripts/post-deploy-smoke-prod.sh"
+fi
 
 echo "Pruning unused Docker images..."
 docker image prune -f

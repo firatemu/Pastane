@@ -8,11 +8,18 @@ type TrWebpack = {
   patchWebpack: (config: { resolve?: { alias?: unknown } }) => void;
 };
 
+type UiWebpack = {
+  resolveUiEntry: () => string;
+  patchWebpack: (config: { resolve?: { alias?: unknown } }) => void;
+};
+
 /** Next.js / webpack bazen `alias`'ı dizi (`{ name, alias }[]`) olarak tutar; nesne yayılımı leaflet'i sessizce düşürür. */
 type WebpackAliasArrayEntry = { name: string | string[]; alias: string | string[] | false };
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { resolveTrApiErrorsEntry, patchWebpack } = require('../../packages/tr-api-errors/next-webpack.cjs') as TrWebpack;
+const { resolveTrApiErrorsEntry, patchWebpack: patchTrApiWebpack } = require('../../packages/tr-api-errors/next-webpack.cjs') as TrWebpack;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { resolveUiEntry, patchWebpack: patchUiWebpack } = require('../../packages/ui/next-webpack.cjs') as UiWebpack;
 
 /** `apps/web` dizini (`next.config` dosyasıyla aynı klasör). */
 const webAppRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -80,10 +87,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(webAppRoot, '../..'),
   distDir: process.env.NEXT_DIST_DIR?.trim() || '.next',
-  transpilePackages: ['@pastane/tr-api-errors', 'leaflet', 'react-leaflet'],
+  transpilePackages: ['@pastane/tr-api-errors', '@pastane/ui', 'leaflet', 'react-leaflet'],
   turbopack: {
     resolveAlias: {
       '@pastane/tr-api-errors': resolveTrApiErrorsEntry(),
+      '@pastane/ui': resolveUiEntry(),
       ...(leafletPackageRoot
         ? {
             leaflet: leafletPackageRoot,
@@ -93,7 +101,8 @@ const nextConfig: NextConfig = {
     },
   },
   webpack: (config, context) => {
-    patchWebpack(config);
+    patchTrApiWebpack(config);
+    patchUiWebpack(config);
     const projectDir =
       context && typeof context === 'object' && 'dir' in context && typeof context.dir === 'string'
         ? context.dir

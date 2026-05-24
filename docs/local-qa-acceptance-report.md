@@ -2,7 +2,7 @@
 
 **Scope:** [`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml), `.env.prod`, Nginx vhosts, stabilization only (no VPS, no mobile, no new product scope).  
 **Run date:** 2026-05-19 (agent execution on WSL2).  
-**Stack:** `pnpm docker:prod:config`; `docker compose --env-file .env.prod -f docker/docker-compose.prod.yml up -d`; optional `pnpm docker:prod:build`.
+**Stack:** `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config`; `docker compose --env-file .env.prod -f docker/docker-compose.prod.yml up -d`; optional `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build`.
 
 ---
 
@@ -15,7 +15,7 @@ For the defined scope—**Docker prod Compose**, **internal networks**, **Nginx 
 - **HTTPS / `Secure` cookies:** `.env.prod.example` uses `https://` public URLs while local Nginx serves **plain HTTP** unless you add TLS (e.g. mkcert). Expect **partial** session/cookie behavior vs real production until URLs and scheme align.
 - **Iyzico:** Empty keys in template env — payment initiation remains **documented skip** unless sandbox keys are supplied.
 - **Host port isolation:** Prod Postgres/Redis/MinIO **do not** publish `0.0.0.0` ports; on this machine `nc 127.0.0.1 5432` **succeeded** because a **parallel dev stack** (`pastane_*_dev`) still bound those ports. Stop dev compose when validating prod isolation.
-- **Local `pnpm build`:** Failed with **EACCES** on root-owned `apps/*/.next` trees; **`pnpm docker:prod:build` succeeded** (Node 22 in Docker). Fix host ownership per [development-workflow.md](development-workflow.md) for local turbo builds.
+- **Local `pnpm build`:** Failed with **EACCES** on root-owned `apps/*/.next` trees; **`docker compose --env-file .env.production -f docker/docker-compose.prod.yml build` succeeded** (Node 22 in Docker). Fix host ownership per [development-workflow.md](development-workflow.md) for local turbo builds.
 - **Toolchain:** Agent host used **Node 20** with engine warning; repo expects **Node 22**.
 
 ---
@@ -44,8 +44,8 @@ For the defined scope—**Docker prod Compose**, **internal networks**, **Nginx 
 | `pnpm typecheck` | **Pass** |
 | `pnpm test` | **Pass** (API Jest includes `orders.service.spec.ts`, etc.) |
 | `pnpm build` (host) | **Fail** — EACCES on `.next` |
-| `pnpm docker:prod:config` | **Pass** |
-| `pnpm docker:prod:build` | **Pass** |
+| `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config` | **Pass** |
+| `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build` | **Pass** |
 | Prisma seed in API container | **Pass** |
 | Resilience (see [runtime-recovery-tests.md](runtime-recovery-tests.md)) | **Pass** api/redis/postgres/minio restart + health |
 | Backup to `/tmp/pastane-pg-backups` | **Pass** (after script fix) |

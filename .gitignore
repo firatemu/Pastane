@@ -8,6 +8,7 @@ node_modules/
 .next-docker/
 .next-ci/
 .next-ci-*/
+.next-test-*/
 tmp/
 build/
 dist/
@@ -22,9 +23,14 @@ uploads/
 !.env.example
 !.env.prod.example
 !.env.production.example
+!.env.staging.example
+!.env.production.cutover.example
 
 # Local VPS deploy overrides (see scripts/deploy-vps.env.example)
 scripts/deploy-vps.env.local
+
+# VPS deploy rollback helper (written by deploy.sh)
+.pastane-deploy-previous-tag
 
 # logs
 *.log
@@ -34,6 +40,14 @@ scripts/deploy-vps.env.local
 .idea/
 .DS_Store
 Thumbs.db
+
+# Playwright
+**/test-results/
+**/playwright-report/
+**/blob-report/
+
+# Firebase / push (never commit secrets)
+apps/mobile/google-services.json
 
 # React Native / Expo
 .expo/
@@ -51,3 +65,7 @@ ios/
 
 # misc
 *.tsbuildinfo
+
+# automation reports (pnpm doctor --report vb.)
+reports/
+

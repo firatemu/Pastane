@@ -1,10 +1,10 @@
-# Production Supabase DB stack — Faz 7 cutover (Faz 6.5 prep).
-# Does NOT stop legacy postgres until cutover overlay is applied.
+# Production Supabase DB stack — Faz 7+ (separate compose project from pastane-prod app stack).
+# Routine deploy (`deploy.sh`) ensures supabase-db is up before app services.
 #
 # Usage:
 #   docker compose --project-name supabase-prod --env-file .env.production \
 #     -f docker/docker-compose.supabase.prod.yml up -d
-#   docker compose ... --profile studio up -d   # optional pgAdmin on 127.0.0.1:54323
+#   docker compose ... --profile studio up -d   # optional pgAdmin on 127.0.0.1:54323 (Faz 7.2 nginx)
 name: supabase-prod
 
 x-logging: &json-logging

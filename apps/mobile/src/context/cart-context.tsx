@@ -11,8 +11,10 @@ import { useAuth } from './auth-context';
 interface CartContextValue {
   items: CartItem[];
   loading: boolean;
+  error: string | null;
   count: number;
   reload: () => Promise<void>;
+  clearError: () => void;
   addItem: (productId: string, quantity?: number, optionIds?: string[], customNote?: string) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
@@ -24,17 +26,22 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
   const { auth } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const clearError = useCallback(() => setError(null), []);
 
   const reload = useCallback(async () => {
     if (!auth) {
       setItems([]);
+      setError(null);
       return;
     }
     setLoading(true);
     try {
       setItems(await fetchCart());
-    } catch {
-      setItems([]);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sepet yüklenemedi.');
     } finally {
       setLoading(false);
     }
@@ -75,8 +82,8 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
   const count = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
 
   const value = useMemo(
-    () => ({ items, loading, count, reload, addItem, updateQuantity, removeItem }),
-    [items, loading, count, reload, addItem, updateQuantity, removeItem],
+    () => ({ items, loading, error, count, reload, clearError, addItem, updateQuantity, removeItem }),
+    [items, loading, error, count, reload, clearError, addItem, updateQuantity, removeItem],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

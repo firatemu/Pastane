@@ -66,6 +66,7 @@ export const CORE_CODE_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Bu işlem için yetkiniz yok.',
   VALIDATION_FAILED: 'Girdiğiniz bilgileri kontrol edin.',
   INTERNAL_SERVER_ERROR: 'Sunucuda bir sorun oluştu. Lütfen daha sonra tekrar deneyin.',
+  NETWORK_ERROR: 'Bağlantı zaman aşımına uğradı veya ağ kullanılamıyor. Lütfen tekrar deneyin.',
   HTTP_429: 'Çok fazla istek. Lütfen kısa bir süre sonra tekrar deneyin.',
   HTTP_502: 'Bağlantı kurulamadı. Lütfen tekrar deneyin.',
   HTTP_503: 'Bağlantı kurulamadı. Lütfen tekrar deneyin.',

@@ -8,15 +8,21 @@ Use this checklist **on a machine where** `staging.local`, `api.staging.local`, 
 
 ---
 
+## GitHub Actions (production workflow)
+
+- [ ] Repository secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`; optional `VPS_PORT`
+- [ ] Repository variables: `API_HEALTH_URL` (tam URL, `/health` dahil) **veya** `DOMAIN_API` (örn. `api.example.com`) — başarılı deploy sonrası sağlık kontrolü ve gerekirse otomatik rollback için
+- [ ] İsteğe bağlı deploy ortamı: `PASTANE_GITHUB_ENVIRONMENT`
+
 ## Environment
 
+- [ ] `bash scripts/validate-env.sh .env.production` (VPS) exits 0 — `PAYMENT_DEV_AUTO_SUCCESS` must not be `true`
 - [ ] `docker compose --env-file .env.prod -f docker/docker-compose.prod.yml ps` — all services up
 - [ ] `curl -H 'Host: api.staging.local' http://127.0.0.1/api/v1/health` → 200
 - [ ] `SWAGGER_ENABLED=false` for staging-style runs
 
 ---
 
-## Customer web (`staging.local` or documented web host)
 
 | Check | Pass |
 |-------|------|
@@ -89,4 +95,4 @@ Use this checklist **on a machine where** `staging.local`, `api.staging.local`, 
 
 **Related:** [human-ui-acceptance-report.md](human-ui-acceptance-report.md), [qa-test-scenarios.md](qa-test-scenarios.md), [regression-checklist.md](regression-checklist.md).
 
-**CI note:** If `pnpm build` fails with `EACCES` on `apps/*/.next`, fix ownership per [development-workflow.md](development-workflow.md) or validate with `pnpm docker:prod:build`.
+**CI notes:** Playwright üç uygulama için `pnpm e2e` tam akışı (Docker dev stack, migrate + seed, `turbo e2e`); hazır yığında yalnız test koşmak için `pnpm e2e:runner`. İlk `docker compose ... --build` uzun sürebilir; güncel imajlarınız varsa tekrarda `E2E_COMPOSE_BUILD=0 pnpm e2e`. `pnpm build` `EACCES` verirse [development-workflow.md](development-workflow.md) veya `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build` ile doğrulayın.

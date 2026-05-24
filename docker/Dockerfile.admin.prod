@@ -12,11 +12,12 @@ ARG VERSION=0.0.0
 LABEL org.opencontainers.image.version="${VERSION}"
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.base.json eslint.config.mjs ./
 COPY packages/tr-api-errors packages/tr-api-errors
+COPY packages/ui packages/ui
 COPY apps/admin/package.json apps/admin/package.json
 RUN pnpm install --frozen-lockfile --filter @pastane/admin...
 COPY apps/admin apps/admin
 RUN mkdir -p apps/admin/public
-RUN pnpm --filter @pastane/tr-api-errors build && pnpm --filter @pastane/admin build
+RUN pnpm --filter @pastane/tr-api-errors --filter @pastane/ui build && pnpm --filter @pastane/admin build
 
 FROM node:22-alpine AS runner
 WORKDIR /app

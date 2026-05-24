@@ -97,7 +97,7 @@ Delivery list/detail, pickup/delivered/failed, ownership denial, mobile-first to
 Proceed to **VPS staging** after:
 
 1. Operators complete **`docs/final-pre-vps-checklist.md`** on machines where `admin.staging.local` and `courier.staging.local` resolve to the edge proxy.  
-2. `pnpm lint`, `typecheck`, `test`, `docker:prod:config`, and prod smoke succeed; `pnpm build` succeeds **after** fixing `.next` ownership (or use `pnpm docker:prod:build` as the production build gate) — see **Validation run** below.
+2. `pnpm lint`, `typecheck`, `test`, `docker compose … config` validation (VPS or CI), and prod smoke succeed; `pnpm build` succeeds **after** fixing `.next` ownership (or use `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build` on the server as the production build gate) — see **Validation run** below.
 
 See also: [`docs/local-qa-acceptance-report.md`](local-qa-acceptance-report.md), [`docs/qa-test-scenarios.md`](qa-test-scenarios.md).
 
@@ -110,8 +110,8 @@ See also: [`docs/local-qa-acceptance-report.md`](local-qa-acceptance-report.md),
 | `pnpm lint` | Pass |
 | `pnpm typecheck` | Pass |
 | `pnpm test` | Pass |
-| `pnpm build` | **Fail** — `EACCES` unlink under `apps/{web,admin,courier}/.next/` (root-owned artifacts from Docker/local runs). **Remediation:** `sudo chown -R "$(whoami)" apps/web/.next apps/admin/.next apps/courier/.next` (or delete those trees with sufficient permissions), then re-run; or rely on **`pnpm docker:prod:build`** for production image validation. |
-| `pnpm docker:prod:config` | Pass |
+| `pnpm build` | **Fail** — `EACCES` unlink under `apps/{web,admin,courier}/.next/` (root-owned artifacts from Docker/local runs). **Remediation:** `sudo chown -R "$(whoami)" apps/web/.next apps/admin/.next apps/courier/.next` (or delete those trees with sufficient permissions), then re-run; or rely on **`docker compose --env-file .env.production -f docker/docker-compose.prod.yml build`** for production image validation. |
+| `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config` | Pass |
 | Nginx smoke (`Host: api.staging.local` health; `Host: staging.local` `/`) | Pass (when stack is up) |
 
 ### Admin — Phase 3 panel coverage (automated implementation, human smoke pending)

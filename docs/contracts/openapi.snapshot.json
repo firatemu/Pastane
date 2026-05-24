@@ -1,0 +1,9 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Pastane API",
+    "version": "0.0.0-placeholder",
+    "description": "Yer tutucu snapshot — Çalışan API için `pnpm mobile:openapi-export` çalıştırın (`SWAGGER_ENABLED=true`)."
+  },
+  "paths": {}
+}

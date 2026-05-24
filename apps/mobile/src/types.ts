@@ -41,6 +41,10 @@ export interface ProductUnit {
   isActive?: boolean;
 }
 
+export interface ProductAllergen {
+  allergen: { id: string; name: string };
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -53,6 +57,7 @@ export interface Product {
   preparationMinutes?: number | null;
   category?: Category;
   images?: ProductImage[];
+  allergens?: ProductAllergen[];
   optionGroups?: ProductOptionGroup[];
   isPurchasable?: boolean;
   availabilityReason?: string | null;
@@ -90,7 +95,8 @@ export interface User {
 export interface AuthState {
   accessToken: string;
   refreshToken: string;
-  user: User;
+  /** Hydrated via login/register/refresh — omitted when restoring only tokens from secure storage (upgrade path). */
+  user?: User;
 }
 
 export interface Address {
@@ -104,6 +110,7 @@ export interface Address {
   floor?: string | null;
   apartment?: string | null;
   directions?: string | null;
+  mapAddress?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   isDefault: boolean;
@@ -201,6 +208,7 @@ export interface AppNotification {
   body: string;
   readAt?: string | null;
   createdAt: string;
+  metadata?: { orderNumber?: string; status?: string; orderId?: string } | null;
 }
 
 export interface HomeBanner {
@@ -209,6 +217,26 @@ export interface HomeBanner {
   subtitle?: string | null;
   desktopMediaUrl: string;
   mobileMediaUrl: string;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  description?: string | null;
+  type: string;
+  value: string;
+  status: string;
+  startDate: string;
+  endDate?: string | null;
+}
+
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  minimumOrderPrice?: string | null;
+  deliveryFee: string;
+  estimatedMinutes?: number | null;
+  isActive: boolean;
 }
 
 export interface PaginatedMeta {

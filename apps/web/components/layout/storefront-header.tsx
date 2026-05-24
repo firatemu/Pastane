@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CustomerSession } from '../../lib/auth/types';
 import type { Cart } from '../../lib/cart/types';
-import type { Category } from '../../lib/catalog/types';
 import { fetchCart } from '../../lib/cart/queries';
 import { formatTry } from '../shared/price';
 
@@ -20,7 +19,7 @@ function cartTotal(cart: Cart | null): string {
   return total.toFixed(2);
 }
 
-export function StorefrontHeader({ categories = [], session }: Readonly<{ categories?: Category[]; session?: CustomerSession | undefined }>): React.JSX.Element {
+export function StorefrontHeader({ session }: Readonly<{ session?: CustomerSession | undefined }>): React.JSX.Element {
   const router = useRouter();
   const [cart, setCart] = useState<Cart | null>(null);
   const quantity = cartQuantity(cart);
@@ -53,19 +52,19 @@ export function StorefrontHeader({ categories = [], session }: Readonly<{ catego
   }
   return (
     <header className="fixed top-0 z-50 w-full border-b border-outline-soft/30 bg-surface-container/95 text-primary backdrop-blur">
-      <div className="stitch-container flex min-h-[88px] items-center justify-between gap-4 py-4">
-        <div className="flex items-center gap-8">
-          <a className="font-display text-2xl font-bold text-primary sm:text-3xl" href="/">Pasta-Hane</a>
-          <nav className="hidden max-w-[56vw] items-center gap-4 overflow-x-auto whitespace-nowrap text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted md:flex lg:gap-5">
-            <a className="hover:text-primary" href="/shop">Tüm ürünler</a>
-            {categories.map((category) => (
-              <a className="hover:text-primary" href={`/kategori/${category.slug}`} key={category.id}>
-                {category.name}
-              </a>
-            ))}
-          </nav>
-        </div>
-        <nav className="flex items-center gap-1 text-sm sm:gap-2">
+      <div className="stitch-container relative flex min-h-[88px] items-center justify-between gap-4 py-4">
+        <a className="relative z-10 shrink-0 font-display text-2xl font-bold text-primary sm:text-3xl" href="/">
+          Pasta-Hane
+        </a>
+        <nav className="absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2" aria-label="Ana menü">
+          <a
+            className="text-lg font-semibold tracking-tight text-primary hover:text-primary/80 sm:text-xl"
+            href="/shop"
+          >
+            Vitrin
+          </a>
+        </nav>
+        <nav className="relative z-10 flex shrink-0 items-center gap-1 text-sm sm:gap-2">
           {session ? (
             <>
               <div className="group relative">
@@ -86,13 +85,12 @@ export function StorefrontHeader({ categories = [], session }: Readonly<{ catego
                 </a>
                 {quantity > 0 ? (
                   <div className="pointer-events-none absolute right-0 top-full hidden min-w-56 pt-3 group-hover:block">
-                    <div className="stitch-panel rounded-2xl p-4 text-sm shadow-ambient">
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-secondary">Mini sepet</p>
+                    <div className="stitch-panel rounded-2xl p-4 font-body text-base shadow-ambient">
+                      <p className="text-sm font-semibold text-primary">Mini sepet</p>
                       <div className="mt-3 flex items-center justify-between gap-5">
                         <span className="text-muted">{quantity} ürün</span>
-                        <span className="font-display text-xl font-semibold text-primary">{formatTry(cartTotal(cart))}</span>
+                        <span className="text-lg font-bold tabular-nums text-primary">{formatTry(cartTotal(cart))}</span>
                       </div>
-                      <p className="mt-2 text-xs text-muted/80">Kesin tutar ödeme adımında hesaplanır.</p>
                     </div>
                   </div>
                 ) : null}

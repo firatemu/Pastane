@@ -22,7 +22,7 @@ This repository follows the official phase plan in `docs/development-phases.md`.
 - **Rebuild the affected service image** when you change **dependencies** (`package.json` / lockfile), **root workspace** files copied in `Dockerfile.dev` (e.g. `eslint.config.mjs` for API), or **Dockerfile** itself:  
   `docker compose --env-file ../.env -f docker/docker-compose.dev.yml build api && docker compose ... up -d api`
 - After editing **`packages/database/schema.prisma`**, run `prisma generate` inside the API container (or reinstall) so `@prisma/client` matches the schema.
-- Keep production-specific concerns in `docker/docker-compose.prod.yml` and deploy only on Ubuntu 24.04 LTS hosts.
+- Production stack is described in **`docker/docker-compose.prod.yml`** and **`deploy.sh`**; run **`./deploy.sh` on Ubuntu 24.04 LTS VPS**, not production Compose on laptops (see `docs/local-development.md`).
 
 ## Database migrations from the host (`pnpm --filter @pastane/database prisma:migrate:deploy`)
 - Uses **`packages/database/scripts/prisma-with-root-env.sh`**: loads **monorepo root** `.env`, then runs Prisma (`migrate deploy` / `migrate dev`).

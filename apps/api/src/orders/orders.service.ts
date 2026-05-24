@@ -7,6 +7,7 @@ import type { AuthUser } from '../common/types/auth-user.type';
 import { money } from '../common/utils/money.util';
 import { createOrderNumber, orderNumberDatePrefix } from '../common/utils/order-number.util';
 import { normalizePagination } from '../common/utils/pagination.util';
+import { istanbulDay } from '../common/utils/time-window.util';
 import { AuditService } from '../audit/audit.service';
 import { CartService } from '../cart/cart.service';
 import { PrismaService } from '../database/prisma.service';
@@ -17,6 +18,7 @@ import { formatProductDisplayName } from '../products/product-display.util';
 import { computeProductAvailability } from '../products/product-availability.util';
 import type { AssignCourierDto } from './dto/assign-courier.dto';
 import type { CreateOrderDto } from './dto/create-order.dto';
+import type { QueryMyOrdersDto } from './dto/query-my-orders.dto';
 import type { QueryOrdersDto } from './dto/query-orders.dto';
 import type { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatusService } from './order-status.service';
@@ -153,9 +155,15 @@ export class OrdersService {
     return { items, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  mine(userId: string) {
+  mine(userId: string, q: QueryMyOrdersDto = {}) {
+    const dayStart = q.tarih ? istanbulDay(q.tarih) : undefined;
+    const dayEnd = dayStart ? new Date(dayStart.getTime() + 86_400_000) : undefined;
     return this.prisma.order.findMany({
-      where: { userId, deletedAt: null },
+      where: {
+        userId,
+        deletedAt: null,
+        ...(dayStart && dayEnd ? { createdAt: { gte: dayStart, lt: dayEnd } } : {}),
+      },
       include: {
         items: { include: { review: true, options: true, product: { select: { id: true, slug: true, name: true } } } },
         statusHistory: true,

@@ -16,8 +16,8 @@ This document describes how to move from **local development** to **production c
 Ordered progression:
 
 1. **Localhost (dev)** — [docker-compose.dev.yml](../docker/docker-compose.dev.yml), `.env`. Fast iteration, hot reload.
-2. **Local production simulation** — Same repo, [docker-compose.prod.yml](../docker/docker-compose.prod.yml) on a workstation with `.env.production` built from [.env.production.example](../.env.production.example). Validates multi-container layout, migrations, Nginx routing, and **pinned image tags** without a public VPS.
-3. **Staging** — Non-production VPS or shared environment: real Linux + Docker, optional **hosts-based** or DNS names such as `staging.local` / `api.staging.local` (see below). Mirrors TLS, cookies, and CORS more accurately than plain `localhost`.
+2. **Full-stack validation (optional / non-VPS)** — This repository’s default workflow does **not** run production Compose on laptops. Use a **staging VPS** or disposable Linux host with [docker-compose.prod.yml](../docker/docker-compose.prod.yml) and `.env.production` when you need Compose + Nginx parity before public cutover.
+3. **Staging** — Non-production VPS: real Linux + Docker; optional **hosts-based** or DNS names such as `staging.local` / `api.staging.local` (see below). Mirrors TLS, cookies, and CORS more accurately than plain `localhost`.
 4. **Production** — Ubuntu 24.04 LTS, locked-down network, real domains, production secrets, backups and monitoring.
 
 **Why staging parity matters**
@@ -77,7 +77,7 @@ See also [production-risk-review.md](production-risk-review.md).
 
 Typical sequence on the server (after secrets and TLS are in place):
 
-1. **Validate** compose: `pnpm run docker:prod:config` (uses `.env.production`).
+1. **Validate** compose on the server (or CI): `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config` (uses `.env.production`).
 2. **Build or pull** images for the chosen **`IMAGE_TAG`**.
 3. **Migrations:** before or as part of API startup, run `prisma migrate deploy` (API entrypoint in production images runs this before `node`).
 4. **`docker compose` up** with the production file and `.env.production`.
@@ -87,7 +87,7 @@ Typical sequence on the server (after secrets and TLS are in place):
 
 | Script | Purpose |
 |--------|---------|
-| [scripts/deploy-prod.sh](../scripts/deploy-prod.sh) | Preflight, optional backup hook, deploy forward with explicit tag |
+| [`deploy.sh`](../deploy.sh) | Primary VPS entrypoint: git pull, Compose build/up, migrations, health gate |
 | [scripts/rollback-prod.sh](../scripts/rollback-prod.sh) | Point `IMAGE_TAG` at previous release and recreate services |
 | [scripts/backup-prod.sh](../scripts/backup-prod.sh) | Timestamped PostgreSQL + MinIO-oriented backup |
 | [scripts/restore-prod.sh](../scripts/restore-prod.sh) | Destructive restore with confirmation |

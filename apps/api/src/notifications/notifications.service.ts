@@ -1,6 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { NotificationType, type Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { ERROR_CODES } from '../common/constants/error-codes';
+import { AppException } from '../common/exceptions/app.exception';
 import type { AuthUser } from '../common/types/auth-user.type';
 import { PrismaService } from '../database/prisma.service';
 import { QueuesService } from '../jobs/queues.service';
@@ -23,6 +25,18 @@ export class NotificationsService {
   ) {}
 
   listOwn(userId: string) { return this.prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 }); }
+
+  async markOwnRead(userId: string, notificationId: string) {
+    const row = await this.prisma.notification.findFirst({ where: { id: notificationId, userId } });
+    if (!row) throw new AppException(ERROR_CODES.NOTIFICATION_NOT_FOUND, 'Notification not found', HttpStatus.NOT_FOUND);
+    if (row.readAt) return row;
+    return this.prisma.notification.update({ where: { id: notificationId }, data: { readAt: new Date() } });
+  }
+
+  async markAllOwnRead(userId: string) {
+    const result = await this.prisma.notification.updateMany({ where: { userId, readAt: null }, data: { readAt: new Date() } });
+    return { updated: result.count };
+  }
 
   async enqueue(dto: SendNotificationDto, actor?: AuthUser) {
     const notification = await this.prisma.notification.create({ data: { userId: dto.userId, type: dto.type, title: dto.title, body: dto.body, metadata: dto.metadata as Prisma.InputJsonValue | undefined } });

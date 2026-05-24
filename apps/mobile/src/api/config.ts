@@ -1,16 +1,26 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import type { ApiErrorPayload } from '../types';
+
+/** Android emülatör host makineye `10.0.2.2` ile ulaşır; iOS simülatör ve genelde `localhost` kullanır. Fiziksel cihaz için `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WEB_URL` ayarlayın. */
+function defaultDevApiUrl(): string {
+  return Platform.OS === 'android' ? 'http://10.0.2.2:3003' : 'http://localhost:3003';
+}
+
+function defaultDevWebUrl(): string {
+  return Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+}
 
 export function getApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   const fromExtra = Constants.expoConfig?.extra?.apiUrl as string | undefined;
-  return (fromEnv ?? fromExtra ?? (__DEV__ ? 'http://10.0.2.2:3003' : 'https://api.azem.cloud')).replace(/\/$/, '');
+  return (fromEnv ?? fromExtra ?? (__DEV__ ? defaultDevApiUrl() : 'https://api.azem.cloud')).replace(/\/$/, '');
 }
 
 export function getWebBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_WEB_URL;
   const fromExtra = Constants.expoConfig?.extra?.webUrl as string | undefined;
-  return (fromEnv ?? fromExtra ?? (__DEV__ ? 'http://10.0.2.2:3000' : 'https://azem.cloud')).replace(/\/$/, '');
+  return (fromEnv ?? fromExtra ?? (__DEV__ ? defaultDevWebUrl() : 'https://azem.cloud')).replace(/\/$/, '');
 }
 
 export function messageFromApi(status: number, payload: ApiErrorPayload, fallback: string): string {

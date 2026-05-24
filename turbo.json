@@ -7,6 +7,7 @@
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", ".next-ci/**", "build/**"] },
     "lint": { "dependsOn": ["^lint"] },
     "typecheck": { "dependsOn": ["^typecheck"] },
-    "test": { "dependsOn": ["^test"], "outputs": ["coverage/**"] }
+    "test": { "dependsOn": ["^test"], "outputs": ["coverage/**"] },
+    "e2e": { "cache": false }
   }
 }

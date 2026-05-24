@@ -29,10 +29,12 @@
     "**/*.ts",
     "**/*.tsx",
     ".next-ci/types/**/*.ts",
+    ".next-docker/types/**/*.ts",
+    ".next-test-webpack/types/**/*.ts",
     ".next/types/**/*.ts",
     "/tmp/pastane-web-next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-docker/types/**/*.ts"
+    ".next-test-webpack2/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -137,4 +137,4 @@ API base `/api/v1`. Success envelope typically `{ success: true, data }` (pagina
 
 - **R1:** `deliveries.viewAll` removed from `ORDER_OPERATOR` in [`seed.ts`](../packages/database/prisma/seed.ts) (permission remains in global catalog for ADMIN / future use).
 - **R2:** Admin salt okunur **`/roles`** ve **`/permissions`** sayfaları eklendi (`roles.view` / `permissions.view`); [`NAV_ITEMS`](../apps/admin/lib/permissions/constants.ts) güncellendi.
-- **Doğrulama:** `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm docker:prod:config` geçti; `pnpm build` host üzerinde **EACCES** (`.next` sahipliği) — bilinen ortam sınırı.
+- **Doğrulama:** `pnpm lint`, `pnpm typecheck`, `pnpm test`, `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config` geçti; `pnpm build` host üzerinde **EACCES** (`.next` sahipliği) — bilinen ortam sınırı.

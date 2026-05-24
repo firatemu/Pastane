@@ -7,63 +7,158 @@ on:
   workflow_dispatch:
 
 # Credentials: secrets.VPS_* then vars.VPS_* (repo-level). If VPS_* live only under
-# Deployments → Environment, this job must declare that environment (default: production).
+# Deployments → Environment, declare that environment via PASTANE_GITHUB_ENVIRONMENT.
 # Override name: Repository variable PASTANE_GITHUB_ENVIRONMENT
 
 concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+env:
+  NODE_VERSION: '22'
+
 jobs:
-  deploy:
+  verify:
     runs-on: ubuntu-latest
-    environment: ${{ vars.PASTANE_GITHUB_ENVIRONMENT || 'production' }}
+    timeout-minutes: 45
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint, typecheck, tests, CI build
+        run: pnpm check
+
+  e2e:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser (Chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Compose env template
+        run: cp .env.example .env
+
+      - name: Run Playwright (Docker Compose dev stack + seed + suites)
+        env:
+          CI: true
+          E2E_COMPOSE_DOWN: '1'
+        run: bash scripts/ci-e2e.sh
+
+  deploy:
+    needs: [verify, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ vars.PASTANE_GITHUB_ENVIRONMENT || 'production' }}
+    env:
+      VPS_HOST_CONN: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+      VPS_PORT_CONN: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
+      VPS_USER_CONN: ${{ secrets.VPS_USER || vars.VPS_USER }}
+      VPS_KEY_CONN: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Verify deploy secrets
         env:
           GITHUB_REPO: ${{ github.repository }}
-          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
-          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
         run: |
           set -eo pipefail
           missing=()
-          [[ -z "${VPS_HOST// }" ]] && missing+=(VPS_HOST)
-          [[ -z "${VPS_USER// }" ]] && missing+=(VPS_USER)
-          [[ -z "${VPS_SSH_KEY// }" ]] && missing+=(VPS_SSH_KEY)
+          [[ -z "${VPS_HOST_CONN// }" ]] && missing+=(VPS_HOST)
+          [[ -z "${VPS_USER_CONN// }" ]] && missing+=(VPS_USER)
+          [[ -z "${VPS_KEY_CONN// }" ]] && missing+=(VPS_SSH_KEY)
           if [[ ${#missing[@]} -gt 0 ]]; then
             echo "::notice::Secrets: https://github.com/${GITHUB_REPO}/settings/secrets/actions"
             echo "::notice::Variables: https://github.com/${GITHUB_REPO}/settings/variables/actions"
             echo "::error::Missing VPS_* config: ${missing[*]}"
             printf '%s\n' "Add Repository OR Environment Secrets/Variables named exactly VPS_HOST VPS_USER VPS_SSH_KEY."
-            printf '%s\n' "This job uses GitHub Environment: ${{ vars.PASTANE_GITHUB_ENVIRONMENT || 'production' }} — put VPS_* there, or use repo-level Secrets tab."
+            printf '%s\n' "This job uses GitHub Environment: ${{ vars.PASTANE_GITHUB_ENVIRONMENT || 'production' }}."
             printf '%s\n' "Override env name: Repository variable PASTANE_GITHUB_ENVIRONMENT. VPS_SSH_KEY must be Secret. Optional VPS_PORT (default 22)."
             printf '%s\n' "Docs: docs/GITHUB_CI_SSH.md"
             exit 1
           fi
 
       - name: Prepare SSH
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
         run: |
           set -euo pipefail
-          VPS_PORT="${VPS_PORT:-22}"
+          VPS_PORT="${VPS_PORT_CONN:-22}"
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/pastane_deploy_key
+          printf '%s\n' "${VPS_KEY_CONN}" > ~/.ssh/pastane_deploy_key
           chmod 600 ~/.ssh/pastane_deploy_key
-          ssh-keyscan -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "${VPS_PORT}" "${VPS_HOST_CONN}" >> ~/.ssh/known_hosts
 
       - name: Run deploy script on VPS
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
+        id: vps_deploy
         run: |
           set -euo pipefail
-          VPS_PORT="${VPS_PORT:-22}"
-          ssh -i ~/.ssh/pastane_deploy_key -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+          VPS_PORT="${VPS_PORT_CONN:-22}"
+          ssh -i ~/.ssh/pastane_deploy_key -p "${VPS_PORT}" "${VPS_USER_CONN}@${VPS_HOST_CONN}" \
             'cd /var/www/pastane-app/app && ./deploy.sh'
+
+      - name: Resolve API health URL
+        id: resolve_health_url
+        env:
+          EXPLICIT_HEALTH: ${{ vars.API_HEALTH_URL }}
+          DOMAIN_API_FALLBACK: ${{ vars.DOMAIN_API }}
+        run: |
+          set -euo pipefail
+          CAND="${EXPLICIT_HEALTH:-}"
+          if [[ -z "${CAND// }" ]] && [[ -n "${DOMAIN_API_FALLBACK:-}" ]]; then
+            CAND="https://${DOMAIN_API_FALLBACK}/health"
+          fi
+          if [[ -z "${CAND// }" ]]; then
+            echo "error: set repository variable API_HEALTH_URL (full URL including /health) or DOMAIN_API (e.g. api.azem.cloud)." >&2
+            exit 1
+          fi
+          printf 'url=%s\n' "${CAND}" >> "$GITHUB_OUTPUT"
+
+      - name: Post-deploy API health check (from GitHub runner)
+        id: api_health
+        env:
+          API_HEALTH_URL: ${{ steps.resolve_health_url.outputs.url }}
+        run: bash scripts/post-deploy-health.sh
+
+      - name: Post-deploy production smoke (read-only)
+        if: steps.api_health.outcome == 'success'
+        env:
+          API_HEALTH_URL: ${{ steps.resolve_health_url.outputs.url }}
+        run: |
+          set -euo pipefail
+          PROD_API_URL="${API_HEALTH_URL%/health}"
+          export PROD_API_URL
+          bash scripts/post-deploy-smoke-prod.sh
+
+      - name: Rollback VPS app images on unhealthy API
+        if: ${{ always() && steps.vps_deploy.outcome == 'success' && steps.api_health.outcome == 'failure' }}
+        run: |
+          set -euo pipefail
+          VPS_PORT="${VPS_PORT_CONN:-22}"
+          echo "::warning::Rolling back containers using IMAGE_TAG from .pastane-deploy-previous-tag on the VPS."
+          ssh -i ~/.ssh/pastane_deploy_key -p "${VPS_PORT}" "${VPS_USER_CONN}@${VPS_HOST_CONN}" \
+            'cd /var/www/pastane-app/app && if [ ! -f .pastane-deploy-previous-tag ]; then echo "error: missing .pastane-deploy-previous-tag"; exit 1; fi && IMAGE_TAG="$(tr -d "\r\n" < .pastane-deploy-previous-tag)" && export IMAGE_TAG && bash scripts/rollback-prod.sh'

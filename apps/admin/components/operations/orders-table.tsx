@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAdaptivePolling } from '@pastane/ui';
+import type { AdaptivePollOutcome } from '@pastane/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { adminFetchEnvelope } from '../../lib/api/catalog';
 import { formatTry } from '../../lib/format/format-try';
@@ -39,7 +41,7 @@ export function OrdersTable(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<OrderListItem | null>(null);
 
-  async function load(): Promise<void> {
+  const pollOrders = useCallback(async (): Promise<AdaptivePollOutcome> => {
     try {
       setError(null);
       const q = new URLSearchParams({ page: String(page), limit: '10' });
@@ -47,19 +49,20 @@ export function OrdersTable(): React.JSX.Element {
       const r = await adminFetchEnvelope<OrderListItem[]>(`/orders?${q}`);
       setRows(r.data);
       setMeta(r.meta as typeof meta);
+      return 'ok';
     } catch (e) {
       setError(adminMessageFromUnknownError(e, 'Siparişler yüklenemedi.'));
+      return 'error';
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    void load();
-    const id = setInterval(() => void load(), 15000);
-    return () => clearInterval(id);
   }, [page, status]);
 
+  useEffect(() => {
+    void pollOrders();
+  }, [pollOrders]);
+
+  useAdaptivePolling({ poll: pollOrders, immediate: false, baseIntervalMs: 15_000 });
   const cols = useMemo<ColumnDef<OrderListItem>[]>(
     () => [
       { header: 'No', accessorKey: 'orderNumber' },

@@ -31,7 +31,7 @@ git push -u origin main
 
 ### Commit edilmemeli (doğrulandı veya uyarı)
 
-10. `.env.production`, `.env`, `.env.prod` — tracked değil; **lokal oluşmuş `.env.production`** `docker:prod:*` nedeniyle var → **asıla `git add` yapılmaz.**
+10. `.env.production`, `.env`, `.env.prod` — tracked değil; **lokal oluşmuş `.env.production`** yalnızca eski yerel prod denemeleri veya `pnpm push:vps` doğrulaması için olabilir → **asıla `git add` yapılmaz.**
 11. SSH private key, `.pem` — tracked içerik tarandı (`OK`).
 12. `apps/api/dist`, `packages/*/dist` — **Git indeksinden çıkarıldı** (artık tracked değil; derleme çıktıları CI/Docker ile üretilir).
 
@@ -41,7 +41,7 @@ git push -u origin main
 14. `pnpm typecheck` — başarılı (mobil düzeltmeleri ile).
 15. `pnpm build:ci` — başarılı.
 16. `pnpm test` — başarılı (ör. `@pastane/api` 22 suite).
-17. `pnpm docker:prod:config`, `pnpm docker:prod:build` — başarılı.
+17. `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config`, `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build` — başarılı.
 18. **Not:** Lokal ortam Node **20** uyarısı (engine 22); üretide Node 22 önerilir.
 
 ### GitHub bağlantısı

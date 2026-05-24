@@ -1,0 +1,23 @@
+{
+  "project_info": {
+    "project_number": "REPLACE_ME",
+    "project_id": "REPLACE_FIREBASE_PROJECT_ID",
+    "storage_bucket": "REPLACE_FIREBASE_BUCKET"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "REPLACE_ANDROID_APP_ID",
+        "android_client_info": {
+          "package_name": "cloud.azem.pastahane"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "REPLACE_API_KEY"
+        }
+      ]
+    }
+  ],
+  "_comment": "Copy to google-services.json in this folder — do not commit real secrets."
+}

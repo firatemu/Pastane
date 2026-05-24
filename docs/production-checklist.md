@@ -120,7 +120,7 @@ Verify: `sudo ufw status verbose`, `ss -tlnp`.
 ## Pre-flight commands (reference)
 
 ```bash
-pnpm run docker:prod:config
+docker compose --env-file .env.production -f docker/docker-compose.prod.yml config
 docker compose --env-file .env.production -f docker/docker-compose.prod.yml ps
 curl -sfS https://api.azem.cloud/health
 ```

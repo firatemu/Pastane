@@ -2,8 +2,8 @@
 # Logical PostgreSQL backup (custom format) + optional MinIO volume note.
 #
 # Usage:
-#   bash scripts/backup-prod.sh                              # legacy postgres (default)
-#   DB_SERVICE=supabase-db bash scripts/backup-prod.sh       # after Faz 7 cutover
+#   bash scripts/backup-prod.sh                              # supabase-db (default after Faz 7)
+#   DB_SERVICE=postgres bash scripts/backup-prod.sh          # legacy rollback window only
 #   COMPOSE_FILE=... ENV_FILE=... PROJECT_NAME=...           # overrides
 set -euo pipefail
 
@@ -11,11 +11,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 ENV_FILE="${ENV_FILE:-.env.production}"
-DB_SERVICE="${DB_SERVICE:-postgres}"
-COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.prod.yml}"
-COMPOSE_SUPABASE="${COMPOSE_SUPABASE:-docker/docker-compose.supabase.prod.yml}"
-PROJECT_NAME="${COMPOSE_PROJECT_NAME:-pastane-prod}"
-PROJECT_SUPABASE="${SUPABASE_PROJECT_NAME:-supabase-prod}"
+DB_SERVICE="${DB_SERVICE:-supabase-db}"
+
+# shellcheck source=scripts/lib/compose-prod.sh
+source "$ROOT/scripts/lib/compose-prod.sh"
+COMPOSE_PROD_ROOT="$ROOT"
 
 BACKUP_DIR_FROM_CALLER="${BACKUP_DIR:-}"
 
@@ -27,7 +27,7 @@ set +a
 if [[ -n "${BACKUP_DIR_FROM_CALLER}" ]]; then
   BACKUP_DIR="${BACKUP_DIR_FROM_CALLER}"
 else
-  BACKUP_DIR="${BACKUP_DIR:-/var/backups/pastane}"
+  BACKUP_DIR="${BACKUP_DIR:-/var/www/pastane-app/backups}"
 fi
 RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-7}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -42,16 +42,13 @@ DUMP_FILE="$OUT_DIR/pastane-pg-${STAMP}.dump"
 
 if [[ "$DB_SERVICE" == "supabase-db" ]]; then
   echo "Writing Supabase PostgreSQL backup to $DUMP_FILE"
-  docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-    exec -T supabase-db pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc -f "/tmp/backup.dump"
-  docker compose --project-name "$PROJECT_SUPABASE" --env-file "$ENV_FILE" -f "$COMPOSE_SUPABASE" \
-    cp "supabase-db:/tmp/backup.dump" "$DUMP_FILE"
+  compose_supabase exec -T supabase-db pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc -f "/tmp/backup.dump"
+  compose_supabase cp "supabase-db:/tmp/backup.dump" "$DUMP_FILE"
 else
-  echo "Writing legacy postgres backup to $DUMP_FILE"
-  docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \
-    exec -T postgres pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc -f "/tmp/backup.dump"
-  docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \
-    cp "postgres:/tmp/backup.dump" "$DUMP_FILE"
+  echo "Writing legacy postgres backup to $DUMP_FILE (profile ${COMPOSE_LEGACY_PROFILE})"
+  compose_prod_app --profile "$COMPOSE_LEGACY_PROFILE" exec -T postgres \
+    pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc -f "/tmp/backup.dump"
+  compose_prod_app --profile "$COMPOSE_LEGACY_PROFILE" cp "postgres:/tmp/backup.dump" "$DUMP_FILE"
 fi
 
 echo "MinIO: mirror objects separately (mc mirror) or snapshot volumes; see docs/backup-and-restore.md"

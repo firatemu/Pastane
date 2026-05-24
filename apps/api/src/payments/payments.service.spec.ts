@@ -40,11 +40,13 @@ describe('PaymentsService initiate', () => {
     };
   }
 
-  it('schedules payment timeout in production even if PAYMENT_DEV_AUTO_SUCCESS is true', async () => {
+  it('schedules payment timeout in production when dev payment bypass is disabled', async () => {
     const prev = process.env.NODE_ENV;
+    const prevPay = process.env.PAYMENT_DEV_AUTO_SUCCESS;
+    delete process.env.PAYMENT_DEV_AUTO_SUCCESS;
     process.env.NODE_ENV = 'production';
     try {
-      const config = { get: jest.fn((k: string) => (k === 'PAYMENT_DEV_AUTO_SUCCESS' ? 'true' : undefined)) } as unknown as ConfigService;
+      const config = { get: jest.fn(() => undefined) } as unknown as ConfigService;
       const schedulePaymentTimeout = jest.fn();
       const paymentCreate = jest.fn().mockResolvedValue({ id: 'pay-1', orderId: 'order-1', amount: new Decimal('100') });
       const prismaMock = {
@@ -63,12 +65,41 @@ describe('PaymentsService initiate', () => {
         { log: jest.fn() } as never,
         { createOrderStatusNotification: jest.fn() } as never,
       );
+      service.onModuleInit();
 
       await service.initiate('user-1', dto, 'idem-1');
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
       expect(schedulePaymentTimeout).toHaveBeenCalledWith('pay-1');
     } finally {
       process.env.NODE_ENV = prev;
+      if (prevPay === undefined) delete process.env.PAYMENT_DEV_AUTO_SUCCESS;
+      else process.env.PAYMENT_DEV_AUTO_SUCCESS = prevPay;
+    }
+  });
+
+  it('throws on module init in production when PAYMENT_DEV_AUTO_SUCCESS is enabled via ConfigService', () => {
+    const prev = process.env.NODE_ENV;
+    const prevPay = process.env.PAYMENT_DEV_AUTO_SUCCESS;
+    delete process.env.PAYMENT_DEV_AUTO_SUCCESS;
+    process.env.NODE_ENV = 'production';
+    try {
+      const config = { get: jest.fn((k: string) => (k === 'PAYMENT_DEV_AUTO_SUCCESS' ? 'true' : undefined)) } as unknown as ConfigService;
+      const prisma = { order: {}, payment: {}, $transaction: jest.fn() } as unknown as PrismaService;
+
+      const service = new PaymentsService(
+        config,
+        prisma,
+        new OrderStatusService(),
+        {} as never,
+        { schedulePaymentTimeout: jest.fn() } as never,
+        { log: jest.fn() } as never,
+        { createOrderStatusNotification: jest.fn() } as never,
+      );
+      expect(() => service.onModuleInit()).toThrow(/PAYMENT_DEV_AUTO_SUCCESS/i);
+    } finally {
+      process.env.NODE_ENV = prev;
+      if (prevPay === undefined) delete process.env.PAYMENT_DEV_AUTO_SUCCESS;
+      else process.env.PAYMENT_DEV_AUTO_SUCCESS = prevPay;
     }
   });
 

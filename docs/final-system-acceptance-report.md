@@ -46,8 +46,8 @@ Detailed inventory: [`docs/final-backend-frontend-gap-report.md`](final-backend-
 
 ## 5. Runtime / Docker review result
 
-- **`pnpm docker:prod:config`:** Pass.
-- **`pnpm build` (host):** May fail with **EACCES** on `apps/*/.next` when trees are root-owned — use `chown`/delete or **`pnpm docker:prod:build`** as gate.
+- **`docker compose --env-file .env.production -f docker/docker-compose.prod.yml config`:** Pass.
+- **`pnpm build` (host):** May fail with **EACCES** on `apps/*/.next` when trees are root-owned — use `chown`/delete or **`docker compose --env-file .env.production -f docker/docker-compose.prod.yml build`** as gate.
 - Dev stack API URL helpers aligned across web/admin/courier (prior work + docs).
 
 ---
@@ -60,7 +60,7 @@ Detailed inventory: [`docs/final-backend-frontend-gap-report.md`](final-backend-
 | `pnpm typecheck` | Pass |
 | `pnpm test` | Pass |
 | `pnpm build` | **Fail** (host `.next` EACCES on web/admin/courier in this environment) |
-| `pnpm docker:prod:config` | Pass |
+| `docker compose --env-file .env.production -f docker/docker-compose.prod.yml config` | Pass |
 
 ---
 

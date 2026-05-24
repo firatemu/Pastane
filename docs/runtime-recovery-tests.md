@@ -15,7 +15,7 @@ Use this checklist when validating **resilience** on a developer machine running
 | 2 | `docker compose ... restart redis` | API may error until Redis is up; then health OK and **queue processing resumes** (retry delayed jobs as designed). |
 | 3 | `docker compose ... restart postgres` | API returns errors until Postgres accepts connections; data persisted on volume; migrations already applied—no auto re-seed. |
 | 4 | `docker compose ... restart minio` | Media health/recovery; objects on volume persist. |
-| 5 | After code change | `docker compose ... up -d --build` (or `pnpm docker:prod:build` then up) reproduces deploy rehearsal; smoke tests pass. |
+| 5 | After code change | `docker compose ... up -d --build` (or `docker compose --env-file .env.production -f docker/docker-compose.prod.yml build` then up) reproduces deploy rehearsal; smoke tests pass. |
 
 **Nginx** (`edge` service, if named in compose): restarting only Nginx should restore static routing quickly; use the same curl smoke tests.
 

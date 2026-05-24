@@ -1,13 +1,19 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fetchCategories, fetchProducts } from '@/api/client';
-import { ProductCard } from '@/components/product-card';
+import { ProductCard } from '@/components/catalog/product-card';
+import { ProductGridSkeleton } from '@/components/feedback/skeleton';
+import { AppHeader } from '@/components/layout/app-header';
+import { SafeScreen } from '@/components/layout/safe-screen';
+import { ErrorBanner } from '@/components/ui';
 import { useAuth } from '@/context/auth-context';
 import { useCart } from '@/context/cart-context';
-import { fallbackCategories, fallbackProducts } from '@/data/fallback';
+import { typography } from '@/design-tokens';
 import type { Category, Product } from '@/types';
+import { hapticLight, hapticSuccess } from '@/utils/haptics';
+import { hasRequiredOptions } from '@/utils/product-options';
 import { colors, radii, spacing } from '@/theme';
 
 export default function ProductsScreen(): React.JSX.Element {
@@ -15,77 +21,151 @@ export default function ProductsScreen(): React.JSX.Element {
   const { categoryId } = useLocalSearchParams<{ categoryId?: string }>();
   const { auth } = useAuth();
   const { addItem } = useCart();
-  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
-  const [products, setProducts] = useState<Product[]>(fallbackProducts);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [selected, setSelected] = useState<string | null>(categoryId ?? null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (categoryId) setSelected(categoryId);
   }, [categoryId]);
 
   useEffect(() => {
-    void fetchCategories().then((c) => { if (c.length) setCategories(c); });
+    void fetchCategories().then(setCategories).catch(() => setNotice('Kategoriler yüklenemedi.'));
   }, []);
 
-  useEffect(() => {
-    void fetchProducts({ categoryId: selected ?? undefined, limit: 50 }).then((p) => {
-      if (p.length) setProducts(p);
-    });
-  }, [selected]);
+  const load = useCallback(async (pageNum = 1, append = false) => {
+    if (!append) setLoading(true);
+    try {
+      const rows = await fetchProducts({
+        categoryId: selected ?? undefined,
+        search: search.trim() || undefined,
+        page: pageNum,
+        limit: 20,
+      });
+      setProducts((prev) => (append ? [...prev, ...rows] : rows));
+      setPage(pageNum);
+    } catch {
+      setNotice('Ürünler yüklenemedi.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [search, selected]);
 
-  const filtered = useMemo(() => {
-    if (!selected) return products;
-    return products.filter((p) => p.category?.id === selected || p.category?.slug === selected);
-  }, [products, selected]);
+  useEffect(() => {
+    void load(1, false);
+  }, [load]);
+
+  const filters = useMemo(() => [{ id: '', name: 'Tümü' }, ...categories], [categories]);
+
+  async function handleAdd(product: Product): Promise<void> {
+    if (!auth) {
+      router.push('/login');
+      return;
+    }
+    if (hasRequiredOptions(product)) {
+      router.push(`/product/${product.slug}`);
+      return;
+    }
+    try {
+      await addItem(product.id);
+      void hapticSuccess();
+      setNotice(`${product.name} sepete eklendi.`);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Sepete eklenemedi.');
+    }
+  }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Ürünler</Text>
-        <Text style={styles.copy}>Günlük pastane seçkimiz</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-          <Pressable style={[styles.filter, !selected && styles.filterActive]} onPress={() => setSelected(null)}>
-            <Text style={[styles.filterText, !selected && styles.filterTextActive]}>Tümü</Text>
-          </Pressable>
-          {categories.map((c) => {
-            const active = selected === c.id || selected === c.slug;
-            return (
-              <Pressable key={c.id} style={[styles.filter, active && styles.filterActive]} onPress={() => setSelected(c.id)}>
-                <Text style={[styles.filterText, active && styles.filterTextActive]}>{c.name}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        <View style={styles.grid}>
-          {filtered.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              onPress={() => router.push(`/product/${p.slug}`)}
-              onAdd={() => {
-                if (!auth) {
-                  router.push('/login');
-                  return;
-                }
-                void addItem(p.id);
+    <SafeScreen edges={['top']} padded={false}>
+      <AppHeader showMenu showSearch onSearchPress={() => undefined} title="VİTRİN" />
+      <View style={styles.searchWrap}>
+        <MaterialCommunityIcons color={colors.muted} name="magnify" size={20} />
+        <TextInput
+          placeholder="Ürün ara…"
+          placeholderTextColor={colors.muted}
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={() => void load(1, false)}
+          returnKeyType="search"
+        />
+      </View>
+      {notice ? <View style={styles.noticePad}><ErrorBanner message={notice} onDismiss={() => setNotice(null)} /></View> : null}
+      <FlatList
+        data={products}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(1, false); }} tintColor={colors.primary} />}
+        ListHeaderComponent={
+          <>
+            <Text style={styles.title}>Ürünler</Text>
+            <Text style={styles.copy}>Günlük pastane seçkimiz</Text>
+            <FlatList
+              horizontal
+              data={filters}
+              keyExtractor={(item) => item.id || 'all'}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filters}
+              renderItem={({ item }) => {
+                const active = item.id ? selected === item.id : !selected;
+                return (
+                  <Pressable
+                    style={[styles.filter, active && styles.filterActive]}
+                    onPress={() => {
+                      void hapticLight();
+                      setSelected(item.id || null);
+                    }}
+                  >
+                    <Text style={[styles.filterText, active && styles.filterTextActive]}>{item.name}</Text>
+                  </Pressable>
+                );
               }}
             />
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            {loading && !products.length ? <ProductGridSkeleton /> : null}
+          </>
+        }
+        ListEmptyComponent={!loading ? <Text style={styles.empty}>Bu kategoride ürün bulunamadı.</Text> : null}
+        renderItem={({ item }) => (
+          <ProductCard product={item} onPress={() => router.push(`/product/${item.slug}`)} onAdd={() => void handleAdd(item)} />
+        )}
+        onEndReached={() => {
+          if (!loading && products.length >= page * 20) void load(page + 1, true);
+        }}
+        onEndReachedThreshold={0.4}
+      />
+    </SafeScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  copy: { color: colors.textMuted, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, marginBottom: spacing.lg },
-  filter: { backgroundColor: colors.surfaceLow, borderRadius: radii.pill, marginRight: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  filterActive: { backgroundColor: colors.chocolate },
-  filterText: { color: colors.chocolate, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
-  filterTextActive: { color: colors.background },
-  filters: { marginBottom: spacing.lg },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  safe: { backgroundColor: colors.background, flex: 1 },
-  scroll: { padding: spacing.xl, paddingBottom: 32 },
-  title: { color: colors.primary, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 32 },
+  copy: { ...typography.bodyMd, color: colors.onSurfaceVariant, marginBottom: spacing.lg, paddingHorizontal: spacing.screenHorizontal },
+  empty: { ...typography.bodyMd, color: colors.onSurfaceVariant, marginTop: spacing.lg, textAlign: 'center' },
+  filter: { backgroundColor: colors.surfaceContainerLow, borderRadius: radii.pill, marginRight: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: 8 },
+  filterActive: { backgroundColor: colors.primary },
+  filterText: { ...typography.labelSm, color: colors.onSurface, textTransform: 'none' },
+  filterTextActive: { color: colors.onPrimary },
+  filters: { marginBottom: spacing.lg, paddingHorizontal: spacing.screenHorizontal },
+  list: { paddingBottom: 32 },
+  noticePad: { paddingHorizontal: spacing.screenHorizontal },
+  row: { justifyContent: 'space-between', paddingHorizontal: spacing.screenHorizontal },
+  searchInput: { ...typography.bodyMd, color: colors.onSurface, flex: 1, marginLeft: spacing.sm, paddingVertical: 0 },
+  searchWrap: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.lg,
+    flexDirection: 'row',
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.screenHorizontal,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  title: { ...typography.displayLg, color: colors.primary, fontSize: 28, paddingHorizontal: spacing.screenHorizontal },
 });

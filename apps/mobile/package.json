@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build:android:apk": "eas build --platform android --profile preview",
     "build:android": "eas build --platform android --profile production",
-    "build:android:preview": "eas build --platform android --profile preview"
+    "build:android:preview": "eas build --platform android --profile preview",
+    "eas-build-post-install": "cd ../.. && pnpm --filter @pastane/constants --filter @pastane/tr-api-errors run build"
   },
   "dependencies": {
     "@expo-google-fonts/playfair-display": "^0.4.2",
@@ -19,12 +20,16 @@
     "@expo/metro-runtime": "~56.0.12",
     "@expo/vector-icons": "^15.0.3",
     "@hookform/resolvers": "^5.0.1",
+    "@pastane/constants": "workspace:*",
+    "@pastane/tr-api-errors": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~56.0.4",
     "expo-constants": "~56.0.15",
     "expo-font": "~56.0.0",
+    "expo-haptics": "~56.0.0",
     "expo-linking": "~56.0.11",
     "expo-router": "~56.2.6",
+    "expo-secure-store": "~56.0.4",
     "expo-status-bar": "~56.0.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Reset Next.js dev caches for web/admin/courier when CSS/chunks break after host build + Docker dev.
+#
+# Gerekli zorunda kalınan başka örnek: `ENOENT … open …/node_modules/.pnpm/next@…/dist/...` — kökten
+# `pnpm install`/hoist değiştiren ayar yapıldıktan sonra eski `.next-docker` bazen fizik olarak
+# artık var olmayan `.pnpm/` yollarına kilit kalır; bu script o önbelleği siler ve konteyneri yeniden
+# oluşturur (Next bir sonraki derlemede geçerli `node_modules` yolunu üretir).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

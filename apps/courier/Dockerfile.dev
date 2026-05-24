@@ -1,11 +1,12 @@
 FROM node:22-alpine
 WORKDIR /app
 RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json .npmrc ./
 COPY packages/tr-api-errors packages/tr-api-errors
+COPY packages/ui packages/ui
 COPY apps/courier/package.json apps/courier/package.json
 RUN pnpm install --filter @pastane/courier... --no-frozen-lockfile --shamefully-hoist
-RUN pnpm --filter @pastane/tr-api-errors build
+RUN pnpm --filter @pastane/tr-api-errors --filter @pastane/ui build
 COPY apps/courier apps/courier
 ENV RUNNING_IN_DOCKER=1
 EXPOSE 3002

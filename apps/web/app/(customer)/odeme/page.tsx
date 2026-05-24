@@ -8,7 +8,7 @@ export default function CheckoutPage(): React.JSX.Element {
           <p className="stitch-eyebrow">Güvenli Checkout</p>
           <h1 className="mt-2 font-display text-4xl font-semibold text-primary">Ödeme ve teslimat</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            Teslimat seçimini, sipariş notunu ve ödeme yöntemini tek akışta tamamlayın.
+            Teslimat seçimini tamamlayın; ödemeyi iyzico güvenli ödeme formu ile yapın.
           </p>
         </div>
         <a className="rounded-full border border-outline-soft/60 px-5 py-3 text-sm font-semibold text-primary hover:border-primary" href="/sepet">
