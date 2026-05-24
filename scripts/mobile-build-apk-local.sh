@@ -135,12 +135,21 @@ pnpm install --frozen-lockfile
 step "Paylaşılan paketler (@pastane/constants, @pastane/tr-api-errors)"
 pnpm --filter @pastane/constants --filter @pastane/tr-api-errors run build
 
+step "Metro / Expo önbellek temizliği (MessagePack cache bozulmasını önler)"
+rm -rf \
+  "${MOBILE_DIR}/.expo" \
+  "${MOBILE_DIR}/dist" \
+  "${MOBILE_DIR}/node_modules/.cache" \
+  "${REPO_ROOT}/node_modules/.cache" \
+  /tmp/metro-* /tmp/haste-map-* 2>/dev/null || true
+
 step "EAS yerel build (preview / APK) — süre ~15–20 dk olabilir"
 mkdir -p "${ARTIFACT_DIR}"
 cd "${MOBILE_DIR}"
 export EAS_BUILD_NO_EXPO_GO_WARNING=true
+export CI=1
 set +e
-npx eas build --platform android --profile preview --local --non-interactive 2>&1 | tee "${EAS_LOG}"
+npx eas build --platform android --profile preview --local --non-interactive --clear-cache 2>&1 | tee "${EAS_LOG}"
 eas_status=${PIPESTATUS[0]}
 set -e
 if [[ "${eas_status}" -ne 0 ]]; then
