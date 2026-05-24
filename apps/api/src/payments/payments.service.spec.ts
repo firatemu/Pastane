@@ -277,8 +277,18 @@ describe('PaymentsService initiateCheckoutForm', () => {
       pickupStore: null,
       items: [
         {
+          id: 'line-1',
+          quantity: 1,
+          unitPriceSnapshot: new Decimal('125'),
           productNameSnapshot: 'Profiterol',
-          product: { status: ProductStatus.ACTIVE, isPublished: true, deletedAt: null, saleWindowStart: null, saleWindowEnd: null },
+          product: {
+            status: ProductStatus.ACTIVE,
+            isPublished: true,
+            deletedAt: null,
+            saleWindowStart: null,
+            saleWindowEnd: null,
+            category: { name: 'Tatlılar' },
+          },
         },
       ],
     };
@@ -300,6 +310,7 @@ describe('PaymentsService initiateCheckoutForm', () => {
             conversationId: 'conv-shared',
             providerToken: 'token-1',
             responsePayload: { checkoutFormContent: checkoutForm },
+            createdAt: new Date(),
           },
         ]),
         create: paymentCreate,
@@ -325,5 +336,64 @@ describe('PaymentsService initiateCheckoutForm', () => {
     expect(result.checkoutFormContent).toBe(checkoutForm);
     expect(paymentCreate).not.toHaveBeenCalled();
     expect(provider.checkoutFormInitialize).not.toHaveBeenCalled();
+  });
+
+  it('supersedes stale same-key payment without form and creates a fresh checkout row', async () => {
+    const config = { get: jest.fn() } as unknown as ConfigService;
+    const paymentUpdate = jest.fn().mockResolvedValue({});
+    const paymentCreate = jest.fn().mockResolvedValue({ id: 'pay-mobile-new' });
+    const prismaMock = {
+      order: { findFirst: jest.fn().mockResolvedValue(payableOrder()) },
+      payment: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'pay-stale',
+          orderId: 'order-1',
+          status: PaymentStatus.PENDING,
+          idempotencyKey: 'order-1:iyzico-mobile',
+          responsePayload: {},
+          createdAt: new Date(),
+        }),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: paymentCreate,
+        update: paymentUpdate,
+      },
+    };
+    const prisma = prismaMock as unknown as PrismaService;
+    const provider = {
+      assertCheckoutConfigured: jest.fn(),
+      checkoutFormInitialize: jest.fn().mockResolvedValue({
+        status: 'success',
+        token: 'tok-1',
+        checkoutFormContent: checkoutForm,
+        conversationId: 'conv-new',
+      }),
+    };
+
+    const service = new PaymentsService(
+      config,
+      prisma,
+      new OrderStatusService(),
+      provider as never,
+      { schedulePaymentTimeout: jest.fn() } as never,
+      { log: jest.fn() } as never,
+      { createOrderStatusNotification: jest.fn() } as never,
+    );
+
+    const result = await service.initiateCheckoutForm('user-1', 'order-1', 'order-1:iyzico-mobile');
+    expect(result.checkoutFormContent).toBe(checkoutForm);
+    expect(paymentUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'pay-stale' },
+        data: expect.objectContaining({
+          status: PaymentStatus.FAILED,
+          idempotencyKey: expect.stringContaining('order-1:iyzico-mobile:superseded:'),
+        }),
+      }),
+    );
+    expect(paymentCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ idempotencyKey: 'order-1:iyzico-mobile' }),
+      }),
+    );
   });
 });

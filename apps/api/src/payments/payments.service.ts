@@ -102,7 +102,11 @@ export class PaymentsService implements OnModuleInit {
     }
   }
 
-  private async supersedePendingPayment(paymentId: string, reason: string): Promise<void> {
+  private async supersedePendingPayment(
+    paymentId: string,
+    reason: string,
+    releaseIdempotencyKey?: string,
+  ): Promise<void> {
     await this.prisma.payment.update({
       where: { id: paymentId },
       data: {
@@ -110,6 +114,9 @@ export class PaymentsService implements OnModuleInit {
         failureReason: reason,
         processedAt: new Date(),
         processingResult: 'SUPERSEDED',
+        ...(releaseIdempotencyKey
+          ? { idempotencyKey: `${releaseIdempotencyKey}:superseded:${paymentId.slice(0, 8)}` }
+          : {}),
       },
     });
   }
@@ -130,8 +137,13 @@ export class PaymentsService implements OnModuleInit {
       if (payment.idempotencyKey === idempotencyKey) continue;
 
       const form = extractCheckoutFormContent(payment.responsePayload);
-      if (!form) {
-        await this.supersedePendingPayment(payment.id, 'Yeni ödeme oturumu ile değiştirildi');
+      const isExpired = Date.now() - payment.createdAt.getTime() > 15 * 60 * 1000;
+      if (!form || isExpired) {
+        await this.supersedePendingPayment(
+          payment.id,
+          isExpired ? 'Ödeme formu süresi doldu' : 'Yeni ödeme oturumu ile değiştirildi',
+          payment.idempotencyKey,
+        );
         continue;
       }
 
@@ -218,7 +230,13 @@ export class PaymentsService implements OnModuleInit {
     const store = order.pickupStore;
     if (!store) throw new AppException(ERROR_CODES.ORDER_NOT_FOUND, 'Pickup store missing for order', HttpStatus.BAD_REQUEST);
     const full = sanitizeIyzicoText(`${store.name} - ${store.address}, ${store.district} ${store.city}`, 256);
-    const addr = { contactName, city: store.city, country, address: full, zipCode: '34000' };
+    const addr = {
+      contactName: sanitizeIyzicoText(contactName, 64),
+      city: sanitizeIyzicoText(store.city, 64),
+      country,
+      address: full,
+      zipCode: '34000',
+    };
     return {
       buyer: { ...buyerBase, registrationAddress: full, city: store.city, country },
       shippingAddress: addr,
@@ -398,8 +416,13 @@ export class PaymentsService implements OnModuleInit {
     const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existing) {
       const cached = extractCheckoutFormContent(existing.responsePayload);
-      if (cached) return { checkoutFormContent: cached };
-      await this.supersedePendingPayment(existing.id, 'Eksik iyzico formu; yeni oturum başlatıldı');
+      const isExpired = Date.now() - existing.createdAt.getTime() > 15 * 60 * 1000;
+      if (cached && !isExpired) return { checkoutFormContent: cached };
+      await this.supersedePendingPayment(
+        existing.id,
+        isExpired ? 'Ödeme formu süresi doldu' : 'Eksik iyzico formu; yeni oturum başlatıldı',
+        idempotencyKey,
+      );
       this.logger.warn(
         `checkout-form-init superseded stale payment orderId=${orderId} idempotency=${idempotencyKey.slice(-24)}`,
       );

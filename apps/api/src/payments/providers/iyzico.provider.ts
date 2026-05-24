@@ -103,6 +103,7 @@ export class IyzicoProvider {
         return JSON.parse(result) as CheckoutFormInitSdkResult;
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'invalid json';
+        this.logger.error(`Failed to parse iyzico SDK result string: "${result.slice(0, 1000)}"`);
         throw new Error(msg);
       }
     }
@@ -116,28 +117,41 @@ export class IyzicoProvider {
   ): Promise<CheckoutFormInitSdkResult> {
     this.assertCheckoutConfigured(channel);
     const client = this.resolveClient(channel)!;
-    return new Promise((resolve, reject) => {
-      client.checkoutFormInitialize.create(request, (err: Error | null, result: unknown) => {
-        if (err) {
-          this.logger.warn(`iyzico checkout init failed (${channel}): ${err.message}`);
-          reject(err);
-          return;
-        }
-        try {
-          const normalized = this.normalizeSdkResult(result);
-          if (normalized.status !== 'success') {
-            this.logger.warn(
-              `iyzico checkout init rejected (${channel}): ${normalized.errorCode ?? ''} ${normalized.errorMessage ?? ''}`.trim(),
-            );
+
+    const attempt = (): Promise<CheckoutFormInitSdkResult> => {
+      return new Promise((resolve, reject) => {
+        // Clone request object to avoid side effects across retries
+        const reqCopy = JSON.parse(JSON.stringify(request));
+        client.checkoutFormInitialize.create(reqCopy, (err: Error | null, result: unknown) => {
+          if (err) {
+            this.logger.warn(`iyzico checkout init failed (${channel}): ${err.message}`);
+            reject(err);
+            return;
           }
-          resolve(normalized);
-        } catch (parseErr) {
-          const msg = parseErr instanceof Error ? parseErr.message : 'parse failed';
-          this.logger.warn(`iyzico checkout init parse error (${channel}): ${msg}`);
-          reject(parseErr instanceof Error ? parseErr : new Error(msg));
-        }
+          try {
+            const normalized = this.normalizeSdkResult(result);
+            if (normalized.status !== 'success') {
+              this.logger.warn(
+                `iyzico checkout init rejected (${channel}): ${normalized.errorCode ?? ''} ${normalized.errorMessage ?? ''}`.trim(),
+              );
+            }
+            resolve(normalized);
+          } catch (parseErr) {
+            const msg = parseErr instanceof Error ? parseErr.message : 'parse failed';
+            this.logger.warn(`iyzico checkout init parse error (${channel}): ${msg}`);
+            reject(parseErr instanceof Error ? parseErr : new Error(msg));
+          }
+        });
       });
-    });
+    };
+
+    try {
+      return await attempt();
+    } catch (err) {
+      this.logger.warn(`iyzico checkout init failed, retrying once in 1s... error: ${err instanceof Error ? err.message : String(err)}`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      return await attempt();
+    }
   }
 
   async checkoutFormRetrieve(
