@@ -30,18 +30,29 @@ bash "$APP_DIR/scripts/validate-env.sh" "$ENV_FILE"
 
 if [[ "${SKIP_CERTBOT:-}" != "1" ]]; then
   echo "Expanding Let's Encrypt cert to include studio.azem.cloud..."
-  sudo certbot certonly --nginx --non-interactive --agree-tos --expand \
+  if ! sudo -n certbot certonly --nginx --non-interactive --agree-tos --expand \
     -d azem.cloud -d www.azem.cloud -d api.azem.cloud -d admin.azem.cloud \
-    -d courier.azem.cloud -d storage.azem.cloud -d studio.azem.cloud \
-    || sudo certbot certonly --nginx --non-interactive --agree-tos -d studio.azem.cloud
+    -d courier.azem.cloud -d storage.azem.cloud -d studio.azem.cloud 2>/dev/null; then
+    echo "::notice::certbot requires root. Run on VPS: sudo bash scripts/setup-studio-vps-root.sh" >&2
+    if [[ "${REQUIRE_SUDO:-}" == "1" ]]; then
+      exit 1
+    fi
+  fi
 fi
 
 if [[ "${SKIP_NGINX:-}" != "1" ]]; then
   echo "Installing nginx vhost for studio.azem.cloud..."
-  sudo install -o root -m 0644 "$APP_DIR/$NGINX_SRC" "$NGINX_DST"
-  sudo ln -sf "$NGINX_DST" /etc/nginx/sites-enabled/pastane-studio.conf
-  sudo nginx -t
-  sudo systemctl reload nginx
+  if sudo -n install -o root -m 0644 "$APP_DIR/$NGINX_SRC" "$NGINX_DST" 2>/dev/null \
+    && sudo -n ln -sf "$NGINX_DST" /etc/nginx/sites-enabled/pastane-studio.conf 2>/dev/null \
+    && sudo -n nginx -t 2>/dev/null \
+    && sudo -n systemctl reload nginx 2>/dev/null; then
+    echo "nginx studio vhost installed."
+  else
+    echo "::notice::nginx install requires root. Run on VPS: sudo bash scripts/setup-studio-vps-root.sh" >&2
+    if [[ "${REQUIRE_SUDO:-}" == "1" ]]; then
+      exit 1
+    fi
+  fi
 fi
 
 if [[ "${SKIP_COMPOSE:-}" != "1" ]]; then
