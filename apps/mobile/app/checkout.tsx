@@ -457,7 +457,12 @@ export default function CheckoutScreen(): React.JSX.Element {
             <Text style={styles.summaryTitle}>Sipariş özeti</Text>
             {items.map((item) => (
               <View key={item.id} style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{item.quantity} x {item.product.name}</Text>
+                <Text style={styles.summaryLabel}>
+                  {item.quantity} x {item.product.name}
+                </Text>
+                <Text style={styles.summaryValue}>
+                  {formatTry((Number(item.unitPrice) * item.quantity).toFixed(2))}
+                </Text>
               </View>
             ))}
             {pendingOrder ? (
@@ -470,9 +475,18 @@ export default function CheckoutScreen(): React.JSX.Element {
                   <Text style={styles.summaryLabel}>Teslimat</Text>
                   <Text style={styles.summaryValue}>{formatTry(pendingOrder.deliveryFee)}</Text>
                 </View>
+                {pendingOrder.serviceFee && Number(pendingOrder.serviceFee) > 0 ? (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Servis</Text>
+                    <Text style={styles.summaryValue}>{formatTry(pendingOrder.serviceFee)}</Text>
+                  </View>
+                ) : null}
                 {Number(pendingOrder.loyaltyDiscount ?? 0) > 0 ? (
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>İndirim</Text>
+                    <Text style={styles.summaryLabel}>
+                      Puan indirimi
+                      {pendingOrder.loyaltyPointsUsed ? ` (${pendingOrder.loyaltyPointsUsed} puan)` : ''}
+                    </Text>
                     <Text style={styles.summaryValue}>-{formatTry(pendingOrder.loyaltyDiscount)}</Text>
                   </View>
                 ) : null}

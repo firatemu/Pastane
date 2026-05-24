@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fetchOrder, fetchPayments } from '@/api/client';
 import { ProductGridSkeleton } from '@/components/feedback/skeleton';
+import { AppHeader } from '@/components/layout/app-header';
 import { SafeScreen } from '@/components/layout/safe-screen';
 import { PrimaryButton, Screen, SecondaryButton } from '@/components/ui';
 import { typography } from '@/design-tokens';
@@ -21,28 +22,33 @@ export default function PaymentResultScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hapticDone, setHapticDone] = useState(false);
+  const requestSeq = useRef(0);
 
-  async function load(): Promise<void> {
+  const load = useCallback(async (): Promise<void> => {
     if (!orderId) {
       setError('Sipariş bilgisi bulunamadı.');
       return;
     }
+    const seq = requestSeq.current + 1;
+    requestSeq.current = seq;
     setLoading(true);
     setError(null);
     try {
       const [nextOrder, nextPayments] = await Promise.all([fetchOrder(orderId), fetchPayments(orderId).catch(() => [])]);
+      if (requestSeq.current !== seq) return;
       setOrder(nextOrder);
       setPayment(nextPayments[0] ?? null);
     } catch (e) {
+      if (requestSeq.current !== seq) return;
       setError(e instanceof Error ? e.message : 'Ödeme sonucu alınamadı.');
     } finally {
-      setLoading(false);
+      if (requestSeq.current === seq) setLoading(false);
     }
-  }
+  }, [orderId]);
 
   useEffect(() => {
     void load();
-  }, [orderId]);
+  }, [load]);
 
   const explicitFail =
     status === 'failure' ||
@@ -50,9 +56,7 @@ export default function PaymentResultScreen(): React.JSX.Element {
     payment?.status === 'FAILED' ||
     order?.status === 'CANCELLED';
 
-  const success =
-    !explicitFail &&
-    (order?.status === 'CONFIRMED' || payment?.status === 'SUCCESS' || status === 'success');
+  const success = !explicitFail && (order?.status === 'CONFIRMED' || payment?.status === 'SUCCESS');
 
   useEffect(() => {
     if (loading || hapticDone || !order) return;
@@ -65,13 +69,16 @@ export default function PaymentResultScreen(): React.JSX.Element {
     ? payment?.failureReason ?? 'Ödeme başarısız veya iptal edildi. Gerekirse tekrar deneyin.'
     : success
       ? 'Siparişiniz alındı.'
-      : 'Ödeme sonucunu kontrol edin.';
+      : status === 'success'
+        ? 'Ödeme sonucu bankadan geldi; sipariş durumunu sunucudan doğruluyoruz.'
+        : 'Ödeme sonucunu kontrol edin.';
 
   const iconName = success ? 'check-circle' : explicitFail ? 'close-circle' : 'clock-outline';
   const iconColor = success ? '#2e7d4f' : explicitFail ? colors.error : colors.secondary;
 
   return (
-    <SafeScreen edges={['top']}>
+    <SafeScreen edges={['top']} padded={false}>
+      <AppHeader showBack showMenu title="ÖDEME SONUCU" onBackPress={() => router.back()} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Screen subtitle={subtitleText} title={titleText}>
           {loading && !order ? <ProductGridSkeleton /> : null}

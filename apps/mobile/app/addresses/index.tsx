@@ -1,8 +1,10 @@
+import { mapUnknownErrorToTurkish } from '@pastane/tr-api-errors';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { deleteAddress, fetchAddresses, setDefaultAddress } from '@/api/client';
+import { AppHeader } from '@/components/layout/app-header';
+import { SafeScreen } from '@/components/layout/safe-screen';
 import { EmptyState, PrimaryButton, Screen, SecondaryButton } from '@/components/ui';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import type { Address } from '@/types';
@@ -15,6 +17,7 @@ export default function AddressesScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
   const load = useCallback(async (mode: 'full' | 'refresh' = 'full'): Promise<void> => {
     if (mode === 'full') setLoading(true);
@@ -23,7 +26,7 @@ export default function AddressesScreen(): React.JSX.Element {
     try {
       setAddresses(await fetchAddresses());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Adresler yüklenemedi.');
+      setError(mapUnknownErrorToTurkish('customer', e, 'Adresler yüklenemedi.'));
       setAddresses([]);
     } finally {
       setLoading(false);
@@ -37,6 +40,26 @@ export default function AddressesScreen(): React.JSX.Element {
     }, [load, ready]),
   );
 
+  async function handleSetDefault(address: Address): Promise<void> {
+    if (settingDefaultId) return;
+    setSettingDefaultId(address.id);
+    setError(null);
+    try {
+      await setDefaultAddress(address.id);
+      setAddresses((prev) =>
+        prev.map((a) => ({
+          ...a,
+          isDefault: a.id === address.id,
+        })),
+      );
+      Alert.alert('Varsayılan adres', `"${address.title}" varsayılan adres olarak kaydedildi.`);
+    } catch (e) {
+      setError(mapUnknownErrorToTurkish('customer', e, 'Varsayılan adres yapılamadı.'));
+    } finally {
+      setSettingDefaultId(null);
+    }
+  }
+
   function confirmDelete(address: Address): void {
     Alert.alert('Adresi sil', `"${address.title}" adresini silmek istediğinize emin misiniz?`, [
       { text: 'Vazgeç', style: 'cancel' },
@@ -46,7 +69,7 @@ export default function AddressesScreen(): React.JSX.Element {
         onPress: () => {
           void deleteAddress(address.id)
             .then(() => load('refresh'))
-            .catch((e) => setError(e instanceof Error ? e.message : 'Adres silinemedi.'));
+            .catch((e) => setError(mapUnknownErrorToTurkish('customer', e, 'Adres silinemedi.')));
         },
       },
     ]);
@@ -54,22 +77,22 @@ export default function AddressesScreen(): React.JSX.Element {
 
   if (!ready) {
     return (
-      <SafeAreaView style={[styles.safe, styles.center]}>
-        <ActivityIndicator color={colors.accent} />
-      </SafeAreaView>
+      <SafeScreen edges={['top']}>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      </SafeScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeScreen edges={['top']} padded={false}>
+      <AppHeader showBack showMenu title="ADRESLERİM" onBackPress={() => router.back()} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load('refresh')} />}
       >
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.back}>← Geri</Text>
-        </Pressable>
-        <Screen title="Adreslerim">
+        <Screen title="Adreslerim" subtitle="Teslimat için kayıtlı adreslerinizi yönetin.">
           {loading ? <ActivityIndicator color={colors.accent} style={styles.loader} /> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <PrimaryButton label="Yeni adres" onPress={() => router.push('/addresses/new')} />
@@ -89,13 +112,15 @@ export default function AddressesScreen(): React.JSX.Element {
               </Pressable>
               {!a.isDefault ? (
                 <Pressable
-                  onPress={() =>
-                    void setDefaultAddress(a.id)
-                      .then(() => load('refresh'))
-                      .catch((e) => setError(e instanceof Error ? e.message : 'Varsayılan yapılamadı.'))
-                  }
+                  disabled={settingDefaultId !== null}
+                  onPress={() => void handleSetDefault(a)}
+                  style={styles.defaultBtn}
                 >
-                  <Text style={styles.action}>Varsayılan yap</Text>
+                  {settingDefaultId === a.id ? (
+                    <ActivityIndicator color={colors.accent} size="small" />
+                  ) : (
+                    <Text style={styles.action}>Varsayılan yap</Text>
+                  )}
                 </Pressable>
               ) : null}
               <SecondaryButton label="Bu adresi sil" onPress={() => confirmDelete(a)} />
@@ -103,19 +128,18 @@ export default function AddressesScreen(): React.JSX.Element {
           ))}
         </Screen>
       </ScrollView>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  action: { color: colors.accent, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: spacing.sm },
-  back: { color: colors.accent, fontFamily: 'PlusJakartaSans_700Bold', marginBottom: spacing.md },
+  action: { color: colors.accent, fontFamily: 'PlusJakartaSans_600SemiBold' },
   card: { ...shadow, backgroundColor: colors.surface, borderRadius: radii.xl, marginTop: spacing.md, padding: spacing.lg },
-  center: { alignItems: 'center', justifyContent: 'center' },
+  center: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+  defaultBtn: { marginTop: spacing.sm, minHeight: 28 },
   error: { color: colors.error, fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: spacing.md },
   loader: { marginVertical: spacing.lg },
   meta: { color: colors.textMuted, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, marginTop: 4 },
-  safe: { backgroundColor: colors.background, flex: 1 },
   scroll: { padding: spacing.xl, paddingBottom: 40 },
   title: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 },
 });

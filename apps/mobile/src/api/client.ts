@@ -377,7 +377,10 @@ export async function deleteAddress(id: string): Promise<void> {
 }
 
 export async function setDefaultAddress(id: string): Promise<Address> {
-  return authedRequest<Address>(`/api/v1/addresses/${id}/default`, { method: 'PATCH' });
+  return authedRequest<Address>(`/api/v1/addresses/${id}/default`, {
+    method: 'PATCH',
+    body: '{}',
+  });
 }
 
 export async function fetchStores(): Promise<Store[]> {
@@ -392,7 +395,12 @@ export async function createOrder(body: {
   note?: string;
   scheduledAt?: string;
 }): Promise<Order> {
-  return authedRequest<Order>('/api/v1/orders', { method: 'POST', body: JSON.stringify(body) });
+  const payload: Record<string, unknown> = { deliveryType: body.deliveryType };
+  if (body.deliveryType === 'HOME_DELIVERY' && body.addressId) payload.addressId = body.addressId;
+  if (body.deliveryType === 'PICKUP' && body.pickupStoreId) payload.pickupStoreId = body.pickupStoreId;
+  if (body.note?.trim()) payload.note = body.note.trim();
+  if (body.scheduledAt) payload.scheduledAt = body.scheduledAt;
+  return authedRequest<Order>('/api/v1/orders', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export async function fetchOrders(params?: { tarih?: string }): Promise<Order[]> {
@@ -413,18 +421,6 @@ export async function initCheckoutForm(orderId: string): Promise<{ checkoutFormC
     method: 'POST',
     headers: { 'idempotency-key': `${orderId}:iyzico-mobile` },
     body: JSON.stringify({ orderId }),
-  });
-}
-
-export async function initiateCardPayment(
-  orderId: string,
-  card: { cardHolderName: string; cardNumber: string; expireMonth: string; expireYear: string; cvc: string },
-  idempotencyKeySuffix: string,
-): Promise<Payment> {
-  return authedRequest<Payment>('/api/v1/payments/initiate', {
-    method: 'POST',
-    headers: { 'idempotency-key': `${orderId}:${idempotencyKeySuffix}` },
-    body: JSON.stringify({ orderId, ...card }),
   });
 }
 

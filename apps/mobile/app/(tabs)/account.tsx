@@ -1,3 +1,4 @@
+import { mapUnknownErrorToTurkish } from '@pastane/tr-api-errors';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,7 +11,7 @@ import { EmptyState, PrimaryButton, SecondaryButton, Screen } from '@/components
 import { typography } from '@/design-tokens';
 import { useAuth } from '@/context/auth-context';
 import type { LoyaltyAccount, LoyaltyMovement, Order, Review } from '@/types';
-import { formatDate, formatTry } from '@/utils/format';
+import { formatDate } from '@/utils/format';
 import { loyaltyMovementLabel } from '@/utils/order-status';
 import { colors, radii, shadow, spacing } from '@/theme';
 
@@ -43,7 +44,7 @@ export default function AccountScreen(): React.JSX.Element {
       setUnreadCount(n.filter((item) => !item.readAt).length);
       setReviews(r.slice(0, 3));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Hesap bilgileri yüklenemedi.');
+      setError(mapUnknownErrorToTurkish('customer', e, 'Hesap bilgileri yüklenemedi.'));
     } finally {
       setLoading(false);
     }
@@ -55,18 +56,21 @@ export default function AccountScreen(): React.JSX.Element {
 
   if (!auth) {
     return (
-      <SafeScreen edges={['top']}>
+      <SafeScreen edges={['top']} padded={false}>
+        <AppHeader showBrand showMenu showSearch={false} title="HESABIM" />
+        <View style={styles.pad}>
         <Screen subtitle="Siparişleriniz, puanlarınız ve bildirimleriniz burada." title="Hesabım">
           <PrimaryButton label="Giriş yap" onPress={() => router.push('/login')} />
           <SecondaryButton label="Kayıt ol" onPress={() => router.push('/register')} />
         </Screen>
+        </View>
       </SafeScreen>
     );
   }
 
   return (
     <SafeScreen edges={['top']} padded={false}>
-      <AppHeader title="HESABIM" />
+      <AppHeader showBrand showMenu showSearch={false} title="HESABIM" />
       <ScrollView contentContainerStyle={styles.scroll} refreshControl={<RefreshControl onRefresh={load} refreshing={loading} tintColor={colors.primary} />}>
         <View style={styles.pad}>
           <Screen

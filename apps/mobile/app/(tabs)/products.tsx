@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fetchCategories, fetchProducts } from '@/api/client';
@@ -29,16 +29,30 @@ export default function ProductsScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const requestSeq = useRef(0);
+  const searchInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (categoryId) setSelected(categoryId);
   }, [categoryId]);
 
   useEffect(() => {
-    void fetchCategories().then(setCategories).catch(() => setNotice('Kategoriler yüklenemedi.'));
+    let mounted = true;
+    void fetchCategories()
+      .then((next) => {
+        if (mounted) setCategories(next);
+      })
+      .catch(() => {
+        if (mounted) setNotice('Kategoriler yüklenemedi.');
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const load = useCallback(async (pageNum = 1, append = false) => {
+    const seq = requestSeq.current + 1;
+    requestSeq.current = seq;
     if (!append) setLoading(true);
     try {
       const rows = await fetchProducts({
@@ -47,13 +61,17 @@ export default function ProductsScreen(): React.JSX.Element {
         page: pageNum,
         limit: 20,
       });
+      if (requestSeq.current !== seq) return;
       setProducts((prev) => (append ? [...prev, ...rows] : rows));
       setPage(pageNum);
     } catch {
+      if (requestSeq.current !== seq) return;
       setNotice('Ürünler yüklenemedi.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestSeq.current === seq) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [search, selected]);
 
@@ -83,10 +101,17 @@ export default function ProductsScreen(): React.JSX.Element {
 
   return (
     <SafeScreen edges={['top']} padded={false}>
-      <AppHeader showMenu showSearch onSearchPress={() => undefined} title="VİTRİN" />
+      <AppHeader
+        showBrand
+        showMenu
+        showSearch
+        title="VİTRİN"
+        onSearchPress={() => searchInputRef.current?.focus()}
+      />
       <View style={styles.searchWrap}>
         <MaterialCommunityIcons color={colors.muted} name="magnify" size={20} />
         <TextInput
+          ref={searchInputRef}
           placeholder="Ürün ara…"
           placeholderTextColor={colors.muted}
           style={styles.searchInput}

@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { cancelOrder, createReview, fetchOrder } from '@/api/client';
 import { ProductGridSkeleton } from '@/components/feedback/skeleton';
+import { AppHeader } from '@/components/layout/app-header';
 import { SafeScreen } from '@/components/layout/safe-screen';
 import { OrderTimeline, StatusBadge } from '@/components/orders/order-row';
 import { Field, PrimaryButton, Screen, SecondaryButton } from '@/components/ui';
@@ -94,7 +94,8 @@ export default function OrderDetailScreen(): React.JSX.Element {
 
   if (loading && !order) {
     return (
-      <SafeScreen edges={['top']}>
+      <SafeScreen edges={['top']} padded={false}>
+        <AppHeader showBack showMenu title="SİPARİŞ" onBackPress={() => router.back()} />
         <ProductGridSkeleton />
         {error ? <Text style={styles.errorCenter}>{error}</Text> : null}
         {error ? <SecondaryButton label="Tekrar dene" onPress={() => void refreshOrder()} /> : null}
@@ -104,7 +105,8 @@ export default function OrderDetailScreen(): React.JSX.Element {
 
   if (!order) {
     return (
-      <SafeScreen edges={['top']}>
+      <SafeScreen edges={['top']} padded={false}>
+        <AppHeader showBack showMenu title="SİPARİŞ" onBackPress={() => router.back()} />
         <Text style={styles.loading}>{error ?? 'Sipariş bulunamadı.'}</Text>
         <SecondaryButton label="Geri dön" onPress={() => router.back()} />
       </SafeScreen>
@@ -116,10 +118,8 @@ export default function OrderDetailScreen(): React.JSX.Element {
 
   return (
     <SafeScreen edges={['top']} padded={false}>
+      <AppHeader showBack showMenu title="SİPARİŞ" onBackPress={() => router.back()} />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Pressable accessibilityLabel="Geri" hitSlop={8} onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialCommunityIcons color={colors.primary} name="arrow-left" size={22} />
-        </Pressable>
         <View style={styles.pad}>
           <Screen subtitle={`${formatDate(order.createdAt)}`} title={order.orderNumber}>
             <View style={styles.statusRow}>
@@ -238,7 +238,6 @@ export default function OrderDetailScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  backBtn: { marginBottom: spacing.md, paddingHorizontal: spacing.screenHorizontal },
   error: { color: colors.error, fontFamily: typography.bodySemi.fontFamily, marginBottom: spacing.md },
   errorCenter: { color: colors.error, marginTop: spacing.md, textAlign: 'center' },
   errorInline: { color: colors.error, fontSize: 12, marginTop: 4 },

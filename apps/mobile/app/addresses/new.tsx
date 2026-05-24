@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { createAddress } from '@/api/client';
 import { AddressMapPicker } from '@/components/address-map-picker';
+import { AppHeader } from '@/components/layout/app-header';
+import { SafeScreen } from '@/components/layout/safe-screen';
 import { Field, PrimaryButton, Screen } from '@/components/ui';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { addressSchema } from '@/schemas/forms';
@@ -27,6 +28,7 @@ export default function NewAddressScreen(): React.JSX.Element {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [mapAddress, setMapAddress] = useState<string | null>(null);
+  const [isDefault, setIsDefault] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -57,7 +59,7 @@ export default function NewAddressScreen(): React.JSX.Element {
     try {
       await createAddress({
         ...parsed.data,
-        isDefault: false,
+        isDefault,
         latitude: latitude ?? undefined,
         longitude: longitude ?? undefined,
         mapAddress: mapAddress ?? undefined,
@@ -70,14 +72,18 @@ export default function NewAddressScreen(): React.JSX.Element {
     }
   }
 
-  if (!ready) return <SafeAreaView style={styles.safe} edges={['top']} />;
+  if (!ready) {
+    return (
+      <SafeScreen edges={['top']}>
+        <View />
+      </SafeScreen>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeScreen edges={['top']} padded={false}>
+      <AppHeader showBack showMenu title="YENİ ADRES" onBackPress={() => router.back()} />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.back}>← Geri</Text>
-        </Pressable>
         <Screen title="Yeni adres">
           <Field label="Başlık" value={title} onChangeText={setTitle} placeholder="Ev, İş…" />
           <Field label="İl" value={city} onChangeText={setCity} />
@@ -88,6 +94,10 @@ export default function NewAddressScreen(): React.JSX.Element {
           <Field label="Kat" value={floor} onChangeText={setFloor} />
           <Field label="Daire" value={apartment} onChangeText={setApartment} />
           <Field label="Tarif" value={directions} onChangeText={setDirections} multiline />
+          <View style={styles.defaultRow}>
+            <Text style={styles.defaultLabel}>Varsayılan adres</Text>
+            <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: colors.accent }} />
+          </View>
           <View style={[styles.pinBadge, pinOk ? styles.pinBadgeOk : styles.pinBadgePending]}>
             <Text style={styles.pinBadgeText}>{pinOk ? 'Konum seçildi' : 'Konum bekliyor'}</Text>
           </View>
@@ -106,12 +116,13 @@ export default function NewAddressScreen(): React.JSX.Element {
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </Screen>
       </ScrollView>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { color: colors.accent, fontFamily: 'PlusJakartaSans_700Bold', marginBottom: spacing.md },
+  defaultLabel: { color: colors.onSurfaceVariant, flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
+  defaultRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
   error: { color: colors.error, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: spacing.md },
   mapSummary: { color: colors.textMuted, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginBottom: spacing.md },
   mapTitle: { color: colors.primary, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, marginBottom: spacing.sm },
@@ -125,6 +136,5 @@ const styles = StyleSheet.create({
   pinBadgeOk: { backgroundColor: colors.surfaceHigh },
   pinBadgePending: { backgroundColor: colors.surfaceLow, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.accent },
   pinBadgeText: { color: colors.chocolate, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12 },
-  safe: { backgroundColor: colors.background, flex: 1 },
   scroll: { padding: spacing.xl, paddingBottom: 40 },
 });

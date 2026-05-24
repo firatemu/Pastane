@@ -1,3 +1,4 @@
+import { mapUnknownErrorToTurkish } from '@pastane/tr-api-errors';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -38,7 +39,7 @@ export default function OrdersScreen(): React.JSX.Element {
     try {
       setOrders(await fetchOrders(tarih ? { tarih } : undefined));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Siparişler yüklenemedi.');
+      setError(mapUnknownErrorToTurkish('customer', e, 'Siparişler yüklenemedi.'));
     } finally {
       setLoading(false);
     }
@@ -59,17 +60,20 @@ export default function OrdersScreen(): React.JSX.Element {
 
   if (!auth) {
     return (
-      <SafeScreen edges={['top']}>
-        <Screen title="Siparişlerim" subtitle="Sipariş geçmişinizi görmek için giriş yapın.">
-          <PrimaryButton label="Giriş yap" onPress={() => router.push('/login')} />
-        </Screen>
+      <SafeScreen edges={['top']} padded={false}>
+        <AppHeader showBrand showMenu showSearch={false} title="SİPARİŞLER" />
+        <View style={styles.pad}>
+          <Screen title="Siparişlerim" subtitle="Sipariş geçmişinizi görmek için giriş yapın.">
+            <PrimaryButton label="Giriş yap" onPress={() => router.push('/login')} />
+          </Screen>
+        </View>
       </SafeScreen>
     );
   }
 
   return (
     <SafeScreen edges={['top']} padded={false}>
-      <AppHeader title="SİPARİŞLER" />
+      <AppHeader showBrand showMenu showSearch={false} title="SİPARİŞLER" />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl onRefresh={load} refreshing={loading} tintColor={colors.primary} />}

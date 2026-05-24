@@ -4,16 +4,16 @@ import { Platform, StyleSheet, Text, View, type ColorValue } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tabBar } from '@/design-tokens';
 import { useCart } from '@/context/cart-context';
-import { colors, spacing } from '@/theme';
+import { spacing } from '@/theme';
 
 function TabLabel({ label, focused }: { label: string; focused: boolean }): React.JSX.Element {
   return (
     <Text
       style={{
-        color: focused ? colors.primary : colors.onSurfaceVariant,
+        color: focused ? tabBar.activeTint : tabBar.inactiveTint,
         fontFamily: 'PlusJakartaSans_700Bold',
         fontSize: tabBar.labelSize,
-        letterSpacing: 1,
+        letterSpacing: 0.8,
         marginTop: 2,
         textTransform: 'uppercase',
       }}
@@ -55,16 +55,19 @@ export default function TabsLayout(): React.JSX.Element {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.surfaceContainerLowest,
+          backgroundColor: tabBar.background,
           borderTopColor: tabBar.borderColor,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: 64 + insets.bottom,
           paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0),
           paddingTop: 8,
-          ...Platform.select({ ios: { shadowColor: colors.chocolate, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.06, shadowRadius: 12 }, android: { elevation: 12 } }),
+          ...Platform.select({
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.2, shadowRadius: 16 },
+            android: { elevation: 16 },
+          }),
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.onSurfaceVariant,
+        tabBarActiveTintColor: tabBar.activeTint,
+        tabBarInactiveTintColor: tabBar.inactiveTint,
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Ana Sayfa', tabBarIcon: tabIcon('home-outline', 'home'), tabBarLabel: ({ focused }) => <TabLabel label="Ana Sayfa" focused={focused} /> }} />
@@ -74,7 +77,7 @@ export default function TabsLayout(): React.JSX.Element {
         options={{
           title: 'Sepet',
           tabBarBadge: count ? count : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.secondary, color: colors.onPrimary, fontSize: 10 },
+          tabBarBadgeStyle: { backgroundColor: tabBar.badgeBg, color: tabBar.badgeText, fontSize: 10 },
           tabBarIcon: tabIcon('shopping-outline', 'shopping'),
           tabBarLabel: ({ focused }) => <TabLabel label="Sepet" focused={focused} />,
         }}
@@ -86,6 +89,6 @@ export default function TabsLayout(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  iconWrap: { alignItems: 'center', borderRadius: 12, justifyContent: 'center', minHeight: 36, minWidth: 48, paddingHorizontal: spacing.sm },
+  iconWrap: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', minHeight: 36, minWidth: 48, paddingHorizontal: spacing.sm },
   iconWrapActive: { backgroundColor: tabBar.activePillBg },
 });

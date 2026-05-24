@@ -94,7 +94,7 @@ export default function NotificationsScreen(): React.JSX.Element {
 
   return (
     <SafeScreen edges={['top']} padded={false}>
-      <AppHeader title="BİLDİRİMLER" />
+      <AppHeader showBack showMenu title="BİLDİRİMLER" onBackPress={() => router.back()} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl onRefresh={() => void load('refresh')} refreshing={refreshing} tintColor={colors.primary} />}

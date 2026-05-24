@@ -15,6 +15,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { addCartItem, fetchProductBySlug, fetchProductReviews } from '@/api/client';
 import { ProductGridSkeleton } from '@/components/feedback/skeleton';
+import { AppHeader } from '@/components/layout/app-header';
 import { SafeScreen } from '@/components/layout/safe-screen';
 import { Field, PrimaryButton, Screen, SecondaryButton } from '@/components/ui';
 import { typography } from '@/design-tokens';
@@ -24,7 +25,6 @@ import type { Product, ProductOptionGroup, Review } from '@/types';
 import { formatTry } from '@/utils/format';
 import { hapticLight, hapticSuccess } from '@/utils/haptics';
 import { productLabel } from '@/utils/product-label';
-import { productImageUrl } from '@/utils/product-image';
 import { colors, radii, spacing } from '@/theme';
 
 const GALLERY_WIDTH = Dimensions.get('window').width - spacing.screenHorizontal * 2;
@@ -60,7 +60,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
   const galleryImages = useMemo(() => {
     if (!product) return [];
-    const imgs = product.images?.length ? product.images : [{ url: productImageUrl(product), isPrimary: true }];
+    const imgs = product.images?.filter((image) => image.url) ?? [];
     return [...imgs].sort((a, b) => (a.isPrimary ? -1 : 0) - (b.isPrimary ? -1 : 0));
   }, [product]);
 
@@ -122,7 +122,8 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
   if (loading) {
     return (
-      <SafeScreen edges={['top']}>
+      <SafeScreen edges={['top']} padded={false}>
+        <AppHeader showBack showMenu title="ÜRÜN" onBackPress={() => router.back()} />
         <ProductGridSkeleton />
       </SafeScreen>
     );
@@ -130,9 +131,12 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
   if (loadError || !product) {
     return (
-      <SafeScreen edges={['top']}>
-        <Text style={styles.error}>{loadError ?? 'Ürün bulunamadı.'}</Text>
-        <SecondaryButton label="Geri dön" onPress={() => router.back()} />
+      <SafeScreen edges={['top']} padded={false}>
+        <AppHeader showBack showMenu title="ÜRÜN" onBackPress={() => router.back()} />
+        <View style={styles.pad}>
+          <Text style={styles.error}>{loadError ?? 'Ürün bulunamadı.'}</Text>
+          <SecondaryButton label="Geri dön" onPress={() => router.back()} />
+        </View>
       </SafeScreen>
     );
   }
@@ -142,10 +146,8 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
   return (
     <SafeScreen edges={['top']} padded={false}>
+      <AppHeader showBack showMenu title="ÜRÜN" onBackPress={() => router.back()} />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Pressable accessibilityLabel="Geri" hitSlop={8} onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialCommunityIcons color={colors.primary} name="arrow-left" size={22} />
-        </Pressable>
         {galleryImages.length > 1 ? (
           <>
             <FlatList
@@ -164,8 +166,12 @@ export default function ProductDetailScreen(): React.JSX.Element {
               ))}
             </View>
           </>
+        ) : galleryImages[0]?.url ? (
+          <Image source={{ uri: galleryImages[0].url }} style={styles.hero} />
         ) : (
-          <Image source={{ uri: galleryImages[0]?.url ?? productImageUrl(product) }} style={styles.hero} />
+          <View style={[styles.hero, styles.heroPlaceholder]}>
+            <MaterialCommunityIcons color={colors.primary} name="image-off-outline" size={32} />
+          </View>
         )}
         <View style={styles.pad}>
           <Screen title={productLabel(product)} subtitle={product.shortDescription ?? product.description ?? undefined}>
@@ -243,7 +249,6 @@ const styles = StyleSheet.create({
   allergenRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   allergenText: { ...typography.bodyMd, color: colors.secondary, fontFamily: typography.price.fontFamily, fontSize: 13 },
   allergenTitle: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'none' },
-  backBtn: { left: spacing.screenHorizontal, position: 'absolute', top: spacing.md, zIndex: 2 },
   dot: { backgroundColor: colors.outlineVariant, borderRadius: 4, height: 8, width: 8 },
   dotActive: { backgroundColor: colors.primary, width: 20 },
   dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginBottom: spacing.md },
@@ -252,12 +257,13 @@ const styles = StyleSheet.create({
   group: { marginBottom: spacing.lg },
   groupTitle: { ...typography.bodyMd, fontFamily: typography.price.fontFamily, marginBottom: spacing.sm },
   hero: { borderRadius: radii.xl, height: 260, width: GALLERY_WIDTH },
+  heroPlaceholder: { alignItems: 'center', backgroundColor: colors.surfaceContainerLow, justifyContent: 'center' },
   opt: { backgroundColor: colors.surfaceContainerLow, borderRadius: radii.pill, marginBottom: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: 10 },
   optActive: { backgroundColor: colors.primary },
   optText: { ...typography.bodyMd, fontFamily: typography.price.fontFamily },
   optTextActive: { color: colors.onPrimary },
   pad: { paddingHorizontal: spacing.screenHorizontal },
-  price: { ...typography.headlineSm, color: colors.secondary, marginBottom: spacing.lg },
+  price: { ...typography.productPrice, color: colors.primary, fontVariant: ['tabular-nums'], marginBottom: spacing.lg },
   qty: { ...typography.headlineSm, fontSize: 18, minWidth: 32, textAlign: 'center' },
   qtyBtn: { alignItems: 'center', backgroundColor: colors.surfaceContainerLow, borderRadius: radii.pill, height: 40, justifyContent: 'center', width: 40 },
   qtyRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },

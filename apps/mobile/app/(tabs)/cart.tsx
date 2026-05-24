@@ -18,12 +18,10 @@ export default function CartScreen(): React.JSX.Element {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const subtotal = items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0);
-
   if (loading && !items.length) {
     return (
       <SafeScreen edges={['top']} padded={false}>
-        <AppHeader title="SEPET" />
+        <AppHeader showBrand showMenu showSearch={false} title="SEPET" />
         <View style={styles.skeletonPad}>
           <ProductGridSkeleton />
         </View>
@@ -33,7 +31,7 @@ export default function CartScreen(): React.JSX.Element {
 
   return (
     <SafeScreen edges={['top']} padded={false}>
-      <AppHeader title="SEPET" />
+      <AppHeader showBrand showMenu showSearch={false} title="SEPET" />
       <ScrollView contentContainerStyle={[styles.scroll, auth && items.length ? { paddingBottom: layout.stickySummaryBottomOffset + 160 } : undefined]}>
         <View style={styles.pad}>
           <Screen title="Sepetim" subtitle="Seçiminizi gözden geçirin.">
@@ -76,7 +74,7 @@ export default function CartScreen(): React.JSX.Element {
         </View>
       </ScrollView>
       {auth && items.length ? (
-        <CartSummarySticky disabled={!items.length} subtotal={subtotal} onCheckout={() => router.push('/checkout')} />
+        <CartSummarySticky disabled={!items.length} itemCount={items.length} onCheckout={() => router.push('/checkout')} />
       ) : null}
     </SafeScreen>
   );

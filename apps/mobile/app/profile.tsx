@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { changePassword, fetchMe, updateMe } from '@/api/client';
+import { AppHeader } from '@/components/layout/app-header';
+import { SafeScreen } from '@/components/layout/safe-screen';
 import { Field, PrimaryButton, Screen } from '@/components/ui';
 import { useAuth } from '@/context/auth-context';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -91,19 +92,19 @@ export default function ProfileScreen(): React.JSX.Element {
 
   if (!ready || loading) {
     return (
-      <SafeAreaView style={[styles.safe, styles.center]}>
-        <ActivityIndicator color={colors.accent} />
-      </SafeAreaView>
+      <SafeScreen edges={['top']}>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      </SafeScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeScreen edges={['top']} padded={false}>
+      <AppHeader showBack showMenu title="PROFİL" onBackPress={() => router.back()} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Pressable onPress={() => router.back()}>
-            <Text style={styles.back}>← Geri</Text>
-          </Pressable>
           <Screen title="Profil bilgilerim" subtitle={`${auth?.user?.phone ?? ''}`}>
             <Field label="Ad" value={firstName} onChangeText={setFirstName} />
             <Field label="Soyad" value={lastName} onChangeText={setLastName} />
@@ -124,16 +125,14 @@ export default function ProfileScreen(): React.JSX.Element {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { color: colors.accent, fontFamily: 'PlusJakartaSans_700Bold', marginBottom: spacing.md },
-  center: { alignItems: 'center', justifyContent: 'center' },
+  center: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   error: { color: colors.error, fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: spacing.md },
   flex: { flex: 1 },
-  safe: { backgroundColor: colors.background, flex: 1 },
   saved: { color: colors.accent, fontFamily: 'PlusJakartaSans_600SemiBold', marginBottom: spacing.md },
   scroll: { padding: spacing.xl, paddingBottom: 40 },
   section: { backgroundColor: colors.surface, borderRadius: radii.xl, marginTop: spacing.xl, padding: spacing.lg },

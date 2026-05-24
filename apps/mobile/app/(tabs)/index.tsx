@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchActiveCampaigns, fetchCategories, fetchDeliveryZones, fetchHomeBanners, fetchProducts } from '@/api/client';
+import { fetchActiveCampaigns, fetchCategories, fetchHomeBanners, fetchProducts } from '@/api/client';
 import { BannerCarousel } from '@/components/catalog/banner-carousel';
-import { CategoryChipRow, ProductCard } from '@/components/catalog/product-card';
+import { ProductCard } from '@/components/catalog/product-card';
 import { ProductGridSkeleton } from '@/components/feedback/skeleton';
 import { AppHeader } from '@/components/layout/app-header';
 import { SafeScreen } from '@/components/layout/safe-screen';
@@ -12,49 +12,54 @@ import { ErrorBanner } from '@/components/ui';
 import { useAuth } from '@/context/auth-context';
 import { useCart } from '@/context/cart-context';
 import { typography } from '@/design-tokens';
-import { fallbackCategories, fallbackImages, fallbackProducts } from '@/data/fallback';
-import type { Campaign, Category, DeliveryZone, HomeBanner, Product } from '@/types';
-import { formatTry } from '@/utils/format';
+import type { Campaign, Category, HomeBanner, Product } from '@/types';
 import { productLabel } from '@/utils/product-label';
 import { hasRequiredOptions } from '@/utils/product-options';
 import { hapticLight, hapticSuccess } from '@/utils/haptics';
+import { headerBar } from '@/design-tokens';
 import { colors, radii, shadow, spacing } from '@/theme';
 
 export default function HomeScreen(): React.JSX.Element {
   const router = useRouter();
   const { auth } = useAuth();
   const { addItem } = useCart();
-  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
-  const [products, setProducts] = useState<Product[]>(fallbackProducts);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<HomeBanner[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [apiLive, setApiLive] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const requestSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = requestSeq.current + 1;
+    requestSeq.current = seq;
     try {
-      const [cats, prods, b, c, z] = await Promise.all([
+      const [cats, prods, b, c] = await Promise.all([
         fetchCategories(),
         fetchProducts({ limit: 8 }),
         fetchHomeBanners(),
         fetchActiveCampaigns(),
-        fetchDeliveryZones(),
       ]);
-      if (cats.length) setCategories(cats);
-      if (prods.length) setProducts(prods);
+      if (requestSeq.current !== seq) return;
+      setCategories(cats);
+      setProducts(prods);
       setBanners(b);
       setCampaigns(c);
-      setZones(z);
       setApiLive(true);
     } catch {
+      if (requestSeq.current !== seq) return;
       setApiLive(false);
-      setNotice('Canlı API bulunamadı; örnek veriler gösteriliyor.');
+      setCategories([]);
+      setProducts([]);
+      setNotice('API bağlantısı kurulamadı. Lütfen bağlantınızı kontrol edip tekrar deneyin.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestSeq.current === seq) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
@@ -87,7 +92,9 @@ export default function HomeScreen(): React.JSX.Element {
   return (
     <SafeScreen edges={['top']} padded={false}>
       <AppHeader
-        title="PASTA-HANE"
+        title="ANA SAYFA"
+        showBrand
+        showMenu
         showSearch
         onSearchPress={() => router.push('/products')}
         rightSlot={
@@ -104,9 +111,6 @@ export default function HomeScreen(): React.JSX.Element {
       >
         <BannerCarousel
           banners={banners}
-          fallbackImage={fallbackImages.hero}
-          fallbackSubtitle="Artisanal bakery"
-          fallbackTitle="Taze pasta ve butik tatlı seçkisi"
           onPressCta={() => router.push('/products')}
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
@@ -141,20 +145,6 @@ export default function HomeScreen(): React.JSX.Element {
             </ScrollView>
           </>
         ) : null}
-        {zones.length ? (
-          <>
-            <Text style={styles.sectionTitle}>Teslimat bölgeleri</Text>
-            {zones.slice(0, 3).map((z) => (
-              <View key={z.id} style={styles.zoneCard}>
-                <Text style={styles.zoneName}>{z.name}</Text>
-                <Text style={styles.zoneMeta}>
-                  Teslimat {formatTry(z.deliveryFee)}
-                  {z.estimatedMinutes ? ` · ~${z.estimatedMinutes} dk` : ''}
-                </Text>
-              </View>
-            ))}
-          </>
-        ) : null}
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Hızlı seçim</Text>
           <Pressable onPress={() => router.push('/products')}>
@@ -163,7 +153,7 @@ export default function HomeScreen(): React.JSX.Element {
         </View>
         {loading ? (
           <ProductGridSkeleton />
-        ) : (
+        ) : products.length ? (
           <View style={styles.grid}>
             {products.slice(0, 6).map((p) => (
               <ProductCard
@@ -174,6 +164,8 @@ export default function HomeScreen(): React.JSX.Element {
               />
             ))}
           </View>
+        ) : (
+          <Text style={styles.empty}>Şu anda gösterilecek ürün bulunamadı.</Text>
         )}
       </ScrollView>
     </SafeScreen>
@@ -181,8 +173,8 @@ export default function HomeScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  avatarBtn: { alignItems: 'center', backgroundColor: colors.surfaceContainerLow, borderRadius: radii.pill, height: 40, justifyContent: 'center', width: 40 },
-  avatarText: { color: colors.primary, fontFamily: typography.bodyBold.fontFamily, fontSize: 16 },
+  avatarBtn: { alignItems: 'center', backgroundColor: headerBar.iconBtnBg, borderRadius: radii.pill, height: 40, justifyContent: 'center', width: 40 },
+  avatarText: { color: headerBar.iconColor, fontFamily: typography.bodyBold.fontFamily, fontSize: 16 },
   campaignCard: { backgroundColor: colors.primaryContainer, borderRadius: radii.xl, marginRight: spacing.md, maxWidth: 220, padding: spacing.lg, ...shadow },
   campaignDesc: { ...typography.bodyMd, color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 6 },
   campaignName: { ...typography.headlineSm, color: colors.secondaryContainer, fontSize: 17 },
@@ -191,13 +183,11 @@ const styles = StyleSheet.create({
   categoryItem: { alignItems: 'center', marginRight: spacing.lg, width: 72 },
   categoryLabel: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 6, textAlign: 'center' },
   categoryScroll: { paddingBottom: spacing.lg, paddingHorizontal: spacing.screenHorizontal },
+  empty: { ...typography.bodyMd, color: colors.onSurfaceVariant, paddingHorizontal: spacing.screenHorizontal, textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: spacing.screenHorizontal },
   noticePad: { paddingHorizontal: spacing.screenHorizontal },
   scroll: { paddingBottom: spacing.section },
   sectionHead: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.screenHorizontal },
   sectionTitle: { ...typography.headlineSm, color: colors.primary, marginBottom: spacing.md, marginTop: spacing.md, paddingHorizontal: spacing.screenHorizontal },
   seeAll: { ...typography.labelSm, color: colors.primary, marginRight: spacing.screenHorizontal, marginTop: spacing.md },
-  zoneCard: { backgroundColor: colors.surfaceContainerLowest, borderRadius: radii.lg, marginBottom: spacing.sm, marginHorizontal: spacing.screenHorizontal, padding: spacing.md, ...shadow },
-  zoneMeta: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontSize: 12, marginTop: 4 },
-  zoneName: { ...typography.bodySemi, color: colors.onSurface },
 });
