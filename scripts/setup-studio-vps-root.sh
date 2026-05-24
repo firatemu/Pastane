@@ -15,10 +15,12 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 echo "Expanding certificate for studio.azem.cloud..."
-certbot certonly --nginx --non-interactive --agree-tos --expand \
-  -d azem.cloud -d www.azem.cloud -d api.azem.cloud -d admin.azem.cloud \
-  -d courier.azem.cloud -d storage.azem.cloud -d studio.azem.cloud \
-  || certbot certonly --nginx --non-interactive --agree-tos -d studio.azem.cloud
+if certbot certificates 2>/dev/null | grep -q 'studio.azem.cloud'; then
+  echo "studio.azem.cloud certificate already present."
+else
+  certbot certonly --nginx --non-interactive --agree-tos -d studio.azem.cloud \
+    || certbot certonly --webroot -w /var/www/certbot --non-interactive --agree-tos -d studio.azem.cloud
+fi
 
 echo "Installing nginx vhost..."
 install -o root -m 0644 "$NGINX_SRC" "$NGINX_DST"
