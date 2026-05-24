@@ -2,7 +2,7 @@
 
 Tek kiracılı pastane operasyonları için monorepo: **NestJS** API, **Next.js** (vitrin, admin, kurye), **Prisma** + PostgreSQL, Redis, MinIO.
 
-**Dokümantasyon:** [`docs/README.md`](docs/README.md) — güncel belge indeksi (AI ajanları buradan başlamalı).
+**Dokümantasyon:** [`docs/README.md`](docs/README.md) · **Teknik referans:** [`docs/PROJE-TEKNIK-DOKUMANTASYON.md`](docs/PROJE-TEKNIK-DOKUMANTASYON.md)
 
 ## Hızlı başlangıç
 

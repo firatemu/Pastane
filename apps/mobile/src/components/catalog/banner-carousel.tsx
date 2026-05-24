@@ -5,31 +5,27 @@ import { colors, radii, spacing } from '@/theme';
 
 export function BannerCarousel({
   banners,
-  fallbackImage,
   fallbackTitle,
-  fallbackSubtitle,
   onPressCta,
 }: {
   banners: HomeBanner[];
-  fallbackImage: string;
-  fallbackTitle: string;
-  fallbackSubtitle: string;
+  fallbackTitle?: string;
   onPressCta?: () => void;
-}): React.JSX.Element {
-  const items = banners.length
-    ? banners
-    : [{ id: 'fallback', title: fallbackTitle, subtitle: fallbackSubtitle, mobileMediaUrl: fallbackImage, desktopMediaUrl: fallbackImage } as HomeBanner];
+}): React.JSX.Element | null {
+  const items = banners.filter((item) => item.mobileMediaUrl || item.desktopMediaUrl);
+  if (!items.length) return null;
 
   return (
     <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.carousel}>
       {items.map((b) => {
-        const uri = b.mobileMediaUrl ?? b.desktopMediaUrl ?? fallbackImage;
+        const uri = b.mobileMediaUrl ?? b.desktopMediaUrl;
+        if (!uri) return null;
         return (
           <ImageBackground key={b.id} imageStyle={styles.heroImg} source={{ uri }} style={styles.hero}>
             <View style={styles.overlay} />
             <View style={styles.content}>
               {b.subtitle ? <Text style={styles.eyebrow}>{b.subtitle}</Text> : null}
-              <Text style={styles.title}>{b.title ?? fallbackTitle}</Text>
+              <Text style={styles.title}>{b.title ?? fallbackTitle ?? ''}</Text>
               {onPressCta ? (
                 <Pressable onPress={onPressCta} style={styles.cta}>
                   <Text style={styles.ctaText}>Keşfet</Text>

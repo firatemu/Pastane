@@ -10,6 +10,12 @@
     "paths": {
       "@/*": [
         "src/*"
+      ],
+      "@pastane/constants": [
+        "../../packages/constants/src/index.ts"
+      ],
+      "@pastane/tr-api-errors": [
+        "../../packages/tr-api-errors/src/index.ts"
       ]
     }
   },

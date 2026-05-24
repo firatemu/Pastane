@@ -53,6 +53,15 @@ For local device testing, `localhost` will not work from a phone/emulator unless
 - Android release artifact: **`eas build --platform android --profile production`** → download **`.aab`** from Expo dashboard.
 - VPS deploy (`pnpm push:vps`) updates API/web/admin/courier only; rebuild mobile AAB after API changes that affect clients.
 
+### iyzico sandbox (mobil checkout)
+
+Mobil ödeme sunucuda `iyzico-mobile` idempotency ile başlar. API container ortamında (VPS `.env.production`, yerelde kök `.env`):
+
+- `IYZICO_MOBILE_API_KEY`, `IYZICO_MOBILE_SECRET_KEY`, `IYZICO_MOBILE_BASE_URL=https://sandbox-api.iyzipay.com`
+- Boş bırakılırsa `IYZICO_*` devralınır (yerel ve prod aynı şablon: `.env.production.example`)
+
+Mobil APK yalnızca `EXPO_PUBLIC_API_URL` taşır; iyzico anahtarları **VPS API env** ile senkron tutulmalıdır.
+
 ## Production Deploy Checklist
 
 - Fill **`.env.production`** on the VPS from `.env.production.example` with real secrets (not `.env.prod`).

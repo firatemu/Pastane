@@ -44,10 +44,18 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     void loadStoredAuth()
       .then((stored) => hydrateAuth(stored))
-      .then(setAuth)
-      .finally(() => setLoading(false));
+      .then((next) => {
+        if (mounted) setAuth(next);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {

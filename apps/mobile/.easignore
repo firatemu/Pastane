@@ -1,0 +1,21 @@
+# EAS arşivinden hariç — monorepo mobil build için gerekli: packages/*, pnpm-lock.yaml, apps/mobile
+apps/web
+apps/admin
+apps/courier
+apps/api
+docker
+docs
+scripts
+supabase
+.github
+.cursor
+**/.next
+**/.next-ci
+**/.next-docker
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+reports

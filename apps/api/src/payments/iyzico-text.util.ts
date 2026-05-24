@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 /** iyzico alanlarında kontrol karakteri / aşırı uzunluk JSON hatalarına yol açabilir. */
 export function sanitizeIyzicoText(value: string, maxLen = 128): string {
   const cleaned = value
+    // eslint-disable-next-line no-control-regex -- iyzico JSON güvenliği için kontrol karakterlerini temizle
     .replace(/[\u0000-\u001F\u007F]/g, ' ')
     .replace(/[\u2013\u2014\u2212]/g, '-')
     .replace(/\s+/g, ' ')

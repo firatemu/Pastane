@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build:android:apk": "eas build --platform android --profile preview",
+    "build:android:apk:local": "bash ../../scripts/mobile-build-apk-local.sh",
     "build:android": "eas build --platform android --profile production",
     "build:android:preview": "eas build --platform android --profile preview",
     "eas-build-post-install": "cd ../.. && pnpm --filter @pastane/constants --filter @pastane/tr-api-errors run build"

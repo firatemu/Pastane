@@ -16,12 +16,13 @@ export function SafeScreen({
 }): React.JSX.Element {
   return (
     <SafeAreaView edges={edges} style={[styles.safe, style]}>
-      <View style={padded ? styles.pad : undefined}>{children}</View>
+      <View style={padded ? styles.pad : styles.fill}>{children}</View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   pad: { flex: 1, paddingHorizontal: spacing.screenHorizontal },
   safe: { backgroundColor: colors.background, flex: 1 },
 });

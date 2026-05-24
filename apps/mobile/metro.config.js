@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-declarations -- Metro CJS yapılandırması */
+/* eslint-disable @typescript-eslint/no-require-imports -- Metro CJS yapılandırması */
 const { getDefaultConfig } = require('expo/metro-config');
 
 /**

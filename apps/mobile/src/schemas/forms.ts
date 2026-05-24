@@ -55,18 +55,6 @@ export const checkoutSchema = z
     }
   });
 
-/** Web `checkoutSchema` kart alanları — mobil `payments/initiate` ile hizalı. */
-export const mobileCardPaymentSchema = z.object({
-  cardHolderName: z.string().trim().min(2, 'Kart sahibinin adı gerekli.'),
-  cardNumber: z
-    .string()
-    .transform((s) => s.replace(/\D/g, ''))
-    .pipe(z.string().regex(/^\d{16}$/, 'Kart numarası tam 16 hane olmalıdır.')),
-  expireMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, 'Ay 01–12 arasında iki hane olmalıdır.'),
-  expireYear: z.string().regex(/^\d{2}$/, 'Yıl iki hane olmalıdır (ör. 30).'),
-  cvc: z.string().regex(/^\d{3}$/, 'Güvenlik kodu 3 rakam olmalıdır.'),
-});
-
 export const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().max(500).optional(),

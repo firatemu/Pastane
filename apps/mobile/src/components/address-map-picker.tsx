@@ -84,7 +84,9 @@ export function AddressMapPicker({
     <View style={styles.wrap}>
       <WebView
         key={hasPin ? `${latitude}-${longitude}` : 'empty'}
-        originWhitelist={['*']}
+        originWhitelist={['https://*']}
+        mixedContentMode="never"
+        setSupportMultipleWindows={false}
         source={{ html }}
         style={styles.map}
         onMessage={(event) => {

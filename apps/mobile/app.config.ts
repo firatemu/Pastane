@@ -16,6 +16,13 @@ const config: ExpoConfig = {
   slug: 'pasta-hane-mobile',
   owner: 'azemyazilim',
   version: '1.0.1',
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  updates: {
+    enabled: false,
+    fallbackToCacheTimeout: 0,
+  },
   orientation: 'portrait',
   scheme: 'pastahane',
   userInterfaceStyle: 'light',
@@ -31,13 +38,9 @@ const config: ExpoConfig = {
     versionCode: 2,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#fff8f5',
+      backgroundColor: '#334537',
     },
-    permissions: [
-      'android.permission.INTERNET',
-      'android.permission.ACCESS_NETWORK_STATE',
-      'android.permission.POST_NOTIFICATIONS',
-    ],
+    permissions: ['android.permission.INTERNET'],
     ...(googleServicesConfigured ? { googleServicesFile: './google-services.json' } : {}),
   },
   web: {

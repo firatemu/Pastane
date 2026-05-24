@@ -9,7 +9,7 @@
 | [AI_HANDOFF_CONTEXT.md](./AI_HANDOFF_CONTEXT.md) | Primary agent onboarding: architecture, phases, conventions |
 | [ai-agent-rules.md](./ai-agent-rules.md) | Agent workflow expectations |
 | [development-phases.md](./development-phases.md) | High-level phase roadmap |
-| [PROJE-TEKNIK-DOKUMANTASYON.md](./PROJE-TEKNIK-DOKUMANTASYON.md) | Full technical reference (Turkish) |
+| [PROJE-TEKNIK-DOKUMANTASYON.md](./PROJE-TEKNIK-DOKUMANTASYON.md) | **Ana teknik referans** — mimari, stack, API, DB, deploy (güncel) |
 
 ## Local development
 

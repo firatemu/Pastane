@@ -173,6 +173,7 @@ export interface Order {
     district?: string;
     fullAddress?: string;
   } | null;
+  pickupStoreId?: string | null;
   pickupStore?: { name: string; address: string; city?: string; district?: string } | null;
   statusHistory?: Array<{ id: string; status: string; note?: string | null; createdAt: string }>;
   createdAt: string;
@@ -249,5 +250,6 @@ export interface PaginatedMeta {
 export interface ApiErrorPayload {
   success?: boolean;
   error?: { message?: string; code?: string };
+  errorCode?: string;
   message?: string;
 }

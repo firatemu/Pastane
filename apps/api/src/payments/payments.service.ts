@@ -375,7 +375,7 @@ export class PaymentsService implements OnModuleInit {
 
   async initiateCheckoutForm(userId: string, orderId: string, idempotencyKey: string): Promise<{ checkoutFormContent: string }> {
     // Mobil ve web aynı iyzico sandbox hesabını kullanır; tek SDK istemcisi tutarlılık sağlar.
-    const iyzicoChannel: 'web' = 'web';
+    const iyzicoChannel = 'web' as const;
     const clientSurface = idempotencyKey.includes('iyzico-mobile') ? 'mobile' : 'web';
     // #region agent log
     agentDebugLog(

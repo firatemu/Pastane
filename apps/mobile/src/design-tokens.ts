@@ -20,6 +20,7 @@ export const typography = {
   labelLg: { fontFamily: fonts.bodySemi, fontSize: 12, lineHeight: 16, letterSpacing: 1.2, textTransform: 'uppercase' as const },
   labelSm: { fontFamily: fonts.bodySemi, fontSize: 10, lineHeight: 14, letterSpacing: 1, textTransform: 'uppercase' as const },
   price: { fontFamily: fonts.bodyBold, fontSize: 14, lineHeight: 20 },
+  productPrice: { fontFamily: fonts.bodyBold, fontSize: 24, lineHeight: 30, letterSpacing: -0.3 },
 };
 
 export const layout = {
@@ -31,9 +32,26 @@ export const layout = {
   screenPadding: spacing.screenHorizontal,
 };
 
+/** Alt menü — koyu zemin + altın vurgu */
 export const tabBar = {
-  activePillBg: `${colors.secondaryContainer}33`,
-  borderColor: `${colors.outlineVariant}4D`,
+  background: colors.inverseSurface,
+  borderColor: 'rgba(255, 255, 255, 0.08)',
+  activeTint: colors.gold,
+  inactiveTint: 'rgba(255, 255, 255, 0.55)',
+  activePillBg: 'rgba(201, 162, 39, 0.18)',
+  badgeBg: colors.honey,
+  badgeText: colors.inverseSurface,
   iconSize: 24,
   labelSize: 10,
+};
+
+/** Üst başlık çubuğu */
+export const headerBar = {
+  background: colors.primary,
+  borderColor: 'rgba(255, 255, 255, 0.12)',
+  accentLine: colors.gold,
+  brandColor: 'rgba(255, 255, 255, 0.75)',
+  titleColor: colors.onPrimary,
+  iconColor: colors.gold,
+  iconBtnBg: 'rgba(255, 255, 255, 0.12)',
 };

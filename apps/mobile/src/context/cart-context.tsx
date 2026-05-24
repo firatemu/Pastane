@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   addCartItem as apiAdd,
   fetchCart,
@@ -27,10 +27,13 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestSeq = useRef(0);
 
   const clearError = useCallback(() => setError(null), []);
 
   const reload = useCallback(async () => {
+    const seq = requestSeq.current + 1;
+    requestSeq.current = seq;
     if (!auth) {
       setItems([]);
       setError(null);
@@ -38,12 +41,15 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
     }
     setLoading(true);
     try {
-      setItems(await fetchCart());
+      const nextItems = await fetchCart();
+      if (requestSeq.current !== seq) return;
+      setItems(nextItems);
       setError(null);
     } catch (e) {
+      if (requestSeq.current !== seq) return;
       setError(e instanceof Error ? e.message : 'Sepet yüklenemedi.');
     } finally {
-      setLoading(false);
+      if (requestSeq.current === seq) setLoading(false);
     }
   }, [auth]);
 

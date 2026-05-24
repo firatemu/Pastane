@@ -57,6 +57,7 @@
     "mobile:typecheck": "pnpm --filter @pastane/mobile typecheck",
     "mobile:build:android": "pnpm --filter @pastane/mobile build:android",
     "mobile:build:android:apk": "pnpm --filter @pastane/mobile build:android:apk",
+    "mobile:apk:local": "bash scripts/mobile-build-apk-local.sh",
     "mobile:sync-check": "tsx --tsconfig scripts/tsconfig.json scripts/mobile/sync-check.ts",
     "mobile:openapi-export": "tsx --tsconfig scripts/tsconfig.json scripts/mobile/export-openapi.ts"
   },

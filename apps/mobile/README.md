@@ -140,6 +140,36 @@ pnpm mobile:build:android
 | `preview` | APK (internal) | prod URL |
 | `production` | **AAB** (Play Store) | prod URL |
 
+## Yerel APK (tek komut)
+
+Fiziksel cihaz / internal test için **yerelde** preview APK üretir (Expo sunucusu yok). İlk çalıştırma ~15–20 dk sürebilir.
+
+**Önkoşullar (bir kez):**
+
+| Gereksinim | Not |
+|------------|-----|
+| Node 22 | `nvm install 22 && nvm use 22` |
+| JDK 17 | WSL: `sudo apt install openjdk-17-jdk` veya Android Studio JBR |
+| Android SDK | Android Studio → SDK; `ANDROID_HOME` genelde `~/Android/Sdk` |
+| Docker Desktop | WSL2 entegrasyonu açık |
+| EAS | `cd apps/mobile && npx eas login` |
+
+`google-services.json` FCM için isteğe bağlı (yoksa build yine olur).
+
+```bash
+# Repo kökünden — önerilen
+pnpm mobile:apk:local
+```
+
+**Çıktı:** `apps/mobile/artifacts/pasta-hane-preview.apk` (prod API: `https://api.azem.cloud`).
+
+| Komut | Nerede build | Çıktı |
+|-------|----------------|-------|
+| `pnpm mobile:apk:local` | Yerel (Docker + EAS `--local`) | `artifacts/pasta-hane-preview.apk` |
+| `pnpm mobile:build:android:apk` | Expo cloud | Dashboard’dan indir |
+
+Cihaza yükleme: `adb install -r apps/mobile/artifacts/pasta-hane-preview.apk`
+
 ## Doğrulama
 
 ```bash
@@ -149,3 +179,15 @@ pnpm mobile:typecheck
 ## VPS ile birlikte
 
 Backend/web güncellemesi: kökten `pnpm push:vps`. Mobil AAB ayrıca `eas build` ile yeniden üretilir.
+
+### iyzico (mobil ödeme — API tarafı)
+
+Mobil uygulama iyzico anahtarını **APK içine gömmez**; `https://api.azem.cloud` üzerinden checkout form alır. Sandbox için API ortamında şunlar gerekir:
+
+| Değişken | Açıklama |
+|----------|----------|
+| `IYZICO_MOBILE_API_KEY` | iyzico sandbox API key (boşsa `IYZICO_API_KEY` kullanılır) |
+| `IYZICO_MOBILE_SECRET_KEY` | sandbox secret (boşsa `IYZICO_SECRET_KEY`) |
+| `IYZICO_MOBILE_BASE_URL` | `https://sandbox-api.iyzipay.com` (boşsa `IYZICO_BASE_URL` veya sandbox varsayılanı) |
+
+Yerel geliştirmede kök `.env` içindeki değerler Docker API’ye `env_file` ile gider. **Mobil prod APK** aynı anahtarları kullanır; VPS’te `.env.production` dosyasına yerel `.env` ile **aynı** `IYZICO_MOBILE_*` (veya yalnızca dolu `IYZICO_*`) değerlerini yazın, ardından `./deploy.sh` ile API’yi yeniden başlatın.

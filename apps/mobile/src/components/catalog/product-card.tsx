@@ -1,7 +1,6 @@
 import { memo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fallbackImages } from '@/data/fallback';
 import { typography } from '@/design-tokens';
 import type { Product } from '@/types';
 import { formatTry } from '@/utils/format';
@@ -26,7 +25,13 @@ function ProductCardInner({
   return (
     <Pressable style={[styles.card, compact && styles.cardCompact]} onPress={onPress}>
       <View style={styles.imageWrap}>
-        <Image source={{ uri: imageUri }} style={styles.image} onError={() => setImageUri(fallbackImages.pastry)} />
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.image} onError={() => setImageUri(null)} />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <MaterialCommunityIcons color={colors.primary} name="image-off-outline" size={26} />
+          </View>
+        )}
         {onAdd ? (
           <Pressable
             accessibilityLabel="Sepete ekle"
@@ -112,6 +117,7 @@ const styles = StyleSheet.create({
   chipText: { ...typography.labelSm, color: colors.onSurface },
   chipTextActive: { color: colors.onPrimary },
   image: { height: '100%', width: '100%' },
+  imagePlaceholder: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   imageWrap: {
     aspectRatio: 1,
     backgroundColor: colors.surfaceContainerLow,

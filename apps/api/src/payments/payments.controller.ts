@@ -6,7 +6,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { RateLimit } from '../common/decorators/rate-limit.decorator';
 import { SkipResponseEnvelope } from '../common/decorators/skip-response-envelope.decorator';
 import type { AuthUser } from '../common/types/auth-user.type';
-import { CheckoutClientReportDto } from './dto/checkout-client-report.dto';
+import type { CheckoutClientReportDto } from './dto/checkout-client-report.dto';
 import { CheckoutFormInitDto } from './dto/checkout-form-init.dto';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { PaymentCallbackDto } from './dto/payment-callback.dto';

@@ -1,9 +1,10 @@
 /**
  * expo-secure-store web stub'ında native API yok (`getValueWithKeyAsync` tanımsız).
- * `isAvailableAsync()` false ise veya güvenli depolama hata verirse tokenları AsyncStorage'da saklarız (web için kabul edilebilir güvenlik).
+ * Native release build'de tokenlar SecureStore dışına düşmez; AsyncStorage fallback yalnızca web stub için kullanılır.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 const FALLBACK_PREFIX = '@pastane/auth_token_fallback:';
 
@@ -15,6 +16,7 @@ async function prefersSecureStorage(): Promise<boolean> {
 }
 
 async function fallbackGet(key: string): Promise<string | null> {
+  if (Platform.OS !== 'web') return null;
   return AsyncStorage.getItem(FALLBACK_PREFIX + key);
 }
 
@@ -39,9 +41,10 @@ export async function setAuthTokenSecure(key: string, value: string): Promise<vo
       await AsyncStorage.removeItem(FALLBACK_PREFIX + key).catch(() => undefined);
       return;
     } catch {
-      /* aşağıdaki fallback */
+      if (Platform.OS !== 'web') throw new Error('Güvenli oturum saklama kullanılamıyor.');
     }
   }
+  if (Platform.OS !== 'web') throw new Error('Güvenli oturum saklama kullanılamıyor.');
   await AsyncStorage.setItem(FALLBACK_PREFIX + key, value);
 }
 

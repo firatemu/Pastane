@@ -26,7 +26,13 @@ function CartLineItemInner({
       <Pressable accessibilityLabel="Kaldır" hitSlop={8} onPress={onRemove} style={styles.removeBtn}>
         <MaterialCommunityIcons color={colors.muted} name="close" size={18} />
       </Pressable>
-      <Image source={{ uri: productImageUrl(item.product) }} style={styles.thumb} />
+      {productImageUrl(item.product) ? (
+        <Image source={{ uri: productImageUrl(item.product)! }} style={styles.thumb} />
+      ) : (
+        <View style={[styles.thumb, styles.thumbPlaceholder]}>
+          <MaterialCommunityIcons color={colors.primary} name="image-off-outline" size={22} />
+        </View>
+      )}
       <View style={styles.body}>
         <Text numberOfLines={2} style={styles.name}>
           {productLabel(item.product)}
@@ -57,33 +63,20 @@ function CartLineItemInner({
 export const CartLineItem = memo(CartLineItemInner);
 
 export function CartSummarySticky({
-  subtotal,
-  deliveryFee,
+  itemCount,
   onCheckout,
   disabled,
 }: {
-  subtotal: number;
-  deliveryFee?: number;
+  itemCount: number;
   onCheckout: () => void;
   disabled?: boolean;
 }): React.JSX.Element {
-  const total = subtotal + (deliveryFee ?? 0);
   return (
     <View style={styles.sticky}>
       <View style={styles.summaryInner}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Ara toplam</Text>
-          <Text style={styles.value}>{formatTry(subtotal)}</Text>
-        </View>
-        {deliveryFee != null && deliveryFee > 0 ? (
-          <View style={styles.row}>
-            <Text style={styles.label}>Teslimat</Text>
-            <Text style={styles.value}>{formatTry(deliveryFee)}</Text>
-          </View>
-        ) : null}
         <View style={[styles.row, styles.totalRow]}>
-          <Text style={styles.totalLabel}>Toplam</Text>
-          <Text style={styles.totalValue}>{formatTry(total)}</Text>
+          <Text style={styles.totalLabel}>{itemCount} ürün</Text>
+          <Text style={styles.totalValue}>Sunucuda doğrulanır</Text>
         </View>
         <Pressable disabled={disabled} onPress={onCheckout} style={[styles.checkoutBtn, disabled && styles.checkoutDisabled]}>
           <Text style={styles.checkoutText}>Ödemeye geç</Text>
@@ -165,9 +158,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   thumb: { borderRadius: radii.lg, height: 96, width: 96 },
+  thumbPlaceholder: { alignItems: 'center', backgroundColor: colors.surfaceContainerLow, justifyContent: 'center' },
   totalLabel: { ...typography.headlineSm, color: colors.primary, fontSize: 18 },
   totalRow: { borderTopColor: `${colors.outlineVariant}40`, borderTopWidth: 1, marginBottom: 0, marginTop: spacing.sm, paddingTop: spacing.sm },
-  totalValue: { ...typography.headlineSm, color: colors.primary, fontSize: 18 },
+  totalValue: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontFamily: typography.price.fontFamily },
   unit: { ...typography.bodyMd, color: colors.onSurface },
   value: { ...typography.bodyMd, color: colors.onSurface },
 });

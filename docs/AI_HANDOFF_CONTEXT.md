@@ -373,6 +373,7 @@ Common variables include:
 - `IYZICO_API_KEY`
 - `IYZICO_SECRET_KEY`
 - `IYZICO_BASE_URL`
+- `IYZICO_MOBILE_API_KEY` / `IYZICO_MOBILE_SECRET_KEY` / `IYZICO_MOBILE_BASE_URL` (mobil checkout sandbox; boşsa `IYZICO_*` — VPS `.env.production` ile yerel `.env` uyumlu olmalı)
 - `OTP_ACTIVE`
 - `PAYMENT_TIMEOUT_MS`
 - `STOCK_RESERVATION_TIMEOUT_MS`
@@ -427,6 +428,12 @@ Health check:
 
 ```bash
 curl http://localhost:3003/api/v1/health
+```
+
+Mobile (yerel test APK — Docker + `eas login` gerekir):
+
+```bash
+pnpm mobile:apk:local   # → apps/mobile/artifacts/pasta-hane-preview.apk
 ```
 
 ## 18. Testing and Validation Workflow
