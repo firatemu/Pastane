@@ -7,6 +7,7 @@ import { Alert, AppState, BackHandler, Modal, Pressable, ScrollView, StyleSheet,
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 import {
+  ApiRequestError,
   createOrder,
   fetchAddresses,
   fetchDeliveryZones,
@@ -14,9 +15,10 @@ import {
   fetchPayments,
   fetchStores,
   initCheckoutForm,
+  reportCheckoutClientError,
   validateCartForCheckout,
 } from '@/api/client';
-import { getWebBaseUrl } from '@/api/config';
+import { getApiBaseUrl, getWebBaseUrl } from '@/api/config';
 import { LoadingOverlay } from '@/components/feedback/loading-overlay';
 import { AppHeader } from '@/components/layout/app-header';
 import { SafeScreen } from '@/components/layout/safe-screen';
@@ -24,7 +26,7 @@ import { Field, PrimaryButton, Screen, SecondaryButton } from '@/components/ui';
 import { useCart } from '@/context/cart-context';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { checkoutSchema } from '@/schemas/forms';
-import type { Address, Order, Payment, Store } from '@/types';
+import type { Address, CartItem, Order, Payment, Store } from '@/types';
 import { formatTry } from '@/utils/format';
 import { colors, radii, shadow, spacing } from '@/theme';
 
@@ -197,8 +199,8 @@ export default function CheckoutScreen(): React.JSX.Element {
     return when.toISOString();
   }
 
-  async function resolveOrder(): Promise<Order> {
-    if (!items.length) {
+  async function resolveOrder(cartItems: CartItem[]): Promise<Order> {
+    if (!cartItems.length) {
       throw new Error('Sepetiniz boş.');
     }
     const scheduledAt = buildScheduledAt();
@@ -262,9 +264,9 @@ export default function CheckoutScreen(): React.JSX.Element {
     }).catch(() => undefined);
     // #endregion
     try {
-      await validateCartForCheckout();
+      const cartItems = await validateCartForCheckout();
       await reloadCart();
-      const order = await resolveOrder();
+      const order = await resolveOrder(cartItems);
       // #region agent log
       fetch('http://127.0.0.1:7317/ingest/2fb3864b-34dc-4d52-b337-e3a2b59567ad', {
         method: 'POST',
@@ -301,6 +303,13 @@ export default function CheckoutScreen(): React.JSX.Element {
     } catch (e) {
       await reloadCart();
       const errMsg = e instanceof Error ? e.message : String(e);
+      const errCode = e instanceof ApiRequestError ? e.code : undefined;
+      void reportCheckoutClientError({
+        step: 'startPayment',
+        message: errMsg,
+        code: errCode,
+        orderId: pendingOrder?.id,
+      });
       // #region agent log
       fetch('http://127.0.0.1:7317/ingest/2fb3864b-34dc-4d52-b337-e3a2b59567ad', {
         method: 'POST',
@@ -315,7 +324,9 @@ export default function CheckoutScreen(): React.JSX.Element {
         }),
       }).catch(() => undefined);
       // #endregion
-      setError(mapUnknownErrorToTurkish('customer', e, 'Ödeme başlatılamadı.'));
+      const mapped = mapUnknownErrorToTurkish('customer', e, 'Ödeme başlatılamadı.');
+      const showCode = process.env.EXPO_PUBLIC_CHECKOUT_DEBUG === '1';
+      setError(showCode && errCode ? `${mapped} (${errCode})` : mapped);
     } finally {
       setBusy(false);
     }
@@ -635,6 +646,9 @@ export default function CheckoutScreen(): React.JSX.Element {
           ) : null}
           {pendingOrder ? <Text style={styles.hint}>Sipariş: {pendingOrder.orderNumber}</Text> : null}
           {payments[0] ? <Text style={styles.hint}>Ödeme durumu: {payments[0].status}</Text> : null}
+          {process.env.EXPO_PUBLIC_CHECKOUT_DEBUG === '1' ? (
+            <Text style={styles.hint}>API: {getApiBaseUrl()}</Text>
+          ) : null}
         </Screen>
         </View>
       </ScrollView>

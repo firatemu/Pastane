@@ -28,6 +28,18 @@ const FETCH_MAX_ATTEMPTS = 3;
 const LEGACY_AUTH_KEY = 'pastahane.auth';
 const RESPONSE_NOT_JSON_MESSAGE_TR = 'Sunucudan beklenen yanıt alınamadı.';
 
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function parseApiJsonStrict(text: string): unknown {
   const trimmed = text.trim();
   if (!trimmed) return {};
@@ -223,9 +235,28 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
       await saveStoredAuth(null);
       unauthorizedHandler?.();
     }
-    throw new Error(messageFromApi(response.status, payload as Parameters<typeof messageFromApi>[1], 'İstek tamamlanamadı.'));
+    const apiPayload = payload as Parameters<typeof messageFromApi>[1];
+    const errorShape = apiPayload.error ?? (apiPayload.errorCode ? { code: apiPayload.errorCode, message: apiPayload.message } : undefined);
+    const message = messageFromApi(response.status, apiPayload, 'İstek tamamlanamadı.');
+    throw new ApiRequestError(message, response.status, errorShape?.code);
   }
   return unwrapData<T>(payload);
+}
+
+export async function reportCheckoutClientError(body: {
+  step: string;
+  message: string;
+  code?: string;
+  orderId?: string;
+}): Promise<void> {
+  try {
+    await authedRequest<{ ok: true }>('/api/v1/payments/checkout-client-report', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  } catch {
+    /* telemetry must not block checkout */
+  }
 }
 
 async function authedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {

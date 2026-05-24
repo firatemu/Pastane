@@ -374,12 +374,14 @@ export class PaymentsService implements OnModuleInit {
   }
 
   async initiateCheckoutForm(userId: string, orderId: string, idempotencyKey: string): Promise<{ checkoutFormContent: string }> {
-    const iyzicoChannel = idempotencyKey.includes('iyzico-mobile') ? ('mobile' as const) : ('web' as const);
+    // Mobil ve web aynı iyzico sandbox hesabını kullanır; tek SDK istemcisi tutarlılık sağlar.
+    const iyzicoChannel: 'web' = 'web';
+    const clientSurface = idempotencyKey.includes('iyzico-mobile') ? 'mobile' : 'web';
     // #region agent log
     agentDebugLog(
       'payments.service.ts:initiateCheckoutForm',
       'checkout init entry',
-      { orderId, channel: iyzicoChannel, idempotencySuffix: idempotencyKey.slice(-24) },
+      { orderId, channel: iyzicoChannel, clientSurface, idempotencySuffix: idempotencyKey.slice(-24) },
       'H1',
     );
     // #endregion
@@ -397,10 +399,9 @@ export class PaymentsService implements OnModuleInit {
     if (existing) {
       const cached = extractCheckoutFormContent(existing.responsePayload);
       if (cached) return { checkoutFormContent: cached };
-      throw new AppException(
-        ERROR_CODES.PAYMENT_ALREADY_COMPLETED,
-        'Bu iyzico ödeme oturumu zaten oluşturuldu; sayfayı yenileyin veya farklı bir ödeme yöntemi deneyin.',
-        HttpStatus.CONFLICT,
+      await this.supersedePendingPayment(existing.id, 'Eksik iyzico formu; yeni oturum başlatıldı');
+      this.logger.warn(
+        `checkout-form-init superseded stale payment orderId=${orderId} idempotency=${idempotencyKey.slice(-24)}`,
       );
     }
 
@@ -437,15 +438,13 @@ export class PaymentsService implements OnModuleInit {
       agentDebugLog(
         'payments.service.ts:initiateCheckoutForm',
         'iyzico sdk init threw',
-        { orderId, channel: iyzicoChannel, detail: detail?.slice(0, 120) },
+        { orderId, channel: iyzicoChannel, clientSurface, detail: detail?.slice(0, 120) },
         'H3',
       );
       // #endregion
-      throw new AppException(
-        ERROR_CODES.INTERNAL_SERVER_ERROR,
-        friendlyIyzicoInitError(detail ?? 'iyzico bağlantı hatası'),
-        HttpStatus.BAD_GATEWAY,
-      );
+      const friendly = friendlyIyzicoInitError(detail ?? 'iyzico bağlantı hatası');
+      this.logger.warn(`checkout-form-init iyzico threw orderId=${orderId} client=${clientSurface} detail=${detail ?? 'n/a'}`);
+      throw new AppException(ERROR_CODES.VALIDATION_FAILED, friendly, HttpStatus.BAD_GATEWAY);
     }
 
     if (sdkResult.status !== 'success' || !sdkResult.token || !sdkResult.checkoutFormContent) {
@@ -460,12 +459,12 @@ export class PaymentsService implements OnModuleInit {
       agentDebugLog(
         'payments.service.ts:initiateCheckoutForm',
         'iyzico sdk rejected init',
-        { orderId, channel: iyzicoChannel, raw: raw?.slice(0, 120), friendly: friendly.slice(0, 120) },
+        { orderId, channel: iyzicoChannel, clientSurface, raw: raw?.slice(0, 120), friendly: friendly.slice(0, 120) },
         'H3',
       );
       // #endregion
       this.logger.warn(
-        `checkout-form-init rejected orderId=${orderId} channel=${iyzicoChannel} raw=${raw ?? 'n/a'}`,
+        `checkout-form-init rejected orderId=${orderId} client=${clientSurface} raw=${raw ?? 'n/a'}`,
       );
       throw new AppException(ERROR_CODES.VALIDATION_FAILED, friendly, HttpStatus.BAD_REQUEST);
     }
