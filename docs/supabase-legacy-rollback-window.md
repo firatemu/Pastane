@@ -3,7 +3,8 @@
 After production cutover to **supabase-db**, the old **`pastane_postgres_prod`** container and **`postgres_data`** volume are kept for a **7-day rollback window** only.
 
 **Cutover reference date:** 2026-05-24  
-**Review / legacy stop target:** 2026-05-31 (extend only with explicit approval)
+**Legacy container stopped:** 2026-05-24 (Faz 7.2 — final backup taken)  
+**Volume removal target:** Faz 7.3 (explicit approval)
 
 ## What is kept
 
