@@ -23,7 +23,7 @@ services:
       - pastane_internal
       - pastane_edge
       - pastane_supabase
-    depends_on:
+    depends_on: !reset
       redis:
         condition: service_healthy
       minio:
