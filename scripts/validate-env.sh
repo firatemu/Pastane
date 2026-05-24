@@ -15,7 +15,7 @@ fi
 # Read LAST assignment for KEY= (bash-like; ignores duplicates)
 get_kv() {
   local key="$1"
-  grep -E "^[[:space:]]*${key}=" "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | sed 's/^"//;s/"$//;s/^'"'"'//;s/'"'"'$//'
+  grep -E "^[[:space:]]*${key}=" "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | sed 's/^"//;s/"$//;s/^'"'"'//;s/'"'"'$//' || true
 }
 
 is_blank() {
