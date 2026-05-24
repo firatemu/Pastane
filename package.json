@@ -43,6 +43,7 @@
     "git:push-deploy": "pnpm doctor:core && pnpm check && bash scripts/push-vps.sh",
     "repo:status": "bash scripts/repo-status.sh",
     "verify:structure": "bash scripts/verify-structure.sh",
+    "verify:docker-lockfile": "bash scripts/verify-docker-lockfile.sh",
     "fix:next-perms": "bash scripts/fix-next-perms.sh",
     "fix:frontend-cache": "bash scripts/fix-frontend-next-cache.sh",
     "supabase:start": "supabase start",

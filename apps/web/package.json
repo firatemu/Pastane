@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "NEXT_DIST_DIR=.next-ci next build --experimental-build-mode compile",
+    "build": "pnpm --filter @pastane/ui run build && NEXT_DIST_DIR=.next-ci next build --experimental-build-mode compile",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
@@ -12,6 +12,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@pastane/tr-api-errors": "workspace:*",
+    "@pastane/ui": "workspace:*",
     "leaflet": "^1.9.4",
     "next": "^15.3.2",
     "react": "19.2.3",

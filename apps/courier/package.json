@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "next dev -p 3002",
     "dev:host": "NEXT_DIST_DIR=.next-host next dev -p 3002",
-    "build": "NEXT_DIST_DIR=.next-ci next build --experimental-build-mode compile",
+    "build": "pnpm --filter @pastane/ui run build && NEXT_DIST_DIR=.next-ci next build --experimental-build-mode compile",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "@pastane/tr-api-errors": "workspace:*",
+    "@pastane/ui": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
     "next": "^15.3.2",
     "react": "19.2.3",

@@ -38,10 +38,20 @@ KUR_TOKEN=$(login_token "$COURIER_PHONE" "$COURIER_PASS")
 
 if [[ -z "$ADMIN_TOKEN" ]]; then echo "FAIL admin login (token empty — password may need re-seed after sanitize)"; failures=$((failures+1)); fi
 
-code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/products")
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/products?limit=5")
 check "GET /products" 200 "$code"
 
-PRODUCT_ID=$(curl -s "$BASE/products" | jq -r '.data.items[0].id // .data[0].id // empty' 2>/dev/null || echo "")
+PRODUCTS_JSON=$(curl -s "$BASE/products?limit=5")
+PRODUCT_ID=$(echo "$PRODUCTS_JSON" | jq -r '
+  if (.data | type) == "array" then .data[0].id
+  elif (.data.items | type) == "array" then .data.items[0].id
+  else empty end // empty')
+
+if [[ -z "$PRODUCT_ID" || "$PRODUCT_ID" == "null" ]]; then
+  PRODUCT_TOTAL=$(echo "$PRODUCTS_JSON" | jq -r '.meta.total // 0')
+  echo "FAIL GET /products product id missing (meta.total=${PRODUCT_TOTAL})"
+  failures=$((failures + 1))
+fi
 
 if [[ -n "$CUST_TOKEN" && -n "$PRODUCT_ID" ]]; then
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/cart/items" \
