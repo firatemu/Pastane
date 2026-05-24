@@ -64,6 +64,8 @@ echo "Restoring..."
 docker compose --project-name "$PROJECT_TARGET" --env-file "$ENV_FILE" -f "$COMPOSE_TARGET" \
   exec -T "$SVC" pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --no-owner --role="${POSTGRES_USER}" "/tmp/restore.dump"
 
-docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" start api
+if [[ "${SKIP_API_START:-}" != "1" ]]; then
+  docker compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" start api
+fi
 
 echo "Restore complete. Run prisma migrate status if schema drift is suspected."
