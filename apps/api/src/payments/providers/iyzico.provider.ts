@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { AppException } from '../../common/exceptions/app.exception';
@@ -29,32 +29,63 @@ export type CheckoutFormRetrieveSdkResult = {
   [key: string]: unknown;
 };
 
+export type IyzicoCheckoutChannel = 'web' | 'mobile';
+
 @Injectable()
 export class IyzicoProvider {
-  private readonly client: any | null;
+  private readonly logger = new Logger(IyzicoProvider.name);
+  private readonly webClient: any | null;
+  private readonly mobileClient: any | null;
 
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {
-    const apiKey = this.config.get<string>('IYZICO_API_KEY') ?? process.env.IYZICO_API_KEY;
-    const secretKey = this.config.get<string>('IYZICO_SECRET_KEY') ?? process.env.IYZICO_SECRET_KEY;
-    const uri = this.config.get<string>('IYZICO_BASE_URL') ?? process.env.IYZICO_BASE_URL;
+    const webKey = this.env('IYZICO_API_KEY');
+    const webSecret = this.env('IYZICO_SECRET_KEY');
+    const webUri = this.env('IYZICO_BASE_URL');
+    this.webClient = this.createClient(webKey, webSecret, webUri);
+
+    const { apiKey: mobileKey, secretKey: mobileSecret, baseUrl: mobileUri } = this.resolveMobileCredentials();
+    this.mobileClient = this.createClient(mobileKey, mobileSecret, mobileUri) ?? this.webClient;
+  }
+
+  /** Mobil checkout her zaman sandbox; IYZICO_MOBILE_* boşsa yerel/prod .env içindeki IYZICO_* kullanılır. */
+  private resolveMobileCredentials(): { apiKey?: string; secretKey?: string; baseUrl: string } {
+    const apiKey = this.env('IYZICO_MOBILE_API_KEY') ?? this.env('IYZICO_API_KEY');
+    const secretKey = this.env('IYZICO_MOBILE_SECRET_KEY') ?? this.env('IYZICO_SECRET_KEY');
+    const baseUrl =
+      this.env('IYZICO_MOBILE_BASE_URL') ??
+      this.env('IYZICO_BASE_URL') ??
+      'https://sandbox-api.iyzipay.com';
+    return { apiKey, secretKey, baseUrl };
+  }
+
+  private env(name: string): string | undefined {
+    const v = this.config.get<string>(name) ?? process.env[name];
+    const trimmed = typeof v === 'string' ? v.trim() : '';
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private createClient(apiKey?: string, secretKey?: string, uri?: string): any | null {
     if (apiKey && secretKey && uri) {
-      this.client = new IyzipayLib({ apiKey, secretKey, uri });
-    } else {
-      this.client = null;
+      return new IyzipayLib({ apiKey, secretKey, uri });
     }
+    return null;
   }
 
-  isCheckoutConfigured(): boolean {
-    return this.client !== null;
+  private resolveClient(channel: IyzicoCheckoutChannel): any | null {
+    return channel === 'mobile' ? this.mobileClient : this.webClient;
   }
 
-  assertCheckoutConfigured(): void {
-    if (!this.client) {
-      throw new AppException(
-        ERROR_CODES.INTERNAL_SERVER_ERROR,
-        'iyzico is not configured (IYZICO_API_KEY, IYZICO_SECRET_KEY, IYZICO_BASE_URL)',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+  isCheckoutConfigured(channel: IyzicoCheckoutChannel = 'web'): boolean {
+    return this.resolveClient(channel) !== null;
+  }
+
+  assertCheckoutConfigured(channel: IyzicoCheckoutChannel = 'web'): void {
+    if (!this.isCheckoutConfigured(channel)) {
+      const hint =
+        channel === 'mobile'
+          ? 'iyzico mobile sandbox is not configured (IYZICO_MOBILE_API_KEY, IYZICO_MOBILE_SECRET_KEY, IYZICO_MOBILE_BASE_URL or IYZICO_*)'
+          : 'iyzico is not configured (IYZICO_API_KEY, IYZICO_SECRET_KEY, IYZICO_BASE_URL)';
+      throw new AppException(ERROR_CODES.INTERNAL_SERVER_ERROR, hint, HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
 
@@ -66,20 +97,57 @@ export class IyzicoProvider {
     };
   }
 
-  async checkoutFormInitialize(request: Record<string, unknown>): Promise<CheckoutFormInitSdkResult> {
-    this.assertCheckoutConfigured();
+  private normalizeSdkResult(result: unknown): CheckoutFormInitSdkResult {
+    if (typeof result === 'string') {
+      try {
+        return JSON.parse(result) as CheckoutFormInitSdkResult;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'invalid json';
+        throw new Error(msg);
+      }
+    }
+    if (result && typeof result === 'object') return result as CheckoutFormInitSdkResult;
+    throw new Error('iyzico returned empty response');
+  }
+
+  async checkoutFormInitialize(
+    request: Record<string, unknown>,
+    channel: IyzicoCheckoutChannel = 'web',
+  ): Promise<CheckoutFormInitSdkResult> {
+    this.assertCheckoutConfigured(channel);
+    const client = this.resolveClient(channel)!;
     return new Promise((resolve, reject) => {
-      this.client!.checkoutFormInitialize.create(request, (err: Error | null, result: CheckoutFormInitSdkResult) => {
-        if (err) reject(err);
-        else resolve(result);
+      client.checkoutFormInitialize.create(request, (err: Error | null, result: unknown) => {
+        if (err) {
+          this.logger.warn(`iyzico checkout init failed (${channel}): ${err.message}`);
+          reject(err);
+          return;
+        }
+        try {
+          const normalized = this.normalizeSdkResult(result);
+          if (normalized.status !== 'success') {
+            this.logger.warn(
+              `iyzico checkout init rejected (${channel}): ${normalized.errorCode ?? ''} ${normalized.errorMessage ?? ''}`.trim(),
+            );
+          }
+          resolve(normalized);
+        } catch (parseErr) {
+          const msg = parseErr instanceof Error ? parseErr.message : 'parse failed';
+          this.logger.warn(`iyzico checkout init parse error (${channel}): ${msg}`);
+          reject(parseErr instanceof Error ? parseErr : new Error(msg));
+        }
       });
     });
   }
 
-  async checkoutFormRetrieve(body: { locale: string; token: string; conversationId: string }): Promise<CheckoutFormRetrieveSdkResult> {
-    this.assertCheckoutConfigured();
+  async checkoutFormRetrieve(
+    body: { locale: string; token: string; conversationId: string },
+    channel: IyzicoCheckoutChannel = 'web',
+  ): Promise<CheckoutFormRetrieveSdkResult> {
+    this.assertCheckoutConfigured(channel);
+    const client = this.resolveClient(channel)!;
     return new Promise((resolve, reject) => {
-      this.client!.checkoutForm.retrieve(body, (err: Error | null, result: CheckoutFormRetrieveSdkResult) => {
+      client.checkoutForm.retrieve(body, (err: Error | null, result: CheckoutFormRetrieveSdkResult) => {
         if (err) reject(err);
         else resolve(result);
       });

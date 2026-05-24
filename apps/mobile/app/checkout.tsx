@@ -1,17 +1,19 @@
+import { mapUnknownErrorToTurkish } from '@pastane/tr-api-errors';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, type AppStateStatus } from 'react-native';
+import { Alert, AppState, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, type AppStateStatus } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 import {
   createOrder,
   fetchAddresses,
+  fetchDeliveryZones,
   fetchOrder,
   fetchPayments,
   fetchStores,
   initCheckoutForm,
-  initiateCardPayment,
   validateCartForCheckout,
 } from '@/api/client';
 import { getWebBaseUrl } from '@/api/config';
@@ -21,7 +23,7 @@ import { SafeScreen } from '@/components/layout/safe-screen';
 import { Field, PrimaryButton, Screen, SecondaryButton } from '@/components/ui';
 import { useCart } from '@/context/cart-context';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { checkoutSchema, mobileCardPaymentSchema } from '@/schemas/forms';
+import { checkoutSchema } from '@/schemas/forms';
 import type { Address, Order, Payment, Store } from '@/types';
 import { formatTry } from '@/utils/format';
 import { colors, radii, shadow, spacing } from '@/theme';
@@ -29,6 +31,14 @@ import { colors, radii, shadow, spacing } from '@/theme';
 type ShouldStartLoadRequestArg = Parameters<
   NonNullable<ComponentProps<typeof WebView>['onShouldStartLoadWithRequest']>
 >[0];
+
+const PAYMENT_PENDING_TIMEOUT_MS = 600_000;
+const PENDING_PAYMENT_STORAGE_KEY = '@pastane/pending_payment_order';
+
+type StoredPendingPayment = {
+  orderId: string;
+  startedAt: number;
+};
 
 export default function CheckoutScreen(): React.JSX.Element {
   const router = useRouter();
@@ -49,29 +59,80 @@ export default function CheckoutScreen(): React.JSX.Element {
   const [checkoutHtml, setCheckoutHtml] = useState<string | null>(null);
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'IYZICO' | 'CARD'>(__DEV__ ? 'CARD' : 'IYZICO');
   const [checking, setChecking] = useState(false);
-  const [cardHolderName, setCardHolderName] = useState(__DEV__ ? 'Demo Müşteri' : '');
-  const [cardNumber, setCardNumber] = useState(__DEV__ ? '5528790000000008' : '');
-  const [expireMonth, setExpireMonth] = useState(__DEV__ ? '12' : '');
-  const [expireYear, setExpireYear] = useState(__DEV__ ? '30' : '');
-  const [cvc, setCvc] = useState(__DEV__ ? '123' : '');
   const [webViewLoading, setWebViewLoading] = useState(false);
+  const [webViewCanGoBack, setWebViewCanGoBack] = useState(false);
+  const [paymentStartedAt, setPaymentStartedAt] = useState<number | null>(null);
   const pendingOrderIdRef = useRef<string | undefined>(undefined);
+  const pendingOrderFormKeyRef = useRef<string | null>(null);
+  const checkingRef = useRef(false);
+  const webViewRef = useRef<WebView>(null);
 
-  const subtotal = items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0);
+  const clearPendingCheckout = useCallback(() => {
+    setPendingOrder(null);
+    setPayments([]);
+    setPaymentStartedAt(null);
+    pendingOrderFormKeyRef.current = null;
+    void AsyncStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY).catch(() => undefined);
+  }, []);
+
+  function checkoutFormKey(): string {
+    return [
+      deliveryType,
+      deliveryType === 'HOME_DELIVERY' ? addressId ?? '' : '',
+      deliveryType === 'PICKUP' ? pickupStoreId ?? '' : '',
+      useScheduled ? `${scheduleDate}|${scheduleTime}` : '',
+    ].join(':');
+  }
 
   useEffect(() => {
     if (!ready) return;
     setInitialLoading(true);
-    void Promise.all([validateCartForCheckout(), fetchAddresses(), fetchStores()])
-      .then(async ([, a, s]) => {
+    void Promise.all([
+      validateCartForCheckout().catch(() => []),
+      fetchAddresses(),
+      fetchStores(),
+      fetchDeliveryZones().catch(() => []),
+      AsyncStorage.getItem(PENDING_PAYMENT_STORAGE_KEY).catch(() => null),
+    ])
+      .then(async ([, a, s, zones, storedPending]) => {
         await reloadCart();
         setAddresses(a);
         setStores(s);
-        const def = a.find((x) => x.isDefault) ?? a[0];
+        const zoneNames = new Set(zones.map((z) => z.name.trim().toLocaleLowerCase('tr-TR')));
+        const isDeliverable = (district: string) => zoneNames.has(district.trim().toLocaleLowerCase('tr-TR'));
+        const def =
+          a.find((x) => x.isDefault && isDeliverable(x.district)) ??
+          a.find((x) => isDeliverable(x.district)) ??
+          a.find((x) => x.isDefault) ??
+          a[0];
         if (def) setAddressId(def.id);
+        if (a.length > 0 && def && !isDeliverable(def.district)) {
+          setError('Varsayılan adresiniz teslimat bölgesinde değil. Yenişehir, Mezitli veya Akdeniz ilçeli bir adres seçin.');
+        }
         if (s[0]) setPickupStoreId(s[0].id);
+        if (storedPending) {
+          try {
+            const parsed = JSON.parse(storedPending) as Partial<StoredPendingPayment>;
+            if (typeof parsed.orderId === 'string' && typeof parsed.startedAt === 'number') {
+              const order = await fetchOrder(parsed.orderId);
+              if (order.status === 'PAYMENT_PENDING') {
+                setPendingOrder(order);
+                pendingOrderFormKeyRef.current = [
+                  order.deliveryType,
+                  order.deliveryType === 'HOME_DELIVERY' ? 'stored' : '',
+                  order.deliveryType === 'PICKUP' ? (order.pickupStoreId ?? '') : '',
+                ].join(':');
+                setPaymentStartedAt(parsed.startedAt);
+                setError('Bekleyen ödeme oturumu bulundu. Sonucu kontrol edebilirsiniz.');
+              } else {
+                await AsyncStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY);
+              }
+            }
+          } catch {
+            await AsyncStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY).catch(() => undefined);
+          }
+        }
       })
       .catch((e) => {
         void reloadCart();
@@ -82,6 +143,15 @@ export default function CheckoutScreen(): React.JSX.Element {
 
   useEffect(() => {
     pendingOrderIdRef.current = pendingOrder?.id;
+  }, [pendingOrder?.id]);
+
+  useEffect(() => {
+    const orderId = pendingOrder?.id;
+    if (!orderId) {
+      setPayments([]);
+      return;
+    }
+    void fetchPayments(orderId).then(setPayments).catch(() => setPayments([]));
   }, [pendingOrder?.id]);
 
   function buildScheduledAt(): string | undefined {
@@ -114,7 +184,10 @@ export default function CheckoutScreen(): React.JSX.Element {
     if (!parsed.success) {
       throw new Error(parsed.error.issues[0]?.message ?? 'Sipariş bilgileri eksik.');
     }
-    if (pendingOrder?.status === 'PAYMENT_PENDING') return pendingOrder;
+    const formKey = checkoutFormKey();
+    if (pendingOrder?.status === 'PAYMENT_PENDING' && pendingOrderFormKeyRef.current === formKey) {
+      return pendingOrder;
+    }
     const order = await createOrder({
       deliveryType,
       addressId: deliveryType === 'HOME_DELIVERY' ? addressId : undefined,
@@ -122,6 +195,7 @@ export default function CheckoutScreen(): React.JSX.Element {
       note: note.trim() || undefined,
       scheduledAt,
     });
+    pendingOrderFormKeyRef.current = formKey;
     setPendingOrder(order);
     return order;
   }
@@ -133,38 +207,14 @@ export default function CheckoutScreen(): React.JSX.Element {
       await validateCartForCheckout();
       await reloadCart();
       const order = await resolveOrder();
-      if (paymentMethod === 'CARD') {
-        const cardParsed = mobileCardPaymentSchema.safeParse({
-          cardHolderName,
-          cardNumber,
-          expireMonth,
-          expireYear,
-          cvc,
-        });
-        if (!cardParsed.success) {
-          throw new Error(cardParsed.error.issues[0]?.message ?? 'Kart bilgilerini kontrol edin.');
-        }
-        const payment = await initiateCardPayment(order.id, cardParsed.data, 'mobile-card');
-        setPayments([payment]);
-        const fresh = await fetchOrder(order.id).catch(() => order);
-        setPendingOrder(fresh);
-        await reloadCart();
-        if (fresh.status === 'CONFIRMED' || payment.status === 'SUCCESS') {
-          router.replace({ pathname: '/payment-result', params: { orderId: order.id, status: 'success' } } as never);
-          return;
-        }
-        setError(
-          __DEV__
-            ? 'Ödeme beklemede. Geliştirmede PAYMENT_DEV_AUTO_SUCCESS=true ise ödeme simülasyonu tamamlanabilir.'
-            : 'Ödeme henüz onaylanmadı; bir süre sonra "Ödemeyi kontrol et" ile tekrar deneyin.',
-        );
-        return;
-      }
       const { checkoutFormContent } = await initCheckoutForm(order.id);
+      const startedAt = Date.now();
+      setPaymentStartedAt(startedAt);
+      await AsyncStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, JSON.stringify({ orderId: order.id, startedAt } satisfies StoredPendingPayment));
       setCheckoutHtml(checkoutFormContent);
     } catch (e) {
       await reloadCart();
-      setError(e instanceof Error ? e.message : 'Ödeme başlatılamadı.');
+      setError(mapUnknownErrorToTurkish('customer', e, 'Ödeme başlatılamadı.'));
     } finally {
       setBusy(false);
     }
@@ -172,6 +222,8 @@ export default function CheckoutScreen(): React.JSX.Element {
 
   const checkPaymentStatus = useCallback(async (orderId = pendingOrder?.id): Promise<void> => {
     if (!orderId) return;
+    if (checkingRef.current) return;
+    checkingRef.current = true;
     setChecking(true);
     setError(null);
     try {
@@ -182,18 +234,47 @@ export default function CheckoutScreen(): React.JSX.Element {
       const latest = nextPayments[0];
       if (order.status === 'CONFIRMED' || latest?.status === 'SUCCESS') {
         setCheckoutHtml(null);
+        setPaymentStartedAt(null);
+        await AsyncStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY).catch(() => undefined);
         router.replace({ pathname: '/payment-result', params: { orderId: order.id, status: 'success' } } as never);
       } else if (latest?.status === 'FAILED' || order.status === 'CANCELLED') {
+        setCheckoutHtml(null);
+        setPaymentStartedAt(null);
+        await AsyncStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY).catch(() => undefined);
         setError(latest?.failureReason ?? 'Ödeme başarısız oldu. Lütfen tekrar deneyin.');
+        router.replace({ pathname: '/payment-result', params: { orderId: order.id, status: 'failure' } } as never);
       } else {
         setError('Ödeme sonucu henüz beklemede. Birkaç saniye sonra tekrar kontrol edin.');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ödeme durumu kontrol edilemedi.');
     } finally {
+      checkingRef.current = false;
       setChecking(false);
     }
   }, [pendingOrder?.id, reloadCart, router]);
+
+  useEffect(() => {
+    if (!checkoutHtml || !pendingOrder?.id || paymentStartedAt === null) return undefined;
+    let cancelled = false;
+    const startedAt = paymentStartedAt;
+    const tick = async (): Promise<void> => {
+      if (cancelled) return;
+      if (Date.now() - startedAt >= PAYMENT_PENDING_TIMEOUT_MS) {
+        setCheckoutHtml(null);
+        setPaymentStartedAt(null);
+        await AsyncStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY).catch(() => undefined);
+        setError('Ödeme sonucu bekleniyor. Banka onayı tamamlandıysa birkaç dakika içinde sipariş detayından tekrar kontrol edebilirsiniz.');
+        return;
+      }
+      await checkPaymentStatus(pendingOrder.id);
+    };
+    const interval = setInterval(() => void tick(), 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [checkoutHtml, checkPaymentStatus, paymentStartedAt, pendingOrder?.id]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
@@ -209,18 +290,16 @@ export default function CheckoutScreen(): React.JSX.Element {
     if (url.startsWith('pastahane://')) {
       const parsed = Linking.parse(url);
       const orderIdRaw = parsed.queryParams?.orderId;
-      const statusRaw = parsed.queryParams?.status;
       const oid = typeof orderIdRaw === 'string' ? orderIdRaw : Array.isArray(orderIdRaw) ? orderIdRaw[0] : null;
       if (oid) {
         setCheckoutHtml(null);
         void checkPaymentStatus(oid);
-        const st = typeof statusRaw === 'string' ? statusRaw : Array.isArray(statusRaw) ? statusRaw[0] : '';
-        router.replace({ pathname: '/payment-result', params: { orderId: oid, status: st } } as never);
       }
       return;
     }
 
     const webBase = getWebBaseUrl();
+    if (!url.startsWith('https://') && !url.startsWith(webBase)) return;
     if (!url.startsWith(webBase) && !url.includes('/odeme')) return;
     try {
       const httpParsed = new URL(url);
@@ -236,6 +315,7 @@ export default function CheckoutScreen(): React.JSX.Element {
   }
 
   function onWebViewNav(state: WebViewNavigation): void {
+    setWebViewCanGoBack(state.canGoBack);
     handlePaymentRedirectUrl(state.url ?? '');
   }
 
@@ -247,6 +327,26 @@ export default function CheckoutScreen(): React.JSX.Element {
     }
     return true;
   }
+
+  const closePaymentModal = useCallback((): void => {
+    Alert.alert('Ödemeyi iptal et', 'Ödeme penceresini kapatmak istediğinize emin misiniz?', [
+      { text: 'Devam et', style: 'cancel' },
+      { text: 'Kapat', style: 'destructive', onPress: () => setCheckoutHtml(null) },
+    ]);
+  }, []);
+
+  useEffect(() => {
+    if (!checkoutHtml) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (webViewCanGoBack) {
+        webViewRef.current?.goBack();
+        return true;
+      }
+      closePaymentModal();
+      return true;
+    });
+    return () => sub.remove();
+  }, [checkoutHtml, closePaymentModal, webViewCanGoBack]);
 
   const paymentHtml = checkoutHtml
     ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" /></head><body>${checkoutHtml}</body></html>`
@@ -260,29 +360,44 @@ export default function CheckoutScreen(): React.JSX.Element {
     );
   }
 
-  function closePaymentModal(): void {
-    Alert.alert('Ödemeyi iptal et', 'Ödeme penceresini kapatmak istediğinize emin misiniz?', [
-      { text: 'Devam et', style: 'cancel' },
-      { text: 'Kapat', style: 'destructive', onPress: () => setCheckoutHtml(null) },
-    ]);
-  }
+  const payment = payments[0];
+  const checkoutComplete = pendingOrder?.status === 'CONFIRMED' || payment?.status === 'SUCCESS';
+  const payLocked = busy || checkoutComplete;
+  const payLabel = busy ? 'Yükleniyor…' : checkoutComplete ? 'Ödeme tamamlandı' : 'İyzico ile öde';
+  const showPaymentCheck = Boolean(pendingOrder) && !checkoutComplete;
 
   return (
     <SafeScreen edges={['top']} padded={false}>
-      <AppHeader title="ÖDEME" />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <AppHeader showBack showSearch={false} title="ÖDEME" onBackPress={() => router.back()} />
+      <View style={styles.scrollHost}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
+      >
         <View style={styles.pad}>
-        <Screen title="Ödeme" subtitle={`Ara toplam: ${formatTry(subtotal)}`}>
-          {__DEV__ ? (
-            <Text style={styles.devNote}>
-              Geliştirme modunda kart ödemesi için API sürecinde PAYMENT_DEV_AUTO_SUCCESS=true kullanılabilir.
-            </Text>
-          ) : null}
+        <Screen
+          title="Ödeme ve teslimat"
+          subtitle="Teslimat seçimini tamamlayın; ödemeyi iyzico güvenli ödeme formu ile yapın."
+        >
           <View style={styles.toggleRow}>
-            <Pressable style={[styles.toggle, deliveryType === 'HOME_DELIVERY' && styles.toggleActive]} onPress={() => setDeliveryType('HOME_DELIVERY')}>
+            <Pressable
+              style={[styles.toggle, deliveryType === 'HOME_DELIVERY' && styles.toggleActive]}
+              onPress={() => {
+                clearPendingCheckout();
+                setDeliveryType('HOME_DELIVERY');
+              }}
+            >
               <Text style={[styles.toggleText, deliveryType === 'HOME_DELIVERY' && styles.toggleTextActive]}>Teslimat</Text>
             </Pressable>
-            <Pressable style={[styles.toggle, deliveryType === 'PICKUP' && styles.toggleActive]} onPress={() => setDeliveryType('PICKUP')}>
+            <Pressable
+              style={[styles.toggle, deliveryType === 'PICKUP' && styles.toggleActive]}
+              onPress={() => {
+                clearPendingCheckout();
+                setDeliveryType('PICKUP');
+              }}
+            >
               <Text style={[styles.toggleText, deliveryType === 'PICKUP' && styles.toggleTextActive]}>Mağazadan al</Text>
             </Pressable>
           </View>
@@ -292,7 +407,14 @@ export default function CheckoutScreen(): React.JSX.Element {
                 <Text style={styles.linkText}>Adresleri yönet</Text>
               </Pressable>
               {addresses.map((a) => (
-                <Pressable key={a.id} style={[styles.choice, addressId === a.id && styles.choiceActive]} onPress={() => setAddressId(a.id)}>
+                <Pressable
+                  key={a.id}
+                  style={[styles.choice, addressId === a.id && styles.choiceActive]}
+                  onPress={() => {
+                    clearPendingCheckout();
+                    setAddressId(a.id);
+                  }}
+                >
                   <Text style={styles.choiceTitle}>{a.title}</Text>
                   <Text style={styles.choiceMeta}>{a.district}, {a.city}</Text>
                 </Pressable>
@@ -300,7 +422,14 @@ export default function CheckoutScreen(): React.JSX.Element {
             </>
           ) : (
             stores.map((s) => (
-              <Pressable key={s.id} style={[styles.choice, pickupStoreId === s.id && styles.choiceActive]} onPress={() => setPickupStoreId(s.id)}>
+              <Pressable
+                key={s.id}
+                style={[styles.choice, pickupStoreId === s.id && styles.choiceActive]}
+                onPress={() => {
+                  clearPendingCheckout();
+                  setPickupStoreId(s.id);
+                }}
+              >
                 <Text style={styles.choiceTitle}>{s.name}</Text>
                 <Text style={styles.choiceMeta}>{s.address}</Text>
               </Pressable>
@@ -318,55 +447,52 @@ export default function CheckoutScreen(): React.JSX.Element {
             </>
           ) : null}
           <Text style={styles.sectionTitle}>Ödeme yöntemi</Text>
-          {__DEV__ ? (
-            <Pressable style={[styles.choice, paymentMethod === 'CARD' && styles.choiceActive]} onPress={() => setPaymentMethod('CARD')}>
-              <Text style={styles.choiceTitle}>Kart ile öde (dev)</Text>
-              <Text style={styles.choiceMeta}>Yalnızca geliştirme ortamında.</Text>
-            </Pressable>
-          ) : null}
-          <Pressable style={[styles.choice, paymentMethod === 'IYZICO' && styles.choiceActive]} onPress={() => setPaymentMethod('IYZICO')}>
+          <Pressable style={[styles.choice, styles.choiceActive]}>
             <Text style={styles.choiceTitle}>iyzico güvenli ödeme</Text>
-            <Text style={styles.choiceMeta}>Ödeme formu backend tarafından başlatılır ve WebView içinde açılır.</Text>
+            <Text style={styles.choiceMeta}>
+              Kart bilgileriniz iyzico güvenli ödeme altyapısında işlenir; ödeme formu uygulama içinde açılır.
+            </Text>
           </Pressable>
-          {__DEV__ && paymentMethod === 'CARD' ? (
-            <>
-              <Field label="Kart üzerindeki isim" value={cardHolderName} onChangeText={setCardHolderName} placeholder="Ad Soyad" autoCapitalize="words" />
-              <Field label="Kart numarası" value={cardNumber} onChangeText={setCardNumber} placeholder="5528 7900 0000 0008" keyboardType="number-pad" />
-              <Field label="Son kullanma ayı (AA)" value={expireMonth} onChangeText={setExpireMonth} placeholder="12" keyboardType="number-pad" maxLength={2} />
-              <Field label="Son kullanma yılı (YY)" value={expireYear} onChangeText={setExpireYear} placeholder="30" keyboardType="number-pad" maxLength={2} />
-              <Field label="CVC" value={cvc} onChangeText={setCvc} keyboardType="number-pad" maxLength={3} secureTextEntry />
-            </>
-          ) : null}
           <View style={styles.summary}>
             <Text style={styles.summaryTitle}>Sipariş özeti</Text>
             {items.map((item) => (
               <View key={item.id} style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>{item.quantity} x {item.product.name}</Text>
-                <Text style={styles.summaryValue}>{formatTry(Number(item.unitPrice) * item.quantity)}</Text>
               </View>
             ))}
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Ara toplam</Text>
-              <Text style={styles.summaryValue}>{formatTry(pendingOrder?.subtotal ?? subtotal)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Teslimat</Text>
-              <Text style={styles.summaryValue}>{formatTry(pendingOrder?.deliveryFee ?? 0)}</Text>
-            </View>
-            {Number(pendingOrder?.loyaltyDiscount ?? 0) > 0 ? (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>İndirim</Text>
-                <Text style={styles.summaryValue}>-{formatTry(pendingOrder?.loyaltyDiscount)}</Text>
-              </View>
-            ) : null}
-            <View style={styles.summaryTotal}>
-              <Text style={styles.summaryTotalText}>Genel toplam</Text>
-              <Text style={styles.summaryTotalText}>{formatTry(pendingOrder?.grandTotal ?? subtotal)}</Text>
-            </View>
+            {pendingOrder ? (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Ara toplam</Text>
+                  <Text style={styles.summaryValue}>{formatTry(pendingOrder.subtotal)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Teslimat</Text>
+                  <Text style={styles.summaryValue}>{formatTry(pendingOrder.deliveryFee)}</Text>
+                </View>
+                {Number(pendingOrder.loyaltyDiscount ?? 0) > 0 ? (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>İndirim</Text>
+                    <Text style={styles.summaryValue}>-{formatTry(pendingOrder.loyaltyDiscount)}</Text>
+                  </View>
+                ) : null}
+                <View style={styles.summaryTotal}>
+                  <Text style={styles.summaryTotalText}>Genel toplam</Text>
+                  <Text style={styles.summaryTotalText}>{formatTry(pendingOrder.grandTotal)}</Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.summaryHint}>Tutar, sipariş oluşturulurken sunucudan alınır.</Text>
+            )}
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <PrimaryButton label="Siparişi Oluştur ve Ödemeyi Başlat" onPress={() => void startPayment()} busy={busy} disabled={!items.length} />
-          {pendingOrder ? (
+          <PrimaryButton
+            busy={busy}
+            disabled={!items.length || payLocked}
+            label={payLabel}
+            onPress={() => void startPayment()}
+          />
+          {showPaymentCheck ? (
             <SecondaryButton
               label={checking ? 'Kontrol ediliyor' : 'Ödemeyi kontrol et'}
               onPress={() => void checkPaymentStatus()}
@@ -378,6 +504,7 @@ export default function CheckoutScreen(): React.JSX.Element {
         </Screen>
         </View>
       </ScrollView>
+      </View>
       <Modal animationType="slide" onRequestClose={closePaymentModal} visible={!!paymentHtml}>
         <SafeScreen edges={['top']} padded={false}>
           <Pressable onPress={closePaymentModal} style={styles.closePay}>
@@ -385,11 +512,14 @@ export default function CheckoutScreen(): React.JSX.Element {
           </Pressable>
           {paymentHtml ? (
             <WebView
+              ref={webViewRef}
               onLoadEnd={() => setWebViewLoading(false)}
               onLoadStart={() => setWebViewLoading(true)}
               onNavigationStateChange={onWebViewNav}
               onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
-              originWhitelist={['*']}
+              originWhitelist={['https://*', 'pastahane://*']}
+              mixedContentMode="never"
+              setSupportMultipleWindows={false}
               source={{ html: paymentHtml }}
               style={{ flex: 1 }}
             />
@@ -408,7 +538,6 @@ const styles = StyleSheet.create({
   choiceTitle: { fontFamily: 'PlusJakartaSans_700Bold' },
   closePay: { padding: spacing.lg },
   closePayText: { color: colors.error, fontFamily: 'PlusJakartaSans_700Bold' },
-  devNote: { backgroundColor: colors.surfaceContainerLow, borderRadius: radii.lg, color: colors.secondary, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, lineHeight: 18, marginBottom: spacing.md, padding: spacing.md },
   error: { color: colors.error, marginBottom: spacing.md },
   hint: { color: colors.onSurfaceVariant, marginTop: spacing.md, textAlign: 'center' },
   link: { marginBottom: spacing.md },
@@ -416,7 +545,9 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: spacing.screenHorizontal },
   scheduleLabel: { color: colors.onSurfaceVariant, flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
   scheduleRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
-  scroll: { paddingBottom: 40, paddingTop: spacing.md },
+  scrollHost: { flex: 1 },
+  scrollView: { flex: 1 },
+  scroll: { flexGrow: 1, paddingBottom: spacing.section, paddingTop: spacing.md },
   sectionTitle: { color: colors.primary, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 22, marginBottom: spacing.md, marginTop: spacing.lg },
   summary: {
     backgroundColor: colors.surface,
@@ -429,6 +560,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   summaryLabel: { color: colors.textMuted, flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13 },
+  summaryHint: { color: colors.onSurfaceVariant, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 20, marginTop: spacing.sm },
   summaryRow: { flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', marginTop: spacing.sm },
   summaryTitle: {
     color: colors.chocolate,
@@ -449,8 +581,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 11,
   },
-  toggleActive: { backgroundColor: colors.surfaceLow, borderColor: colors.accent },
+  toggleActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   toggleRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   toggleText: { color: colors.textMuted, fontFamily: 'PlusJakartaSans_600SemiBold', textAlign: 'center' },
-  toggleTextActive: { color: colors.chocolate, fontFamily: 'PlusJakartaSans_700Bold' },
+  toggleTextActive: { color: colors.onPrimary, fontFamily: 'PlusJakartaSans_700Bold' },
 });

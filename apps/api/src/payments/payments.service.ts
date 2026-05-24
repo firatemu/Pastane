@@ -16,6 +16,11 @@ import { computeProductAvailability } from '../products/product-availability.uti
 import type { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import type { PaymentCallbackDto } from './dto/payment-callback.dto';
 import type { CheckoutFormRetrieveSdkResult } from './providers/iyzico.provider';
+import {
+  buildIyzicoCheckoutSdkRequest,
+  extractCheckoutFormContent,
+} from './iyzico-checkout.util';
+import { friendlyIyzicoInitError, sanitizeIyzicoText } from './iyzico-text.util';
 import { IyzicoProvider } from './providers/iyzico.provider';
 import { assertForbiddenPaymentDevAutoSuccessWithConfig } from './assert-payment-env';
 
@@ -66,6 +71,51 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.CONFLICT,
       );
     }
+  }
+
+  private async supersedePendingPayment(paymentId: string, reason: string): Promise<void> {
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: PaymentStatus.FAILED,
+        failureReason: reason,
+        processedAt: new Date(),
+        processingResult: 'SUPERSEDED',
+      },
+    });
+  }
+
+  /** Eski / eksik bekleyen ödemeleri temizler; aktif checkout formu varsa yeniden kullanılabilir. */
+  private async reconcilePendingPaymentsForCheckout(
+    orderId: string,
+    idempotencyKey: string,
+  ): Promise<{ checkoutFormContent: string; conversationId: string; providerToken: string | null } | null> {
+    const pending = await this.prisma.payment.findMany({
+      where: { orderId, status: PaymentStatus.PENDING },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let reusable: { checkoutFormContent: string; conversationId: string; providerToken: string | null } | null = null;
+
+    for (const payment of pending) {
+      if (payment.idempotencyKey === idempotencyKey) continue;
+
+      const form = extractCheckoutFormContent(payment.responsePayload);
+      if (!form) {
+        await this.supersedePendingPayment(payment.id, 'Yeni ödeme oturumu ile değiştirildi');
+        continue;
+      }
+
+      if (!reusable) {
+        reusable = {
+          checkoutFormContent: form,
+          conversationId: payment.conversationId ?? randomUUID(),
+          providerToken: payment.providerToken,
+        };
+      }
+    }
+
+    return reusable;
   }
 
   private assertOrderItemsPurchasable(
@@ -121,8 +171,14 @@ export class PaymentsService implements OnModuleInit {
         typeof snap?.fullAddress === 'string'
           ? snap.fullAddress
           : [typeof snap?.title === 'string' ? snap.title : '', district].filter(Boolean).join(', ') || 'Teslimat adresi';
-      const registrationAddress = full;
-      const addr = { contactName, city, country, address: full, zipCode: '34000' };
+      const registrationAddress = sanitizeIyzicoText(full, 256);
+      const addr = {
+        contactName: sanitizeIyzicoText(contactName, 64),
+        city: sanitizeIyzicoText(city, 64),
+        country,
+        address: registrationAddress,
+        zipCode: '34000',
+      };
       return {
         buyer: { ...buyerBase, registrationAddress, city, country },
         shippingAddress: addr,
@@ -132,7 +188,7 @@ export class PaymentsService implements OnModuleInit {
 
     const store = order.pickupStore;
     if (!store) throw new AppException(ERROR_CODES.ORDER_NOT_FOUND, 'Pickup store missing for order', HttpStatus.BAD_REQUEST);
-    const full = `${store.name} — ${store.address}, ${store.district} ${store.city}`;
+    const full = sanitizeIyzicoText(`${store.name} - ${store.address}, ${store.district} ${store.city}`, 256);
     const addr = { contactName, city: store.city, country, address: full, zipCode: '34000' };
     return {
       buyer: { ...buyerBase, registrationAddress: full, city: store.city, country },
@@ -289,7 +345,8 @@ export class PaymentsService implements OnModuleInit {
   }
 
   async initiateCheckoutForm(userId: string, orderId: string, idempotencyKey: string): Promise<{ checkoutFormContent: string }> {
-    this.provider.assertCheckoutConfigured();
+    const iyzicoChannel = idempotencyKey.includes('iyzico-mobile') ? ('mobile' as const) : ('web' as const);
+    this.provider.assertCheckoutConfigured(iyzicoChannel);
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId, deletedAt: null },
       include: { user: true, pickupStore: true, items: { include: { product: { include: { category: true } } } } },
@@ -301,10 +358,8 @@ export class PaymentsService implements OnModuleInit {
 
     const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existing) {
-      const payload = existing.responsePayload as { checkoutFormContent?: string } | null | undefined;
-      if (payload && typeof payload.checkoutFormContent === 'string') {
-        return { checkoutFormContent: payload.checkoutFormContent };
-      }
+      const cached = extractCheckoutFormContent(existing.responsePayload);
+      if (cached) return { checkoutFormContent: cached };
       throw new AppException(
         ERROR_CODES.PAYMENT_ALREADY_COMPLETED,
         'Bu iyzico ödeme oturumu zaten oluşturuldu; sayfayı yenileyin veya farklı bir ödeme yöntemi deneyin.',
@@ -312,80 +367,59 @@ export class PaymentsService implements OnModuleInit {
       );
     }
 
-    await this.assertNoOtherPendingPayment(order.id, idempotencyKey);
+    const reusableSession = await this.reconcilePendingPaymentsForCheckout(order.id, idempotencyKey);
+    if (reusableSession) {
+      const payment = await this.prisma.payment.create({
+        data: {
+          orderId: order.id,
+          idempotencyKey,
+          providerPaymentId: null,
+          conversationId: reusableSession.conversationId,
+          providerToken: reusableSession.providerToken,
+          amount: order.grandTotal,
+          responsePayload: {
+            checkoutFormContent: reusableSession.checkoutFormContent,
+            reusedCheckoutSession: true,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await this.queues.schedulePaymentTimeout(payment.id);
+      return { checkoutFormContent: reusableSession.checkoutFormContent };
+    }
 
     const { buyer, shippingAddress, billingAddress } = this.buildIyzicoBuyerAndAddresses(order);
-    const grandStr = money.round(order.grandTotal).toFixed(2);
-
-    const basketItems: Array<{ id: string; name: string; category1: string; itemType: string; price: string }> =
-      order.items.length > 0
-        ? order.items.map((item) => {
-            const line = money.multiply(item.unitPriceSnapshot, item.quantity);
-            const cat = item.product?.category?.name ?? 'Pastane';
-            return {
-              id: item.id,
-              name: item.productNameSnapshot,
-              category1: cat,
-              itemType: 'PHYSICAL',
-              price: money.round(line).toFixed(2),
-            };
-          })
-        : [
-            {
-              id: order.id,
-              name: `Sipariş ${order.orderNumber}`,
-              category1: 'Pastane',
-              itemType: 'PHYSICAL',
-              price: grandStr,
-            },
-          ];
-
-    let sum = money.of(0);
-    for (const b of basketItems) {
-      sum = money.add(sum, b.price);
-    }
-    if (money.compare(money.round(sum), money.round(order.grandTotal)) !== 0) {
-      basketItems.length = 0;
-      basketItems.push({
-        id: order.id,
-        name: `Sipariş ${order.orderNumber}`,
-        category1: 'Pastane',
-        itemType: 'PHYSICAL',
-        price: grandStr,
-      });
-    }
-
     const conversationId = randomUUID();
-    const sdkRequest = {
-      locale: 'tr',
+    const sdkRequest = buildIyzicoCheckoutSdkRequest({
+      order,
       conversationId,
-      price: grandStr,
-      paidPrice: grandStr,
-      currency: 'TRY',
-      basketId: order.id,
-      paymentGroup: 'PRODUCT',
       callbackUrl: this.checkoutFormCallbackUrl(),
-      enabledInstallments: [1, 2, 3, 6, 9],
-      buyer: {
-        ...buyer,
-        ip: '85.34.78.112',
-      },
+      buyer,
       shippingAddress,
       billingAddress,
-      basketItems,
-    };
+    });
 
     let sdkResult;
     try {
-      sdkResult = await this.provider.checkoutFormInitialize(sdkRequest);
-    } catch {
-      throw new AppException(ERROR_CODES.INTERNAL_SERVER_ERROR, 'iyzico bağlantı hatası', HttpStatus.BAD_GATEWAY);
+      sdkResult = await this.provider.checkoutFormInitialize(sdkRequest, iyzicoChannel);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : undefined;
+      throw new AppException(
+        ERROR_CODES.INTERNAL_SERVER_ERROR,
+        friendlyIyzicoInitError(detail ?? 'iyzico bağlantı hatası'),
+        HttpStatus.BAD_GATEWAY,
+      );
     }
 
     if (sdkResult.status !== 'success' || !sdkResult.token || !sdkResult.checkoutFormContent) {
+      const raw =
+        typeof sdkResult.errorMessage === 'string'
+          ? sdkResult.errorMessage
+          : typeof sdkResult.errorCode === 'string'
+            ? sdkResult.errorCode
+            : undefined;
       throw new AppException(
         ERROR_CODES.VALIDATION_FAILED,
-        typeof sdkResult.errorMessage === 'string' ? sdkResult.errorMessage : 'Ödeme formu başlatılamadı',
+        friendlyIyzicoInitError(raw),
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -438,11 +472,14 @@ export class PaymentsService implements OnModuleInit {
 
     let retrieve: CheckoutFormRetrieveSdkResult;
     try {
-      retrieve = await this.provider.checkoutFormRetrieve({
-        locale: 'tr',
-        token,
-        conversationId: pay0.conversationId,
-      });
+      retrieve = await this.provider.checkoutFormRetrieve(
+        {
+          locale: 'tr',
+          token,
+          conversationId: pay0.conversationId,
+        },
+        isMobileCheckout ? 'mobile' : 'web',
+      );
     } catch {
       return failRedirect(pay0.orderId);
     }

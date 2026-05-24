@@ -58,7 +58,14 @@ export class OrdersService {
         const a = await tx.address.findFirst({ where: { id: dto.addressId, userId, deletedAt: null } });
         if (!a) throw new AppException(ERROR_CODES.ORDER_ADDRESS_REQUIRED, 'Address required', HttpStatus.BAD_REQUEST);
         const zone = await tx.deliveryZone.findFirst({ where: { name: { equals: a.district, mode: 'insensitive' }, deletedAt: null, isActive: true } });
-        if (!zone) throw new AppException(ERROR_CODES.DELIVERY_ZONE_NOT_FOUND, 'Delivery zone not found for address', HttpStatus.BAD_REQUEST);
+        if (!zone) {
+          throw new AppException(
+            ERROR_CODES.DELIVERY_ZONE_NOT_FOUND,
+            'Delivery zone not found for address',
+            HttpStatus.BAD_REQUEST,
+            { district: a.district, hint: 'Teslimat yalnızca tanımlı ilçelere yapılır (ör. Yenişehir, Mezitli, Akdeniz).' },
+          );
+        }
         addressSnapshot = Object.assign(
           { title: a.title, city: a.city, district: a.district, neighborhood: a.neighborhood, fullAddress: a.fullAddress, building: a.building, floor: a.floor, apartment: a.apartment, directions: a.directions },
           typeof a.latitude === 'number' && Number.isFinite(a.latitude) && typeof a.longitude === 'number' && Number.isFinite(a.longitude) ? { latitude: a.latitude, longitude: a.longitude } : {},

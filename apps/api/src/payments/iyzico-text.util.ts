@@ -1,0 +1,27 @@
+import { money } from '../common/utils/money.util';
+import type { Prisma } from '@prisma/client';
+
+/** iyzico alanlarında kontrol karakteri / aşırı uzunluk JSON hatalarına yol açabilir. */
+export function sanitizeIyzicoText(value: string, maxLen = 128): string {
+  const cleaned = value
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return 'Urun';
+  return cleaned.length > maxLen ? cleaned.slice(0, maxLen) : cleaned;
+}
+
+/** iyzipay SDK formatPrice ile uyumlu; toplam tutarlar sepet satırlarıyla eşleşmeli. */
+export function formatIyzicoMoney(value: Prisma.Decimal | string | number): string {
+  return money.round(value).toFixed(2);
+}
+
+export function friendlyIyzicoInitError(raw: string | undefined): string {
+  const msg = raw?.trim() ?? '';
+  if (!msg) return 'Ödeme formu başlatılamadı. Lütfen tekrar deneyin.';
+  if (/unexpected token|not valid json|bad control character/i.test(msg)) {
+    return 'Ödeme sağlayıcısı geçici olarak yanıt veremedi. Lütfen birkaç saniye sonra tekrar deneyin.';
+  }
+  return msg;
+}
