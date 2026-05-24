@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Pastane Production (supabase-db)",
+      "Group": "Servers",
+      "Host": "supabase-db",
+      "Port": 5432,
+      "MaintenanceDB": "pastane_db",
+      "Username": "pastane_user",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

@@ -80,4 +80,22 @@ if [[ "$pay_dev" == "true" ]]; then
   exit 1
 fi
 
+studio_enabled="$(get_kv SUPABASE_STUDIO_ENABLED)"
+if [[ -z "${studio_enabled// }" ]]; then
+  studio_enabled="1"
+fi
+if [[ "$studio_enabled" == "1" || "$studio_enabled" == "true" || "$studio_enabled" == "yes" ]]; then
+  require_nonblank SUPABASE_STUDIO_EMAIL
+  require_nonblank SUPABASE_STUDIO_PASSWORD
+  studio_pass=$(get_kv SUPABASE_STUDIO_PASSWORD)
+  if [[ "$studio_pass" == *change_me* ]] || [[ "$studio_pass" == *placeholder* ]]; then
+    echo "validate-env: SUPABASE_STUDIO_PASSWORD must not be a placeholder in $ENV_FILE" >&2
+    exit 1
+  fi
+  if [[ ${#studio_pass} -lt 20 ]]; then
+    echo "validate-env: SUPABASE_STUDIO_PASSWORD should be at least 20 characters in $ENV_FILE" >&2
+    exit 1
+  fi
+fi
+
 echo "validate-env: OK ($ENV_FILE)"

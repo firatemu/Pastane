@@ -49,3 +49,42 @@ ensure_supabase_db_up() {
   compose_supabase up -d supabase-db
   wait_supabase_db_healthy
 }
+
+studio_enabled() {
+  local flag
+  flag="$(grep -E '^[[:space:]]*SUPABASE_STUDIO_ENABLED=' "${ENV_FILE:-.env.production}" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '[:space:]"'"'"'')"
+  if [[ -z "$flag" ]]; then
+    flag="${SUPABASE_STUDIO_ENABLED:-1}"
+  fi
+  [[ "$flag" == "1" || "$flag" == "true" || "$flag" == "yes" ]]
+}
+
+wait_supabase_studio_http() {
+  local tries="${SUPABASE_STUDIO_HEALTH_TRIES:-30}"
+  local delay="${SUPABASE_STUDIO_HEALTH_DELAY_SEC:-2}"
+  local i code
+
+  for ((i = 1; i <= tries; i++)); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:54323/ 2>/dev/null || echo 000)"
+    if [[ "$code" =~ ^(200|302|301)$ ]]; then
+      echo "supabase-studio HTTP OK (${code})"
+      return 0
+    fi
+    echo "waiting for supabase-studio (${i}/${tries}, HTTP ${code})..."
+    sleep "$delay"
+  done
+
+  echo "error: supabase-studio did not respond on 127.0.0.1:54323" >&2
+  return 1
+}
+
+ensure_supabase_studio_up() {
+  if ! studio_enabled; then
+    echo "SUPABASE_STUDIO_ENABLED is off — skipping studio profile"
+    return 0
+  fi
+
+  echo "Ensuring Supabase Studio (pgAdmin) is up..."
+  compose_supabase --profile studio up -d supabase-studio
+  wait_supabase_studio_http
+}

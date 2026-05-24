@@ -12,30 +12,36 @@ flowchart LR
   api[Docker_api_3003_loopback]
   minio[Docker_minio_9000_loopback]
   supadb[supabase_db_pastane_supabase]
+  studio[pgAdmin_studio_54323]
   internet --> nginx
   nginx --> web
   nginx --> admin
   nginx --> courier
   nginx --> api
   nginx --> minio
+  nginx --> studio
   api --> supadb
+  studio --> supadb
 ```
 
 **Two Docker Compose projects on the VPS:**
 
 | Project | Compose file | Services |
 |---------|--------------|----------|
-| `supabase-prod` | [`docker/docker-compose.supabase.prod.yml`](../docker/docker-compose.supabase.prod.yml) | `supabase-db` (+ optional `studio` profile) |
+| `supabase-prod` | [`docker/docker-compose.supabase.prod.yml`](../docker/docker-compose.supabase.prod.yml) | `supabase-db`, `supabase-studio` (pgAdmin) |
 | `pastane-prod` | [`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml) | api, web, admin, courier, redis, minio |
 
-- **PostgreSQL (production):** `supabase-db` on external network `pastane_supabase` — **no** host port publish.
-- **Legacy postgres:** profile `legacy-db` in app compose — **rollback window only** (~7 days after cutover). See [`supabase-legacy-rollback-window.md`](supabase-legacy-rollback-window.md).
-- **Redis:** Docker internal network only (`pastane_internal`).
-- **MinIO S3 API:** `127.0.0.1:9000` for Host Nginx `storage.azem.cloud`.
+- **PostgreSQL (production):** `supabase-db` on network `pastane_supabase` — **no** host port publish.
+- **Studio:** https://studio.azem.cloud → pgAdmin on `127.0.0.1:54323`. See [`supabase-production-complete.md`](supabase-production-complete.md).
+- **Legacy postgres:** stopped (Faz 7.2); volume retained. See [`supabase-legacy-rollback-window.md`](supabase-legacy-rollback-window.md).
 
-Deploy helper: [`deploy.sh`](../deploy.sh) — syncs `main` to **`origin/main`**, ensures **supabase-db** is up, `docker compose build`, `up -d`, `prisma migrate deploy` (via `DIRECT_URL`), then **post-deploy health + smoke**. Legacy `pull --ff-only` behaviour: `DEPLOY_NO_HARD_RESET=1 ./deploy.sh`.
+Deploy helper: [`deploy.sh`](../deploy.sh) — ensures **supabase-db** (+ **studio** when `SUPABASE_STUDIO_ENABLED=1`), build/up, migrate, health + smoke.
 
 Shared compose helpers: [`scripts/lib/compose-prod.sh`](../scripts/lib/compose-prod.sh).
+
+- **Redis:** Docker internal network only (`pastane_internal`).
+- **MinIO S3 API:** `127.0.0.1:9000` for Host Nginx `storage.azem.cloud`.
+- Legacy `pull --ff-only` behaviour: `DEPLOY_NO_HARD_RESET=1 ./deploy.sh`.
 
 ## Routine deploy on VPS
 
@@ -87,6 +93,15 @@ docker compose --project-name supabase-prod --env-file .env.production \
 
 Production uses **`prisma migrate deploy` only**, invoked from `deploy.sh`. Requires **`DIRECT_URL`** pointing at `supabase-db`. Do **not** run `prisma migrate dev` on production.
 
+## Studio (pgAdmin)
+
+```bash
+# One-time VPS setup (cert + nginx + container)
+bash scripts/setup-studio-vps.sh
+```
+
+URL: https://studio.azem.cloud — login via `SUPABASE_STUDIO_EMAIL` / `SUPABASE_STUDIO_PASSWORD`.
+
 ## Backups
 
 Default target is **supabase-db**:
@@ -95,10 +110,10 @@ Default target is **supabase-db**:
 bash scripts/backup-prod.sh
 ```
 
-Legacy postgres (rollback window only):
+Legacy postgres (archived — container stopped Faz 7.2):
 
 ```bash
-DB_SERVICE=postgres bash scripts/backup-prod.sh
+DB_SERVICE=postgres bash scripts/backup-prod.sh   # only if legacy profile restarted manually
 ```
 
 See [`scripts/backup-prod.sh`](../scripts/backup-prod.sh), [`docs/backup-and-restore.md`](backup-and-restore.md), [`docs/azem-cloud-vps-deployment.md`](azem-cloud-vps-deployment.md).

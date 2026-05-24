@@ -221,3 +221,4 @@ After Faz 7 production cutover:
 - Default backup/restore target: **`supabase-db`** ([`backup-prod.sh`](../scripts/backup-prod.sh)).
 - Legacy postgres rollback window: [`supabase-legacy-rollback-window.md`](supabase-legacy-rollback-window.md) (~7 days from 2026-05-24).
 - Routine deploy: `pnpm push:vps` or VPS `./deploy.sh`.
+- Studio: https://studio.azem.cloud — [`supabase-production-complete.md`](supabase-production-complete.md)

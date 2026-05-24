@@ -456,6 +456,7 @@ docker compose --env-file .env.production -f docker/docker-compose.prod.yml \
 1. ~~`docker-compose.supabase.prod.yml` draft~~ ✅ (Faz 6.5 uygulandı)
 2. ~~Nginx Studio bloğu~~ ✅ [`deploy/nginx/pastane-studio.conf.example`](../deploy/nginx/pastane-studio.conf.example)
 3. ~~Staging dry-run~~ ✅ local (2026-05-24) — VPS'te `run-staging-dry-run.sh` tekrarla
-4. Onay → Faz 7 production cutover ([`docker-compose.prod.cutover.yml`](../docker/docker-compose.prod.cutover.yml))
+4. ~~Faz 7 production cutover~~ ✅ (2026-05-24)
+5. ~~Faz 7.2 studio.azem.cloud + legacy close~~ ✅ — [`supabase-production-complete.md`](supabase-production-complete.md)
 
 **Rollback hazırlığı:** Cutover öncesi mutlaka `backup-prod.sh` çalıştır; `postgres_data` volume’u en az 7 gün sakla.

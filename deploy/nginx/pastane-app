@@ -1,6 +1,6 @@
 server {
   listen 80;
-  server_name azem.cloud www.azem.cloud api.azem.cloud admin.azem.cloud courier.azem.cloud storage.azem.cloud;
+  server_name azem.cloud www.azem.cloud api.azem.cloud admin.azem.cloud courier.azem.cloud storage.azem.cloud studio.azem.cloud;
 
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;

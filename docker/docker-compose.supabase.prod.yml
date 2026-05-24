@@ -53,6 +53,15 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${SUPABASE_STUDIO_EMAIL:-studio-admin@example.test}
       PGADMIN_DEFAULT_PASSWORD: ${SUPABASE_STUDIO_PASSWORD:-studio-not-used-without-profile}
       PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      POSTGRES_USER: ${POSTGRES_USER:-pastane_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-pastane_db}
+    entrypoint: ["/bin/sh", "/pgadmin-entrypoint.sh"]
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/docker-entrypoint-pgadmin.sh:/pgadmin-entrypoint.sh:ro
     ports:
       - "127.0.0.1:54323:80"
     depends_on:

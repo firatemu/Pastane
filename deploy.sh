@@ -59,6 +59,10 @@ fi
 
 ensure_supabase_db_up
 
+if studio_enabled; then
+  ensure_supabase_studio_up
+fi
+
 echo "Validating compose config..."
 compose_prod_app config >/dev/null
 

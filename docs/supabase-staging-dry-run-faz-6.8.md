@@ -337,7 +337,7 @@ Dry-run sonrası [`cutover-timing-report.json`](/var/backups/pastane-staging/cut
 - [ ] `docker-compose.supabase.prod.yml` (staging'den türet, prod isimleri)  
 - [ ] `docker-compose.prod.yml` — postgres → external supabase network (Faz 7)  
 - [ ] `scripts/backup-prod.sh` / `restore-prod.sh` — supabase-db desteği  
-- [ ] Nginx `studio.azem.cloud` + IP whitelist  
+- [x] Nginx `studio.azem.cloud` — Faz 7.2 [`deploy/nginx/pastane-studio.conf`](../deploy/nginx/pastane-studio.conf)
 - [ ] VPS `.env.production` — `DATABASE_URL` / `DIRECT_URL` güncelleme  
 - [ ] Maintenance duyuru + İyzico callback runbook  
 - [ ] Dry-run timing raporu ile downtime revize  

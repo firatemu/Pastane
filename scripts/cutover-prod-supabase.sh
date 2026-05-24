@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Faz 7 — Production Supabase cutover (maintenance window).
-# Requires: .env.production, backup-prod.sh, supabase prod compose, cutover overlay.
+# Faz 7 — Production Supabase cutover (historical one-shot; completed 2026-05-24).
+# Cutover overlay merged into docker-compose.prod.yml — do not re-run unless disaster recovery.
 #
 # Usage (VPS):
 #   CONFIRM_CUTOVER=YES bash scripts/cutover-prod-supabase.sh
@@ -13,7 +13,6 @@ cd "$ROOT"
 
 ENV_FILE="${ENV_FILE:-.env.production}"
 COMPOSE_PROD="${COMPOSE_PROD:-docker/docker-compose.prod.yml}"
-COMPOSE_CUTOVER="${COMPOSE_CUTOVER:-docker/docker-compose.prod.cutover.yml}"
 COMPOSE_SUPABASE="${COMPOSE_SUPABASE:-docker/docker-compose.supabase.prod.yml}"
 PROJECT_PROD="${PROJECT_PROD:-pastane-prod}"
 PROJECT_SUPABASE="${PROJECT_SUPABASE:-supabase-prod}"
@@ -125,9 +124,9 @@ env_path.write_text("\n".join(out) + "\n", encoding="utf-8")
 print("Updated:", ", ".join(replace.keys()))
 PY
 
-echo "[8] Cutover compose up (overlay + images)"
+echo "[8] Production compose up"
 docker compose --project-name "$PROJECT_PROD" --env-file "$ENV_FILE" \
-  -f "$COMPOSE_PROD" -f "$COMPOSE_CUTOVER" up -d
+  -f "$COMPOSE_PROD" up -d
 
 echo "[9] Wait for API healthy + prisma migrate deploy"
 for _ in $(seq 1 60); do
@@ -135,7 +134,7 @@ for _ in $(seq 1 60); do
   sleep 3
 done
 docker compose --project-name "$PROJECT_PROD" --env-file "$ENV_FILE" \
-  -f "$COMPOSE_PROD" -f "$COMPOSE_CUTOVER" exec -T api \
+  -f "$COMPOSE_PROD" exec -T api \
   sh -lc 'cd /app/packages/database && npx prisma migrate deploy --schema=schema.prisma'
 
 echo "[10] Health checks"
@@ -150,7 +149,7 @@ curl -sf -o /dev/null -w "GET /products public=%{http_code}\n" https://api.azem.
 
 echo "[12] Service status"
 docker compose --project-name "$PROJECT_PROD" --env-file "$ENV_FILE" \
-  -f "$COMPOSE_PROD" -f "$COMPOSE_CUTOVER" ps
+  -f "$COMPOSE_PROD" ps
 
 echo "=== Cutover complete ==="
 echo "Log: $LOG"

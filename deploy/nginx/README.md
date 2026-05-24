@@ -9,7 +9,8 @@ Production exposes **Docker app ports only on `127.0.0.1`** (see `docker/docker-
 | File | Purpose |
 |------|---------|
 | [`pastane-app`](pastane-app) | Full HTTPS vhosts for `azem.cloud`, APIs, Next apps, and `storage.azem.cloud` → MinIO on `127.0.0.1:9000`. Requires existing Let’s Encrypt certs at `/etc/letsencrypt/live/azem.cloud/`. |
-| Bootstrap (optional): see VPS runbook | HTTP-only snippets if you must serve ACME **before** certificates exist |
+| [`pastane-studio.conf`](pastane-studio.conf) | pgAdmin UI at `https://studio.azem.cloud` → `127.0.0.1:54323`. Install via `bash scripts/setup-studio-vps.sh` on the VPS. |
+| [`pastane-studio.conf.example`](pastane-studio.conf.example) | IP-whitelist variant (optional hardening). |
 
 ## Bootstrap order (recommended)
 

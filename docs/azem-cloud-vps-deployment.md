@@ -22,6 +22,7 @@ Create A records pointing to the VPS public IP `76.13.14.43`:
 | `admin.azem.cloud` | A | `76.13.14.43` |
 | `courier.azem.cloud` | A | `76.13.14.43` |
 | `storage.azem.cloud` | A | `76.13.14.43` |
+| `studio.azem.cloud` | A | `76.13.14.43` |
 
 ```bash
 dig +short azem.cloud
@@ -160,7 +161,21 @@ curl -I https://azem.cloud
 curl -I https://admin.azem.cloud
 curl -I https://courier.azem.cloud
 curl -I https://storage.azem.cloud
+curl -I https://studio.azem.cloud
 ```
+
+## Supabase Studio (pgAdmin)
+
+One-time on VPS after DNS `studio.azem.cloud`:
+
+```bash
+cd /var/www/pastane-app/app
+bash scripts/setup-studio-vps.sh
+```
+
+Set in `.env.production`: `SUPABASE_STUDIO_ENABLED=1`, `SUPABASE_STUDIO_EMAIL`, `SUPABASE_STUDIO_PASSWORD` (20+ chars).
+
+See [`docs/supabase-production-complete.md`](supabase-production-complete.md).
 
 ## Certbot renewal + reload Host Nginx
 
