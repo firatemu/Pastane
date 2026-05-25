@@ -59,10 +59,10 @@ fi
 check_http "GET /api/v1/products" "$PRODUCTS_URL" 200
 
 PRODUCTS_JSON="$(curl -s --max-time 15 "$PRODUCTS_URL" || echo '{}')"
-PRODUCT_ID="$(printf '%s' "$PRODUCTS_JSON" | python3 - <<'PY'
-import json, sys
+PRODUCT_ID="$(PRODUCTS_JSON="$PRODUCTS_JSON" python3 - <<'PY'
+import json, os, sys
 try:
-    doc = json.load(sys.stdin)
+    doc = json.loads(os.environ.get("PRODUCTS_JSON", "{}"))
 except json.JSONDecodeError:
     sys.exit(0)
 data = doc.get("data")
