@@ -43,13 +43,23 @@ Zorunlu VPS erişimi:
 - `VPS_SSH_KEY`
 - `VPS_PORT` (opsiyonel, varsayılan `22`)
 
-Zorunlu build/deploy URL bilgileri:
+Build/deploy URL bilgileri:
+
+Workflow artık mevcut production DNS düzenine göre şu built-in fallback'ları kullanır:
+
+- `NEXT_PUBLIC_API_URL` -> `https://api.azem.cloud`
+- `WEB_URL` -> `https://www.azem.cloud`
+- `ADMIN_URL` -> `https://admin.azem.cloud`
+- `COURIER_URL` -> `https://courier.azem.cloud`
+- `API_HEALTH_URL` -> `<api-url>/health`
+
+Bu hostlardan farklı bir domain kullanıyorsanız override için:
 
 - `NEXT_PUBLIC_API_URL` veya `DOMAIN_API`
 - `WEB_URL` veya `DOMAIN_WEB`
 - `ADMIN_URL` veya `DOMAIN_ADMIN`
 - `COURIER_URL` veya `DOMAIN_COURIER`
-- `API_HEALTH_URL` veya `DOMAIN_API`
+- `API_HEALTH_URL`
 
 Opsiyonel registry override:
 

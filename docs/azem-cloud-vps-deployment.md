@@ -12,27 +12,27 @@ GitHub Actions SSH: [`GITHUB_CI_SSH.md`](GITHUB_CI_SSH.md)
 
 ## DNS
 
-Create A records pointing to the VPS public IP `76.13.14.43`:
+Current visible production-zone subdomains under `azem.cloud` are:
 
-| Host | Type | Value |
-|------|------|--------|
-| `azem.cloud` | A | `76.13.14.43` |
-| `www.azem.cloud` | A | `76.13.14.43` |
-| `api.azem.cloud` | A | `76.13.14.43` |
-| `admin.azem.cloud` | A | `76.13.14.43` |
-| `courier.azem.cloud` | A | `76.13.14.43` |
-| `storage.azem.cloud` | A | `76.13.14.43` |
-| `studio.azem.cloud` | A | `76.13.14.43` |
+| Host                  | Notes                                                  |
+| --------------------- | ------------------------------------------------------ |
+| `www.azem.cloud`      | storefront/default `WEB_URL` in this repo              |
+| `api.azem.cloud`      | API/default `NEXT_PUBLIC_API_URL`                      |
+| `admin.azem.cloud`    | admin panel                                            |
+| `courier.azem.cloud`  | courier panel                                          |
+| `studio.azem.cloud`   | Supabase Studio                                        |
+| `openclaw.azem.cloud` | extra DNS record; not used by deploy workflow defaults |
+| `ai.azem.cloud`       | extra DNS record; not used by deploy workflow defaults |
+
+Point the hosts you actually terminate on this VPS to its public IP before requesting certificates. A dedicated public object-storage host is no longer assumed by default; if you expose MinIO or an object proxy on its own hostname, set `MINIO_PUBLIC_URL` / `DOMAIN_STORAGE` explicitly and add that host to nginx + TLS yourself.
 
 ```bash
-dig +short azem.cloud
+dig +short www.azem.cloud
 dig +short api.azem.cloud
 dig +short admin.azem.cloud
 dig +short courier.azem.cloud
-dig +short storage.azem.cloud
+dig +short studio.azem.cloud
 ```
-
-Resolve to `76.13.14.43` **before** requesting certificates.
 
 ## SSH
 
@@ -102,13 +102,14 @@ Public URLs (example):
 API_URL=https://api.azem.cloud
 PUBLIC_API_URL=https://api.azem.cloud
 NEXT_PUBLIC_API_URL=https://api.azem.cloud
-WEB_URL=https://azem.cloud
+WEB_URL=https://www.azem.cloud
 ADMIN_URL=https://admin.azem.cloud
 COURIER_URL=https://courier.azem.cloud
-MINIO_PUBLIC_URL=https://storage.azem.cloud
-MINIO_PUBLIC_DOMAIN=https://storage.azem.cloud
-NEXT_PUBLIC_SITE_URL=https://azem.cloud
-CORS_ORIGINS=https://azem.cloud,https://www.azem.cloud,https://admin.azem.cloud,https://courier.azem.cloud
+NEXT_PUBLIC_SITE_URL=https://www.azem.cloud
+CORS_ORIGINS=https://www.azem.cloud,https://admin.azem.cloud,https://courier.azem.cloud
+# Optional dedicated public object host:
+# MINIO_PUBLIC_URL=https://<your-public-object-host>
+# MINIO_PUBLIC_DOMAIN=https://<your-public-object-host>
 ```
 
 ## TLS before enabling HTTPS vhosts
@@ -121,9 +122,11 @@ The checked-in Host Nginx file [`deploy/nginx/pastane-app`](../deploy/nginx/past
 sudo systemctl stop nginx
 sudo certbot certonly --standalone \
   -d azem.cloud -d www.azem.cloud \
-  -d api.azem.cloud -d admin.azem.cloud -d courier.azem.cloud -d storage.azem.cloud
+  -d api.azem.cloud -d admin.azem.cloud -d courier.azem.cloud
 sudo systemctl start nginx
 ```
+
+Add `-d studio.azem.cloud`, `-d openclaw.azem.cloud`, `-d ai.azem.cloud`, or your public object host only if that VPS actually terminates those names.
 
 **Option B** — staged HTTP-only nginx for HTTP-01 (`/.well-known/…`) via `sudo certbot --nginx` once a minimal `:80` vhost exists. See [`deploy/nginx/README.md`](../deploy/nginx/README.md).
 
@@ -157,10 +160,9 @@ Post-deploy checks run automatically (health + read-only smoke). Skip with `SKIP
 curl -fsS http://127.0.0.1:3003/health
 curl -fsS https://api.azem.cloud/health
 PROD_API_URL=https://api.azem.cloud bash scripts/post-deploy-smoke-prod.sh
-curl -I https://azem.cloud
+curl -I https://www.azem.cloud
 curl -I https://admin.azem.cloud
 curl -I https://courier.azem.cloud
-curl -I https://storage.azem.cloud
 curl -I https://studio.azem.cloud
 ```
 
@@ -177,10 +179,10 @@ Set in `.env.production`: `SUPABASE_STUDIO_ENABLED=1`, `DASHBOARD_*`, `SUPABASE_
 
 ## VPS sizing (reference)
 
-| Tier | vCPU | RAM | Root disk |
-|------|------|-----|-----------|
-| **MVP** | 4 | 8 GB | 120 GB NVMe |
-| **Growth** | 8+ | 16+ GB | Larger NVMe; separate data volume if possible |
+| Tier       | vCPU | RAM    | Root disk                                     |
+| ---------- | ---- | ------ | --------------------------------------------- |
+| **MVP**    | 4    | 8 GB   | 120 GB NVMe                                   |
+| **Growth** | 8+   | 16+ GB | Larger NVMe; separate data volume if possible |
 
 Plan disk for MinIO object growth and PostgreSQL backups (temporary space during `pg_dump`).
 
