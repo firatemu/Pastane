@@ -122,14 +122,16 @@ export class IyzicoProvider {
       return new Promise((resolve, reject) => {
         // Clone request object to avoid side effects across retries
         const reqCopy = JSON.parse(JSON.stringify(request));
+        this.logger.warn(`iyzico checkoutFormInitialize attempt (${channel}): conversationId=${reqCopy.conversationId}, basketId=${reqCopy.basketId}, price=${reqCopy.price}`);
         client.checkoutFormInitialize.create(reqCopy, (err: Error | null, result: unknown) => {
           if (err) {
-            this.logger.warn(`iyzico checkout init failed (${channel}): ${err.message}`);
+            this.logger.error(`iyzico checkout init FAILED (${channel}): err="${err.message}", stack=${err.stack?.slice(0, 200)}`);
             reject(err);
             return;
           }
           try {
             const normalized = this.normalizeSdkResult(result);
+            this.logger.warn(`iyzico checkout init result (${channel}): status=${normalized.status}, errorCode=${normalized.errorCode ?? 'none'}, errorMessage=${normalized.errorMessage ?? 'none'}`);
             if (normalized.status !== 'success') {
               this.logger.warn(
                 `iyzico checkout init rejected (${channel}): ${normalized.errorCode ?? ''} ${normalized.errorMessage ?? ''}`.trim(),

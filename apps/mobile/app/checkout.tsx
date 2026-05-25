@@ -5,7 +5,7 @@ import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WebView, type WebViewNavigation } from 'react-native-webview';
+import { WebView, type WebViewMessageEvent, type WebViewNavigation } from 'react-native-webview';
 import {
   ApiRequestError,
   createOrder,
@@ -451,6 +451,35 @@ export default function CheckoutScreen(): React.JSX.Element {
     return true;
   }
 
+  function onWebViewMessage(event: WebViewMessageEvent): void {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'iyzico_message' || data.type === 'nav_push') {
+        if (pendingOrder?.id) {
+          setCheckoutHtml(null);
+          void checkPaymentStatus(pendingOrder.id);
+        }
+      }
+    } catch {
+      /* ignore parse errors */
+    }
+  }
+
+  // Injected JavaScript to capture postMessage from iframe and navigation events
+  const injectedJs = `
+    window.addEventListener('message', function(e) {
+      if (e.data && typeof e.data === 'string' && e.data.includes('iyzico')) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({type: 'iyzico_message', data: e.data}));
+      }
+    });
+    var originalPushState = history.pushState;
+    history.pushState = function() {
+      originalPushState.apply(this, arguments);
+      window.ReactNativeWebView.postMessage(JSON.stringify({type: 'nav_push', url: location.href}));
+    };
+    true;
+  `;
+
   const closePaymentModal = useCallback((): void => {
     Alert.alert('Ödemeyi iptal et', 'Ödeme penceresini kapatmak istediğinize emin misiniz?', [
       { text: 'Devam et', style: 'cancel' },
@@ -472,7 +501,7 @@ export default function CheckoutScreen(): React.JSX.Element {
   }, [checkoutHtml, closePaymentModal, webViewCanGoBack]);
 
   const paymentHtml = checkoutHtml
-    ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" /></head><body><div id="iyzipay-checkout-form" class="responsive"></div>${checkoutHtml}</body></html>`
+    ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" /></head><body>${checkoutHtml}</body></html>`
     : null;
 
   if (!ready || initialLoading) {
@@ -676,9 +705,11 @@ export default function CheckoutScreen(): React.JSX.Element {
               onLoadStart={() => setWebViewLoading(true)}
               onNavigationStateChange={onWebViewNav}
               onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+              onMessage={onWebViewMessage}
               originWhitelist={['*']}
               mixedContentMode="never"
               setSupportMultipleWindows={false}
+              injectedJavaScript={injectedJs}
               source={{ html: paymentHtml, baseUrl: getWebBaseUrl() }}
               style={{ flex: 1 }}
             />
