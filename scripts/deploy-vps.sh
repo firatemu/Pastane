@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Deploy workflow from your machine: push to GitHub, then run ./deploy.sh on the VPS over SSH.
-# Requires: VPS_* variables (via environment or scripts/deploy-vps.env.local — gitignored pattern).
+# Production deploy helper from your machine.
+# Default behaviour: push to GitHub and let GitHub Actions build/publish images and deploy them.
+# Manual fallback: pass --remote-only to SSH into the VPS and run ./deploy.sh explicitly.
+#
+# Requires: VPS_* variables (via environment or scripts/deploy-vps.env.local — gitignored pattern)
+# only for --remote-only mode.
 #
 # Usage:
 #   chmod +x scripts/deploy-vps.sh
@@ -9,8 +13,8 @@
 #
 # Options:
 #   --dry-run        Print steps only (no git push, no ssh).
-#   --push-only      git push only (use when GitHub Actions runs deploy).
-#   --remote-only    SSH ./deploy.sh only (code must already be on origin).
+#   --push-only      Push only (same as default GitHub Actions path).
+#   --remote-only    SSH ./deploy.sh on the VPS (manual fallback / redeploy).
 #   --skip-checks    Skip pnpm typecheck before push.
 #   --allow-dirty    Allow deploying with uncommitted local changes (default: refuse).
 #
@@ -35,7 +39,7 @@ if [[ -f "$LOCAL_ENV" ]]; then
 fi
 
 usage() {
-  sed -n '1,25p' "$0" >&2
+  sed -n '1,27p' "$0" >&2
   exit 2
 }
 
@@ -60,21 +64,19 @@ VPS_HOST="${VPS_HOST:-}"
 VPS_USER="${VPS_USER:-deploy}"
 VPS_PORT="${VPS_PORT:-22}"
 VPS_APP_DIR="${VPS_APP_DIR:-/var/www/pastane-app/app}"
-BRANCH="${VPS_DEPLOY_BRANCH:-main}"
+BRANCH="${VPS_DEPLOY_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
 _vh_norm="$(printf '%s' "$VPS_HOST" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
-# Require real VPS host before push/SSH (placeholders from the example file break ssh).
-if [[ "$PUSH_ONLY" -eq 0 && "$DRY_RUN" -eq 0 ]]; then
+if [[ "$REMOTE_ONLY" -eq 1 && "$DRY_RUN" -eq 0 ]]; then
   if [[ -z "$_vh_norm" ]]; then
-    echo 'error: VPS_HOST is not set — cannot run remote ./deploy.sh after push.' >&2
+    echo 'error: VPS_HOST is not set — cannot run remote ./deploy.sh.' >&2
     if [[ ! -f "$LOCAL_ENV" ]]; then
       echo "  Create ${LOCAL_ENV} from scripts/deploy-vps.env.example and set VPS_HOST (and optional VPS_*)." >&2
     else
       echo "  ${LOCAL_ENV} exists but VPS_HOST is empty; set VPS_HOST to your server IP or hostname." >&2
     fi
-    echo '  Or run: VPS_HOST=1.2.3.4 ./scripts/deploy-vps.sh …' >&2
-    echo '  Or push only (GitHub Actions deploy): ./scripts/deploy-vps.sh --push-only' >&2
+    echo '  Or run: VPS_HOST=1.2.3.4 ./scripts/deploy-vps.sh --remote-only' >&2
     exit 1
   fi
   case "$_vh_norm" in
@@ -115,8 +117,8 @@ if [[ "$REMOTE_ONLY" -eq 0 ]]; then
   run git push -u origin "$BRANCH"
 fi
 
-if [[ "$PUSH_ONLY" -eq 1 ]]; then
-  echo "${DRY_RUN:+(dry-run) }Push step done; exiting (--push-only)."
+if [[ "$REMOTE_ONLY" -eq 0 ]]; then
+  echo "${DRY_RUN:+(dry-run) }Push step done; GitHub Actions will build images and continue deployment."
   exit 0
 fi
 
@@ -125,14 +127,28 @@ if [[ -n "${VPS_SSH_IDENTITY:-}" ]]; then
   SSH_BASE+=(-i "$VPS_SSH_IDENTITY")
 fi
 
-REMOTE_CMD="$(printf 'cd %q && ./deploy.sh' "$VPS_APP_DIR")"
+REMOTE_ENV_ASSIGNMENTS=()
+for key in DEPLOY_GIT_REF IMAGE_TAG REGISTRY REGISTRY_SERVER SKIP_POST_DEPLOY_CHECKS; do
+  value="${!key:-}"
+  if [[ -n "${value// }" ]]; then
+    printf -v assignment '%s=%q' "$key" "$value"
+    REMOTE_ENV_ASSIGNMENTS+=("$assignment")
+  fi
+done
+
+REMOTE_CMD="$(printf 'cd %q && ' "$VPS_APP_DIR")"
+if [[ ${#REMOTE_ENV_ASSIGNMENTS[@]} -gt 0 ]]; then
+  REMOTE_CMD+="${REMOTE_ENV_ASSIGNMENTS[*]} "
+fi
+REMOTE_CMD+="./deploy.sh"
+
 HOST_DISP="${VPS_HOST:-YOUR_VPS_HOST}"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   ssh_id=""
   [[ -n "${VPS_SSH_IDENTITY:-}" ]] && ssh_id=" -i ${VPS_SSH_IDENTITY}"
   echo "[dry-run] ssh (-o BatchMode=yes -o StrictHostKeyChecking=accept-new) -p ${VPS_PORT}${ssh_id} ${VPS_USER}@${HOST_DISP}"
-  echo "[dry-run]   remote: cd ${VPS_APP_DIR} && ./deploy.sh"
+  echo "[dry-run]   remote: ${REMOTE_CMD}"
   exit 0
 fi
 

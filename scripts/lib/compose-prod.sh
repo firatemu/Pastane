@@ -18,6 +18,74 @@ compose_prod_app() {
   compose_prod --env-file "${ENV_FILE:-.env.production}" -f "$COMPOSE_PROD_FILE" "$@"
 }
 
+read_prod_env_value() {
+  local key="$1"
+  local file="${ENV_FILE:-.env.production}"
+  local value
+
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+
+  value="$(grep -E "^[[:space:]]*${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+  value="${value%$'\r'}"
+  value="${value#\"}"
+  value="${value%\"}"
+  value="${value#\'}"
+  value="${value%\'}"
+  printf '%s' "$value"
+}
+
+resolve_prod_runtime_value() {
+  local key="$1"
+  local value="${!key:-}"
+
+  if [[ -n "${value// }" ]]; then
+    printf '%s' "$value"
+    return 0
+  fi
+
+  read_prod_env_value "$key"
+}
+
+infer_registry_server() {
+  local registry="$1"
+  local first_segment
+
+  first_segment="${registry%%/*}"
+  if [[ "$registry" == */* ]] && [[ "$first_segment" == *.* || "$first_segment" == *:* || "$first_segment" == "localhost" ]]; then
+    printf '%s' "$first_segment"
+  fi
+}
+
+docker_login_registry_if_configured() {
+  local registry server username password
+
+  registry="$(resolve_prod_runtime_value REGISTRY)"
+  server="$(resolve_prod_runtime_value REGISTRY_SERVER)"
+  username="$(resolve_prod_runtime_value REGISTRY_USERNAME)"
+  password="$(resolve_prod_runtime_value REGISTRY_PASSWORD)"
+
+  if [[ -z "${server// }" ]] && [[ -n "${registry// }" ]]; then
+    server="$(infer_registry_server "$registry")"
+  fi
+
+  if [[ -z "${username// }" && -z "${password// }" ]]; then
+    if [[ -n "${server// }" ]]; then
+      echo "No registry credentials configured for ${server}; continuing without docker login."
+    fi
+    return 0
+  fi
+
+  if [[ -z "${server// }" || -z "${username// }" || -z "${password// }" ]]; then
+    echo "error: REGISTRY_SERVER, REGISTRY_USERNAME, and REGISTRY_PASSWORD must all be set for authenticated registry access." >&2
+    return 1
+  fi
+
+  printf '%s' "$password" | docker login "$server" --username "$username" --password-stdin >/dev/null
+  echo "Docker registry login succeeded for ${server}."
+}
+
 supabase_compose_files() {
   printf '%s\n' \
     "$COMPOSE_PROD_ROOT/docker/supabase/docker-compose.yml" \

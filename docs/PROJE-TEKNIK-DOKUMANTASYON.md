@@ -1,12 +1,12 @@
 # Pastane Platform — Teknik Dokümantasyon
 
-| Alan | Değer |
-|------|--------|
-| **Proje** | Pastane Platform (tek kiracılı pastane e-ticaret + operasyon) |
-| **Depo** | Monorepo — pnpm 10 + Turborepo 2 |
-| **Node** | 22 LTS (`>=22 <23`) |
-| **Son güncelleme** | Mayıs 2026 |
-| **Canlı ortam** | azem.cloud (VPS, Docker Compose + Host Nginx) |
+| Alan               | Değer                                                         |
+| ------------------ | ------------------------------------------------------------- |
+| **Proje**          | Pastane Platform (tek kiracılı pastane e-ticaret + operasyon) |
+| **Depo**           | Monorepo — pnpm 10 + Turborepo 2                              |
+| **Node**           | 22 LTS (`>=22 <23`)                                           |
+| **Son güncelleme** | Mayıs 2026                                                    |
+| **Canlı ortam**    | azem.cloud (VPS, Docker Compose + Host Nginx)                 |
 
 Bu belge projenin **güncel teknik durumunu** tek kaynaktan anlatır. Günlük operasyon için [`OPERATIONS.md`](./OPERATIONS.md); agent onboarding için [`AI_HANDOFF_CONTEXT.md`](./AI_HANDOFF_CONTEXT.md); belge indeksi için [`README.md`](./README.md).
 
@@ -55,26 +55,26 @@ Pastane Platform, **tek bir pastane işletmesi** için uçtan uca dijital altyap
 
 **Temel prensipler:**
 
-| Prensip | Açıklama |
-|---------|----------|
-| Backend otoritesi | Fiyat, stok görünürlüğü, sipariş durumu, sadakat — sunucuda hesaplanır |
-| Tek API | Tüm istemciler `/api/v1` kullanır |
-| BFF + cookie | Web/admin/kurye: httpOnly cookie; access token JS’e sızmaz |
-| Polling | Kritik akışlarda WebSocket yok; optimistic update yok |
-| Mobil ayrı pipeline | Expo EAS ile build; VPS Docker’a deploy edilmez |
+| Prensip             | Açıklama                                                               |
+| ------------------- | ---------------------------------------------------------------------- |
+| Backend otoritesi   | Fiyat, stok görünürlüğü, sipariş durumu, sadakat — sunucuda hesaplanır |
+| Tek API             | Tüm istemciler `/api/v1` kullanır                                      |
+| BFF + cookie        | Web/admin/kurye: httpOnly cookie; access token JS’e sızmaz             |
+| Polling             | Kritik akışlarda WebSocket yok; optimistic update yok                  |
+| Mobil ayrı pipeline | Expo EAS ile build; VPS Docker’a deploy edilmez                        |
 
 ---
 
 ## 2. Canlı ortam ve URL’ler
 
-| Servis | URL | Backend port (loopback) |
-|--------|-----|-------------------------|
-| Müşteri vitrini | https://azem.cloud | 3000 |
-| API | https://api.azem.cloud | 3003 |
-| Admin | https://admin.azem.cloud | 3001 |
-| Kurye | https://courier.azem.cloud | 3002 |
-| MinIO (S3) | https://storage.azem.cloud | 9000 |
-| Supabase Studio | https://studio.azem.cloud | 54323 |
+| Servis          | URL                        | Backend port (loopback) |
+| --------------- | -------------------------- | ----------------------- |
+| Müşteri vitrini | https://azem.cloud         | 3000                    |
+| API             | https://api.azem.cloud     | 3003                    |
+| Admin           | https://admin.azem.cloud   | 3001                    |
+| Kurye           | https://courier.azem.cloud | 3002                    |
+| MinIO (S3)      | https://storage.azem.cloud | 9000                    |
+| Supabase Studio | https://studio.azem.cloud  | 54323                   |
 
 **VPS:** Ubuntu 24.04, Docker Compose, Host Nginx TLS sonlandırma. Uygulama kodu `/var/www/pastane-app/app`.
 
@@ -129,10 +129,10 @@ flowchart TB
 
 **İki ayrı Compose projesi:**
 
-| Proje | İçerik |
-|-------|--------|
+| Proje           | İçerik                                                                                             |
+| --------------- | -------------------------------------------------------------------------------------------------- |
 | `supabase-prod` | Resmi Supabase Docker yığını (PG 17, Studio, Kong, Auth, …). Pastane yalnızca PostgreSQL kullanır. |
-| `pastane-prod` | api, web, admin, courier, redis, minio |
+| `pastane-prod`  | api, web, admin, courier, redis, minio                                                             |
 
 API veritabanına Docker ağı üzerinden `supabase-db` host alias’ı ile bağlanır. PostgreSQL, Redis ve MinIO **WAN’a açılmaz**.
 
@@ -187,22 +187,22 @@ Admin, courier ve web **ayrı Next.js uygulamalarıdır**; tek uygulama altında
 
 ## 5. Teknoloji yığını
 
-| Katman | Teknoloji |
-|--------|-----------|
-| Runtime | Node.js 22 LTS |
-| Dil | TypeScript (strict) |
-| Backend | NestJS 11 |
-| ORM | Prisma 6 |
-| Veritabanı (prod) | PostgreSQL 17 — Supabase self-host |
-| Veritabanı (local) | Docker PG 16 **veya** Supabase CLI PG 17 |
-| Cache / kuyruk | Redis 7 + BullMQ |
-| Nesne depolama | MinIO (S3 uyumlu) |
-| Web | Next.js 15 App Router, React 19, Tailwind |
-| Form | react-hook-form + zod |
-| Mobil | Expo SDK 56, Expo Router, React Native 0.85 |
-| Ödeme | İyzico Checkout Form |
-| Container | Docker Compose |
-| CI/CD | GitHub Actions → VPS SSH |
+| Katman             | Teknoloji                                   |
+| ------------------ | ------------------------------------------- |
+| Runtime            | Node.js 22 LTS                              |
+| Dil                | TypeScript (strict)                         |
+| Backend            | NestJS 11                                   |
+| ORM                | Prisma 6                                    |
+| Veritabanı (prod)  | PostgreSQL 17 — Supabase self-host          |
+| Veritabanı (local) | Docker PG 16 **veya** Supabase CLI PG 17    |
+| Cache / kuyruk     | Redis 7 + BullMQ                            |
+| Nesne depolama     | MinIO (S3 uyumlu)                           |
+| Web                | Next.js 15 App Router, React 19, Tailwind   |
+| Form               | react-hook-form + zod                       |
+| Mobil              | Expo SDK 56, Expo Router, React Native 0.85 |
+| Ödeme              | İyzico Checkout Form                        |
+| Container          | Docker Compose                              |
+| CI/CD              | GitHub Actions → VPS SSH                    |
 
 ---
 
@@ -210,12 +210,12 @@ Admin, courier ve web **ayrı Next.js uygulamalarıdır**; tek uygulama altında
 
 ### 6.1 `apps/api` — Backend
 
-| Özellik | Değer |
-|---------|--------|
-| Paket | `@pastane/api` |
-| Port | 3003 |
-| Prefix | `/api/v1` |
-| Health | `GET /health` (prefix dışı) |
+| Özellik | Değer                                                |
+| ------- | ---------------------------------------------------- |
+| Paket   | `@pastane/api`                                       |
+| Port    | 3003                                                 |
+| Prefix  | `/api/v1`                                            |
+| Health  | `GET /health` (prefix dışı)                          |
 | Swagger | `/api/docs` (`SWAGGER_ENABLED=true`, prod’da kapalı) |
 
 **Modüller:** auth, users, roles, permissions, otp, categories, products, product-units, allergens, media, banners, stores, delivery-zones, cart, orders, payments, couriers, deliveries, addresses, reviews, loyalty, notifications, campaigns, settings, reports, audit, jobs (BullMQ), health, prisma.
@@ -257,14 +257,14 @@ Detay: [`MOBILE-PHASED-PLAN.md`](./MOBILE-PHASED-PLAN.md), [`apps/mobile/README.
 
 ## 7. Paylaşılan paketler
 
-| Paket | Amaç |
-|-------|------|
-| `@pastane/database` | [`schema.prisma`](../packages/database/schema.prisma), migrations, seed |
-| `@pastane/tr-api-errors` | `errorCode` → Türkçe UI mesajı |
-| `@pastane/types` | `ApiSuccessResponse`, `ApiErrorResponse` |
-| `@pastane/constants` | Sabitler |
-| `@pastane/ui` | Paylaşılan UI (genişletilebilir) |
-| `@pastane/config` | Paylaşılan config |
+| Paket                    | Amaç                                                                    |
+| ------------------------ | ----------------------------------------------------------------------- |
+| `@pastane/database`      | [`schema.prisma`](../packages/database/schema.prisma), migrations, seed |
+| `@pastane/tr-api-errors` | `errorCode` → Türkçe UI mesajı                                          |
+| `@pastane/types`         | `ApiSuccessResponse`, `ApiErrorResponse`                                |
+| `@pastane/constants`     | Sabitler                                                                |
+| `@pastane/ui`            | Paylaşılan UI (genişletilebilir)                                        |
+| `@pastane/config`        | Paylaşılan config                                                       |
 
 **Prisma komutları:**
 
@@ -307,11 +307,11 @@ Liste uçları sayfalı yanıt döner (`data` + `meta`). İstemci tarafında top
 
 ### 8.2 Kuyruk işleri (BullMQ)
 
-| Job | Amaç |
-|-----|------|
-| Ödeme zaman aşımı | `PAYMENT_TIMEOUT_MS` sonrası sipariş iptali |
-| Bildirim gönderimi | FCM/SMS/e-posta placeholder |
-| Stok rezervasyonu | Timeout ve finalize |
+| Job                | Amaç                                        |
+| ------------------ | ------------------------------------------- |
+| Ödeme zaman aşımı  | `PAYMENT_TIMEOUT_MS` sonrası sipariş iptali |
+| Bildirim gönderimi | FCM/SMS/e-posta placeholder                 |
+| Stok rezervasyonu  | Timeout ve finalize                         |
 
 Redis bağlantısı `REDIS_HOST` / `REDIS_PASSWORD` ile yapılandırılır.
 
@@ -327,31 +327,31 @@ Redis bağlantısı `REDIS_HOST` / `REDIS_PASSWORD` ile yapılandırılır.
 
 **38 model** — [`packages/database/schema.prisma`](../packages/database/schema.prisma)
 
-| Grup | Modeller |
-|------|----------|
-| Kimlik | User, Role, Permission, RolePermission, RefreshToken, OtpCode |
-| Adres | Address |
-| Katalog | Category, Product, ProductUnit, ProductImage, Allergen, ProductAllergen, ProductOptionGroup, ProductOption, Banner |
-| Mağaza | Store, DeliveryZone |
-| Sepet | Cart, CartItem, CartItemOption |
-| Sipariş | Order, OrderItem, OrderItemOption, OrderStatusHistory |
-| Ödeme | Payment |
-| Teslimat | Courier, Delivery |
-| Sadakat | LoyaltyAccount, LoyaltyMovement, LoyaltySetting |
-| Diğer | Review, Notification, Campaign, Setting, AuditLog |
+| Grup     | Modeller                                                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Kimlik   | User, Role, Permission, RolePermission, RefreshToken, OtpCode                                                      |
+| Adres    | Address                                                                                                            |
+| Katalog  | Category, Product, ProductUnit, ProductImage, Allergen, ProductAllergen, ProductOptionGroup, ProductOption, Banner |
+| Mağaza   | Store, DeliveryZone                                                                                                |
+| Sepet    | Cart, CartItem, CartItemOption                                                                                     |
+| Sipariş  | Order, OrderItem, OrderItemOption, OrderStatusHistory                                                              |
+| Ödeme    | Payment                                                                                                            |
+| Teslimat | Courier, Delivery                                                                                                  |
+| Sadakat  | LoyaltyAccount, LoyaltyMovement, LoyaltySetting                                                                    |
+| Diğer    | Review, Notification, Campaign, Setting, AuditLog                                                                  |
 
 ### Migration geçmişi
 
-| Migration | Konu |
-|-----------|------|
-| `20260517182508_phase1_backend_core` | Temel şema |
-| `20260517184123_phase2_catalog_stock` | Katalog |
-| `20260517221500_phase3_order_payment_flow` | Sipariş / ödeme |
-| `20260519143000_banners` | Banner CMS |
-| `20260520120000_address_map_coordinates` | Adres koordinatları |
-| `20260520140000_order_delivery_failed` | Teslimat başarısız |
+| Migration                                             | Konu                                       |
+| ----------------------------------------------------- | ------------------------------------------ |
+| `20260517182508_phase1_backend_core`                  | Temel şema                                 |
+| `20260517184123_phase2_catalog_stock`                 | Katalog                                    |
+| `20260517221500_phase3_order_payment_flow`            | Sipariş / ödeme                            |
+| `20260519143000_banners`                              | Banner CMS                                 |
+| `20260520120000_address_map_coordinates`              | Adres koordinatları                        |
+| `20260520140000_order_delivery_failed`                | Teslimat başarısız                         |
 | `20260520180000_remove_stock_add_product_publication` | Stok tabloları kaldırıldı; yayın penceresi |
-| `20260523120000_product_units` | Satış birimleri |
+| `20260523120000_product_units`                        | Satış birimleri                            |
 
 Production’da yalnızca `prisma migrate deploy` (`deploy.sh` içinde). `migrate dev` production’da **çalıştırılmaz**.
 
@@ -359,13 +359,13 @@ Production’da yalnızca `prisma migrate deploy` (`deploy.sh` içinde). `migrat
 
 [`packages/database/prisma/seed.ts`](../packages/database/prisma/seed.ts):
 
-| Rol | Örnek e-posta |
-|-----|----------------|
-| Admin | `admin@pastane.com` |
-| Operatör | `operator@pastane.com` |
-| Ürün yöneticisi | `product@pastane.com` |
-| Kurye | `kurye1@pastane.com` |
-| Müşteri | `musteri@pastane.com` |
+| Rol             | Örnek e-posta          |
+| --------------- | ---------------------- |
+| Admin           | `admin@pastane.com`    |
+| Operatör        | `operator@pastane.com` |
+| Ürün yöneticisi | `product@pastane.com`  |
+| Kurye           | `kurye1@pastane.com`   |
+| Müşteri         | `musteri@pastane.com`  |
 
 Şifreler seed dosyasında — **yalnızca dev**.
 
@@ -375,10 +375,10 @@ Production’da yalnızca `prisma migrate deploy` (`deploy.sh` içinde). `migrat
 
 ### 10.1 JWT
 
-| Token | Süre | Saklama |
-|-------|------|---------|
-| Access | ~15 dk | Web: httpOnly cookie (BFF); Mobil: SecureStore |
-| Refresh | ~30 gün | Hash’lenmiş DB (`RefreshToken`) |
+| Token   | Süre    | Saklama                                        |
+| ------- | ------- | ---------------------------------------------- |
+| Access  | ~15 dk  | Web: httpOnly cookie (BFF); Mobil: SecureStore |
+| Refresh | ~30 gün | Hash’lenmiş DB (`RefreshToken`)                |
 
 Access payload: `sub`, `phone`, `role`, `permissions[]`.
 
@@ -394,13 +394,13 @@ Frontend menü izinleri yalnızca UX; karar backend’dedir.
 
 ### 10.3 Rol tipleri (`RoleType`)
 
-| Rol | Arayüz |
-|-----|--------|
-| `ADMIN` | Admin |
-| `ORDER_OPERATOR` | Admin |
-| `PRODUCT_MANAGER` | Admin |
-| `COURIER` | Courier |
-| `CUSTOMER` | Web / Mobil |
+| Rol               | Arayüz      |
+| ----------------- | ----------- |
+| `ADMIN`           | Admin       |
+| `ORDER_OPERATOR`  | Admin       |
+| `PRODUCT_MANAGER` | Admin       |
+| `COURIER`         | Courier     |
+| `CUSTOMER`        | Web / Mobil |
 
 İzin kodu formatı: `module.action` (ör. `products.view`, `orders.assignCourier`, `banners.reorder`).
 
@@ -423,10 +423,10 @@ Alternatif: `DELIVERY_FAILED`, `CANCELLED`
 
 ### 11.3 Teslimat
 
-| Tip | Gereksinim |
-|-----|------------|
+| Tip             | Gereksinim                       |
+| --------------- | -------------------------------- |
 | `HOME_DELIVERY` | Kayıtlı adres + teslimat bölgesi |
-| `PICKUP` | Aktif mağaza |
+| `PICKUP`        | Aktif mağaza                     |
 
 ### 11.4 Sepet ve checkout
 
@@ -476,20 +476,20 @@ sequenceDiagram
 
 ### 13.1 Ortak desenler
 
-| Desen | Açıklama |
-|-------|----------|
-| BFF proxy | `app/api/*` — cookie session |
-| Hata eşleme | `@pastane/tr-api-errors` |
-| Validasyon | zod şemaları |
-| Polling | Admin siparişler, kurye, müşteri takip — [`adr-polling-strategy.md`](./adr-polling-strategy.md) |
+| Desen       | Açıklama                                                                                        |
+| ----------- | ----------------------------------------------------------------------------------------------- |
+| BFF proxy   | `app/api/*` — cookie session                                                                    |
+| Hata eşleme | `@pastane/tr-api-errors`                                                                        |
+| Validasyon  | zod şemaları                                                                                    |
+| Polling     | Admin siparişler, kurye, müşteri takip — [`adr-polling-strategy.md`](./adr-polling-strategy.md) |
 
 ### 13.2 API URL çözümlemesi
 
-| Değişken | Kullanım |
-|----------|----------|
+| Değişken                                            | Kullanım                      |
+| --------------------------------------------------- | ----------------------------- |
 | `WEB_API_URL` / `ADMIN_API_URL` / `COURIER_API_URL` | Docker içi: `http://api:3003` |
-| `API_URL` | Host geliştirme fallback |
-| `RUNNING_IN_DOCKER=1` | Container hostname mantığı |
+| `API_URL`                                           | Host geliştirme fallback      |
+| `RUNNING_IN_DOCKER=1`                               | Container hostname mantığı    |
 
 ---
 
@@ -506,11 +506,11 @@ apps/mobile/
 └── eas.json
 ```
 
-| Özellik | Durum |
-|---------|--------|
-| Vitrin, sepet, auth, adres, sipariş, İyzico WebView | ✅ |
-| Sadakat QR, yorumlar, bildirim listesi | ✅ |
-| Push (FCM) | ⏳ Backend placeholder |
+| Özellik                                             | Durum                  |
+| --------------------------------------------------- | ---------------------- |
+| Vitrin, sepet, auth, adres, sipariş, İyzico WebView | ✅                     |
+| Sadakat QR, yorumlar, bildirim listesi              | ✅                     |
+| Push (FCM)                                          | ⏳ Backend placeholder |
 
 Build:
 
@@ -526,12 +526,12 @@ Detay: [`MOBILE_SYNC_WORKFLOW.md`](./MOBILE_SYNC_WORKFLOW.md), [`mobile-deploy-p
 
 ## 15. Harici entegrasyonlar
 
-| Servis | Durum |
-|--------|--------|
-| İyzico | Sandbox + prod yapılandırması hazır |
-| FCM (push) | Provider iskeleti; canlı credential yok |
-| SMS / OTP | Placeholder; `OTP_ACTIVE=false` varsayılan |
-| E-posta | Placeholder SMTP |
+| Servis     | Durum                                      |
+| ---------- | ------------------------------------------ |
+| İyzico     | Sandbox + prod yapılandırması hazır        |
+| FCM (push) | Provider iskeleti; canlı credential yok    |
+| SMS / OTP  | Placeholder; `OTP_ACTIVE=false` varsayılan |
+| E-posta    | Placeholder SMTP                           |
 
 ---
 
@@ -548,10 +548,10 @@ cp .env.example .env
 
 ### 16.2 İki yerel DB seçeneği
 
-| Yöntem | Komut | DB |
-|--------|-------|-----|
-| Docker dev stack | `pnpm docker:dev:up` | Compose içi PostgreSQL 16 |
-| Supabase CLI | `pnpm supabase:start` | PG 17 @ `127.0.0.1:54322` |
+| Yöntem           | Komut                 | DB                        |
+| ---------------- | --------------------- | ------------------------- |
+| Docker dev stack | `pnpm docker:dev:up`  | Compose içi PostgreSQL 16 |
+| Supabase CLI     | `pnpm supabase:start` | PG 17 @ `127.0.0.1:54322` |
 
 Supabase CLI kullanıyorsanız `.env` içinde `DATABASE_URL` genelde `@127.0.0.1:54322/postgres` olur.
 
@@ -573,23 +573,23 @@ pnpm e2e:smoke
 
 Detaylı sorun giderme: [`local-development.md`](./local-development.md).
 
-**Politika:** Yerel = dev; production = yalnızca VPS (`pnpm push:vps`).
+**Politika:** Yerel = dev; production deploy = GitHub Actions registry build/push + VPS pull-only (`pnpm push:vps`).
 
 ---
 
 ## 17. Komut referansı
 
-| Komut | Açıklama |
-|--------|----------|
-| `pnpm dev` | Tüm dev sunucuları (Turbo) |
-| `pnpm check` | Tam kalite kapısı |
-| `pnpm docker:dev:up` | Dev Docker stack |
-| `pnpm push:vps` | typecheck → git push → VPS `./deploy.sh` |
-| `pnpm push:vps:fast` | typecheck atlanır |
-| `pnpm doctor` | Ortam doğrulama |
-| `pnpm supabase:start` | Local Supabase CLI |
-| `pnpm fix:next-perms` | Root sahipli `.next` düzeltme |
-| `pnpm mobile:sync-check` | Mobil ↔ API uyum kontrolü |
+| Komut                    | Açıklama                                     |
+| ------------------------ | -------------------------------------------- |
+| `pnpm dev`               | Tüm dev sunucuları (Turbo)                   |
+| `pnpm check`             | Tam kalite kapısı                            |
+| `pnpm docker:dev:up`     | Dev Docker stack                             |
+| `pnpm push:vps`          | typecheck → git push → GitHub Actions deploy |
+| `pnpm push:vps:fast`     | typecheck atlanır                            |
+| `pnpm doctor`            | Ortam doğrulama                              |
+| `pnpm supabase:start`    | Local Supabase CLI                           |
+| `pnpm fix:next-perms`    | Root sahipli `.next` düzeltme                |
+| `pnpm mobile:sync-check` | Mobil ↔ API uyum kontrolü                    |
 
 Tam liste: [`DEPLOYMENT_WORKFLOW.md`](./DEPLOYMENT_WORKFLOW.md).
 
@@ -599,15 +599,15 @@ Tam liste: [`DEPLOYMENT_WORKFLOW.md`](./DEPLOYMENT_WORKFLOW.md).
 
 ### 18.1 Development (`docker/docker-compose.dev.yml`)
 
-| Servis | Port |
-|--------|------|
-| postgres | 5432 |
-| redis | 6379 |
-| minio | 9000 / 9001 |
-| api | 3003 |
-| web | 3000 |
-| admin | 3001 |
-| courier | 3002 |
+| Servis   | Port        |
+| -------- | ----------- |
+| postgres | 5432        |
+| redis    | 6379        |
+| minio    | 9000 / 9001 |
+| api      | 3003        |
+| web      | 3000        |
+| admin    | 3001        |
+| courier  | 3002        |
 
 Kök `node_modules` container’a mount edilir (pnpm symlink uyumu). Next cache: `apps/*/.next-docker`.
 
@@ -632,16 +632,16 @@ pnpm push:vps
 cd /var/www/pastane-app/app && ./deploy.sh
 ```
 
-`deploy.sh` sırası: supabase-prod sağlık → app build/up → `prisma migrate deploy` → health + smoke.
+`deploy.sh` sırası: supabase-prod sağlık → registry pull + `up --no-build` → `prisma migrate deploy` → health + smoke.
 
 ### 19.2 Supabase (production DB + Studio)
 
-| Konu | Değer |
-|------|--------|
-| DB host (Docker) | `supabase-db` |
-| Veritabanı | `pastane_db` |
-| Studio | https://studio.azem.cloud |
-| Login | `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` |
+| Konu             | Değer                                       |
+| ---------------- | ------------------------------------------- |
+| DB host (Docker) | `supabase-db`                               |
+| Veritabanı       | `pastane_db`                                |
+| Studio           | https://studio.azem.cloud                   |
+| Login            | `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` |
 
 Secret üretimi:
 
@@ -666,30 +666,30 @@ bash scripts/sync-local-to-vps-verify.sh
 
 ### 19.5 Rollback
 
-| Tür | Yöntem |
-|-----|--------|
-| Uygulama imajı | `pnpm deploy:rollback` / `scripts/rollback-prod.sh` |
-| Veritabanı | Dump restore — [`backup-and-restore.md`](./backup-and-restore.md) |
+| Tür            | Yöntem                                                            |
+| -------------- | ----------------------------------------------------------------- |
+| Uygulama imajı | `pnpm deploy:rollback` / `scripts/rollback-prod.sh`               |
+| Veritabanı     | Dump restore — [`backup-and-restore.md`](./backup-and-restore.md) |
 
 Runbook: [`azem-cloud-vps-deployment.md`](./azem-cloud-vps-deployment.md), [`OPERATIONS.md`](./OPERATIONS.md).
 
 ### 19.6 VPS boyutlandırma (referans)
 
-| Tier | vCPU | RAM | Disk |
-|------|------|-----|------|
-| MVP | 4 | 8 GB | 120 GB NVMe |
-| Growth | 8+ | 16+ GB | Büyütülebilir ayrı volume |
+| Tier   | vCPU | RAM    | Disk                      |
+| ------ | ---- | ------ | ------------------------- |
+| MVP    | 4    | 8 GB   | 120 GB NVMe               |
+| Growth | 8+   | 16+ GB | Büyütülebilir ayrı volume |
 
 ---
 
 ## 20. Test ve kalite
 
-| Tür | Konum | Araç |
-|-----|-------|------|
-| API unit/integration | `apps/api/src/**/*.spec.ts` | Jest |
-| Frontend unit | `**/*.spec.ts` | Vitest |
-| E2E | `apps/*-e2e/` | Playwright |
-| tr-api-errors | `packages/tr-api-errors` | Vitest |
+| Tür                  | Konum                       | Araç       |
+| -------------------- | --------------------------- | ---------- |
+| API unit/integration | `apps/api/src/**/*.spec.ts` | Jest       |
+| Frontend unit        | `**/*.spec.ts`              | Vitest     |
+| E2E                  | `apps/*-e2e/`               | Playwright |
+| tr-api-errors        | `packages/tr-api-errors`    | Vitest     |
 
 **Kalite kapısı:**
 
@@ -703,12 +703,12 @@ E2E önceliği: auth, ödeme callback, sepet, sipariş yaşam döngüsü, yetkil
 
 ## 21. Kod standartları
 
-| Öğe | Konvansiyon |
-|-----|-------------|
-| Klasör / dosya | kebab-case |
-| Sınıf / bileşen | PascalCase |
-| Değişken / fonksiyon | camelCase |
-| Sabit | SCREAMING_SNAKE_CASE |
+| Öğe                  | Konvansiyon          |
+| -------------------- | -------------------- |
+| Klasör / dosya       | kebab-case           |
+| Sınıf / bileşen      | PascalCase           |
+| Değişken / fonksiyon | camelCase            |
+| Sabit                | SCREAMING_SNAKE_CASE |
 
 - DTO + class-validator (API girişi)
 - İş kuralları backend’de; istemcide tekrarlanmaz
@@ -721,17 +721,17 @@ Detay: [`git-workflow.md`](./git-workflow.md), [`ai-agent-rules.md`](./ai-agent-
 
 ## 22. Proje durumu
 
-| Faz | Kapsam | Durum |
-|-----|--------|--------|
-| 0 | Monorepo altyapısı | ✅ |
-| 1 | Backend core | ✅ |
-| 2 | Katalog, medya, mağaza | ✅ |
-| 3 | Sepet, sipariş, ödeme | ✅ |
-| 4 | Admin panel | ✅ |
-| 5 | Kurye paneli | ✅ |
-| 6 | Müşteri web vitrini | ✅ |
-| 7 | Mobil (Expo) | 🟡 İskelet + temel akışlar |
-| 8 | Supabase self-host (prod) | ✅ Canlı |
+| Faz | Kapsam                    | Durum                      |
+| --- | ------------------------- | -------------------------- |
+| 0   | Monorepo altyapısı        | ✅                         |
+| 1   | Backend core              | ✅                         |
+| 2   | Katalog, medya, mağaza    | ✅                         |
+| 3   | Sepet, sipariş, ödeme     | ✅                         |
+| 4   | Admin panel               | ✅                         |
+| 5   | Kurye paneli              | ✅                         |
+| 6   | Müşteri web vitrini       | ✅                         |
+| 7   | Mobil (Expo)              | 🟡 İskelet + temel akışlar |
+| 8   | Supabase self-host (prod) | ✅ Canlı                   |
 
 **Sıradaki iş (talep edilirse):** mobil tamamlama, canlı FCM/SMS provider’ları, ürün backlog.
 
@@ -741,24 +741,24 @@ Detay: [`git-workflow.md`](./git-workflow.md), [`ai-agent-rules.md`](./ai-agent-
 
 ## 23. Ortam değişkenleri
 
-| Dosya | Kullanım |
-|-------|----------|
-| [`.env.example`](../.env.example) | Yerel geliştirme |
+| Dosya                                                   | Kullanım                            |
+| ------------------------------------------------------- | ----------------------------------- |
+| [`.env.example`](../.env.example)                       | Yerel geliştirme                    |
 | [`.env.production.example`](../.env.production.example) | Production şablonu (commit edilmez) |
 
 **Kategoriler:**
 
-| Kategori | Örnekler |
-|----------|----------|
-| Uygulama | `NODE_ENV`, `API_PORT`, `API_URL`, `CORS_ORIGINS` |
-| PostgreSQL | `DATABASE_URL`, `DIRECT_URL`, `POSTGRES_*` |
+| Kategori       | Örnekler                                                  |
+| -------------- | --------------------------------------------------------- |
+| Uygulama       | `NODE_ENV`, `API_PORT`, `API_URL`, `CORS_ORIGINS`         |
+| PostgreSQL     | `DATABASE_URL`, `DIRECT_URL`, `POSTGRES_*`                |
 | Supabase stack | `SUPABASE_JWT_SECRET`, `DASHBOARD_*`, `SUPABASE_ANON_KEY` |
-| JWT (Pastane) | `JWT_SECRET`, `JWT_REFRESH_SECRET`, süreler |
-| Redis | `REDIS_HOST`, `REDIS_PASSWORD` |
-| MinIO | `MINIO_*`, bucket adları, `MINIO_PUBLIC_URL` |
-| Ödeme | `IYZICO_*`, `PAYMENT_TIMEOUT_MS` |
-| Bildirim | `FCM_*`, `SMS_*`, `SMTP_*` (placeholder) |
-| Deploy | `IMAGE_TAG`, `REGISTRY` |
+| JWT (Pastane)  | `JWT_SECRET`, `JWT_REFRESH_SECRET`, süreler               |
+| Redis          | `REDIS_HOST`, `REDIS_PASSWORD`                            |
+| MinIO          | `MINIO_*`, bucket adları, `MINIO_PUBLIC_URL`              |
+| Ödeme          | `IYZICO_*`, `PAYMENT_TIMEOUT_MS`                          |
+| Bildirim       | `FCM_*`, `SMS_*`, `SMTP_*` (placeholder)                  |
+| Deploy         | `IMAGE_TAG`, `REGISTRY`                                   |
 
 Gerçek `.env.production` yalnızca VPS’te (`chmod 600`). Secret’lar repoya commit edilmez.
 
@@ -766,28 +766,28 @@ Gerçek `.env.production` yalnızca VPS’te (`chmod 600`). Secret’lar repoya 
 
 ## 24. Dokümantasyon indeksi
 
-| Belge | Amaç |
-|-------|------|
-| **Bu belge** | Kapsamlı teknik referans |
-| [`README.md`](./README.md) | Belge indeksi |
-| [`AI_HANDOFF_CONTEXT.md`](./AI_HANDOFF_CONTEXT.md) | AI agent onboarding |
-| [`local-development.md`](./local-development.md) | Yerel kurulum |
-| [`DEPLOYMENT_WORKFLOW.md`](./DEPLOYMENT_WORKFLOW.md) | Deploy komutları |
-| [`OPERATIONS.md`](./OPERATIONS.md) | Günlük production ops |
-| [`azem-cloud-vps-deployment.md`](./azem-cloud-vps-deployment.md) | VPS runbook |
-| [`backup-and-restore.md`](./backup-and-restore.md) | Yedekleme |
-| [`ROLLBACK_GUIDE.md`](./ROLLBACK_GUIDE.md) | App rollback |
-| [`iyzico_sandbox_entegrasyon_v3_web.md`](./iyzico_sandbox_entegrasyon_v3_web.md) | İyzico |
-| [`MOBILE-PHASED-PLAN.md`](./MOBILE-PHASED-PLAN.md) | Mobil yol haritası |
+| Belge                                                                            | Amaç                     |
+| -------------------------------------------------------------------------------- | ------------------------ |
+| **Bu belge**                                                                     | Kapsamlı teknik referans |
+| [`README.md`](./README.md)                                                       | Belge indeksi            |
+| [`AI_HANDOFF_CONTEXT.md`](./AI_HANDOFF_CONTEXT.md)                               | AI agent onboarding      |
+| [`local-development.md`](./local-development.md)                                 | Yerel kurulum            |
+| [`DEPLOYMENT_WORKFLOW.md`](./DEPLOYMENT_WORKFLOW.md)                             | Deploy komutları         |
+| [`OPERATIONS.md`](./OPERATIONS.md)                                               | Günlük production ops    |
+| [`azem-cloud-vps-deployment.md`](./azem-cloud-vps-deployment.md)                 | VPS runbook              |
+| [`backup-and-restore.md`](./backup-and-restore.md)                               | Yedekleme                |
+| [`ROLLBACK_GUIDE.md`](./ROLLBACK_GUIDE.md)                                       | App rollback             |
+| [`iyzico_sandbox_entegrasyon_v3_web.md`](./iyzico_sandbox_entegrasyon_v3_web.md) | İyzico                   |
+| [`MOBILE-PHASED-PLAN.md`](./MOBILE-PHASED-PLAN.md)                               | Mobil yol haritası       |
 
 ---
 
 ## Sözlük
 
-| Terim | Anlam |
-|-------|--------|
-| BFF | Backend-for-Frontend — Next.js `app/api` proxy katmanı |
-| BullMQ | Redis tabanlı job kuyruğu |
-| Prisma | TypeScript ORM + migration aracı |
+| Terim              | Anlam                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| BFF                | Backend-for-Frontend — Next.js `app/api` proxy katmanı     |
+| BullMQ             | Redis tabanlı job kuyruğu                                  |
+| Prisma             | TypeScript ORM + migration aracı                           |
 | Supabase self-host | Resmi Supabase Docker yığını; Pastane yalnızca PG kullanır |
-| Loopback bind | `127.0.0.1:PORT` — yalnızca aynı sunucudaki Nginx erişir |
+| Loopback bind      | `127.0.0.1:PORT` — yalnızca aynı sunucudaki Nginx erişir   |

@@ -5,10 +5,24 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Git ref to verify, build, and deploy (branch, tag, or SHA)
+        required: false
+        default: main
+        type: string
+      image_tag:
+        description: Optional container image tag override (defaults to resolved commit SHA)
+        required: false
+        type: string
 
 # Credentials: secrets.VPS_* then vars.VPS_* (repo-level). If VPS_* live only under
-# Deployments → Environment, declare that environment via PASTANE_GITHUB_ENVIRONMENT.
+# Deployments -> Environment, declare that environment via PASTANE_GITHUB_ENVIRONMENT.
 # Override name: Repository variable PASTANE_GITHUB_ENVIRONMENT
+
+permissions:
+  contents: read
+  packages: write
 
 concurrency:
   group: production-deploy
@@ -18,11 +32,114 @@ env:
   NODE_VERSION: '22'
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      git_ref: ${{ steps.resolve.outputs.git_ref }}
+      image_tag: ${{ steps.resolve.outputs.image_tag }}
+      registry: ${{ steps.resolve.outputs.registry }}
+      registry_host: ${{ steps.resolve.outputs.registry_host }}
+      api_health_url: ${{ steps.resolve.outputs.api_health_url }}
+      api_public_url: ${{ steps.resolve.outputs.api_public_url }}
+      web_url: ${{ steps.resolve.outputs.web_url }}
+      admin_url: ${{ steps.resolve.outputs.admin_url }}
+      courier_url: ${{ steps.resolve.outputs.courier_url }}
+      publish_main_alias: ${{ steps.resolve.outputs.publish_main_alias }}
+    steps:
+      - name: Resolve deploy inputs
+        id: resolve
+        env:
+          INPUT_GIT_REF: ${{ github.event.inputs.git_ref || '' }}
+          INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag || '' }}
+          REGISTRY_OVERRIDE: ${{ vars.REGISTRY || '' }}
+          REGISTRY_HOST_OVERRIDE: ${{ vars.REGISTRY_HOST || '' }}
+          API_HEALTH_EXPLICIT: ${{ vars.API_HEALTH_URL || '' }}
+          NEXT_PUBLIC_API_URL_OVERRIDE: ${{ vars.NEXT_PUBLIC_API_URL || '' }}
+          WEB_URL_OVERRIDE: ${{ vars.WEB_URL || '' }}
+          ADMIN_URL_OVERRIDE: ${{ vars.ADMIN_URL || '' }}
+          COURIER_URL_OVERRIDE: ${{ vars.COURIER_URL || '' }}
+          DOMAIN_API_FALLBACK: ${{ vars.DOMAIN_API || '' }}
+          DOMAIN_WEB_FALLBACK: ${{ vars.DOMAIN_WEB || '' }}
+          DOMAIN_ADMIN_FALLBACK: ${{ vars.DOMAIN_ADMIN || '' }}
+          DOMAIN_COURIER_FALLBACK: ${{ vars.DOMAIN_COURIER || '' }}
+        run: |
+          set -euo pipefail
+
+          resolve_url() {
+            local explicit="$1"
+            local domain="$2"
+            local label="$3"
+            if [[ -n "${explicit// }" ]]; then
+              printf '%s' "${explicit%/}"
+              return 0
+            fi
+            if [[ -n "${domain// }" ]]; then
+              printf 'https://%s' "${domain%/}"
+              return 0
+            fi
+            echo "::error::Missing ${label}. Set repository/environment variable ${label} or the matching DOMAIN_* fallback." >&2
+            return 1
+          }
+
+          git_ref="${INPUT_GIT_REF:-}"
+          if [[ -z "${git_ref// }" ]]; then
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              git_ref="main"
+            else
+              git_ref="${GITHUB_SHA}"
+            fi
+          fi
+
+          image_tag="${INPUT_IMAGE_TAG:-}"
+          if [[ -z "${image_tag// }" ]]; then
+            image_tag="${GITHUB_SHA}"
+          fi
+          if [[ ! "${image_tag}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+            echo "::error::image_tag must match Docker tag rules (letters, numbers, ., _, -)." >&2
+            exit 1
+          fi
+
+          owner_lc="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          registry_host="${REGISTRY_HOST_OVERRIDE:-ghcr.io}"
+          registry="${REGISTRY_OVERRIDE:-${registry_host}/${owner_lc}}"
+
+          api_public_url="$(resolve_url "${NEXT_PUBLIC_API_URL_OVERRIDE:-}" "${DOMAIN_API_FALLBACK:-}" "NEXT_PUBLIC_API_URL")"
+          web_url="$(resolve_url "${WEB_URL_OVERRIDE:-}" "${DOMAIN_WEB_FALLBACK:-}" "WEB_URL")"
+          admin_url="$(resolve_url "${ADMIN_URL_OVERRIDE:-}" "${DOMAIN_ADMIN_FALLBACK:-}" "ADMIN_URL")"
+          courier_url="$(resolve_url "${COURIER_URL_OVERRIDE:-}" "${DOMAIN_COURIER_FALLBACK:-}" "COURIER_URL")"
+
+          api_health_url="${API_HEALTH_EXPLICIT:-}"
+          if [[ -z "${api_health_url// }" ]]; then
+            api_health_url="${api_public_url}/health"
+          fi
+
+          publish_main_alias=0
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "main" ]]; then
+            publish_main_alias=1
+          fi
+
+          {
+            printf 'git_ref=%s\n' "${git_ref}"
+            printf 'image_tag=%s\n' "${image_tag}"
+            printf 'registry=%s\n' "${registry}"
+            printf 'registry_host=%s\n' "${registry_host}"
+            printf 'api_health_url=%s\n' "${api_health_url}"
+            printf 'api_public_url=%s\n' "${api_public_url}"
+            printf 'web_url=%s\n' "${web_url}"
+            printf 'admin_url=%s\n' "${admin_url}"
+            printf 'courier_url=%s\n' "${courier_url}"
+            printf 'publish_main_alias=%s\n' "${publish_main_alias}"
+          } >> "$GITHUB_OUTPUT"
+
   verify:
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -40,11 +157,14 @@ jobs:
         run: pnpm check
 
   e2e:
-    needs: verify
+    needs: [prepare, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -70,8 +190,116 @@ jobs:
           E2E_COMPOSE_DOWN: '1'
         run: bash scripts/ci-e2e.sh
 
+  build_images:
+    needs: [prepare, verify, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, web, admin, courier]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to container registry
+        env:
+          REGISTRY_HOST: ${{ needs.prepare.outputs.registry_host }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME || vars.REGISTRY_USERNAME || github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || '' }}
+          GHCR_FALLBACK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          username="${REGISTRY_USERNAME:-}"
+          password="${REGISTRY_PASSWORD:-}"
+
+          if [[ "${REGISTRY_HOST}" == "ghcr.io" && -z "${password// }" ]]; then
+            password="${GHCR_FALLBACK_TOKEN}"
+          fi
+
+          if [[ -z "${username// }" || -z "${password// }" ]]; then
+            echo "::error::Missing registry credentials. GHCR uses GITHUB_TOKEN by default; other registries need REGISTRY_USERNAME and REGISTRY_PASSWORD." >&2
+            exit 1
+          fi
+
+          printf '%s' "${password}" | docker login "${REGISTRY_HOST}" --username "${username}" --password-stdin
+
+      - name: Resolve image settings
+        id: image
+        env:
+          SERVICE: ${{ matrix.service }}
+          IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+          REGISTRY: ${{ needs.prepare.outputs.registry }}
+          API_PUBLIC_URL: ${{ needs.prepare.outputs.api_public_url }}
+          WEB_URL: ${{ needs.prepare.outputs.web_url }}
+          ADMIN_URL: ${{ needs.prepare.outputs.admin_url }}
+          COURIER_URL: ${{ needs.prepare.outputs.courier_url }}
+          PUBLISH_MAIN_ALIAS: ${{ needs.prepare.outputs.publish_main_alias }}
+        run: |
+          set -euo pipefail
+
+          case "${SERVICE}" in
+            api)
+              dockerfile="docker/Dockerfile.api.prod"
+              image_name="pastane-api"
+              build_args="$(printf 'VERSION=%s\n' "${IMAGE_TAG}")"
+              ;;
+            web)
+              dockerfile="docker/Dockerfile.web.prod"
+              image_name="pastane-web"
+              build_args="$(printf 'NEXT_PUBLIC_SITE_URL=%s\nNEXT_PUBLIC_API_URL=%s\nVERSION=%s\n' "${WEB_URL}" "${API_PUBLIC_URL}" "${IMAGE_TAG}")"
+              ;;
+            admin)
+              dockerfile="docker/Dockerfile.admin.prod"
+              image_name="pastane-admin"
+              build_args="$(printf 'NEXT_PUBLIC_SITE_URL=%s\nNEXT_PUBLIC_API_URL=%s\nVERSION=%s\n' "${ADMIN_URL}" "${API_PUBLIC_URL}" "${IMAGE_TAG}")"
+              ;;
+            courier)
+              dockerfile="docker/Dockerfile.courier.prod"
+              image_name="pastane-courier"
+              build_args="$(printf 'NEXT_PUBLIC_SITE_URL=%s\nNEXT_PUBLIC_API_URL=%s\nVERSION=%s\n' "${COURIER_URL}" "${API_PUBLIC_URL}" "${IMAGE_TAG}")"
+              ;;
+            *)
+              echo "::error::Unknown service: ${SERVICE}" >&2
+              exit 1
+              ;;
+          esac
+
+          tags="${REGISTRY}/${image_name}:${IMAGE_TAG}"
+          if [[ "${PUBLISH_MAIN_ALIAS}" == "1" ]]; then
+            tags="${tags}"$'\n'"${REGISTRY}/${image_name}:main"
+          fi
+
+          {
+            printf 'dockerfile=%s\n' "${dockerfile}"
+            printf 'image_name=%s\n' "${image_name}"
+            echo 'build_args<<EOF'
+            printf '%s\n' "${build_args}"
+            echo 'EOF'
+            echo 'tags<<EOF'
+            printf '%s\n' "${tags}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ steps.image.outputs.dockerfile }}
+          pull: true
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+          build-args: ${{ steps.image.outputs.build_args }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
   deploy:
-    needs: [verify, e2e]
+    needs: [prepare, build_images]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ vars.PASTANE_GITHUB_ENVIRONMENT || 'production' }}
@@ -80,8 +308,16 @@ jobs:
       VPS_PORT_CONN: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
       VPS_USER_CONN: ${{ secrets.VPS_USER || vars.VPS_USER }}
       VPS_KEY_CONN: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+      DEPLOY_GIT_REF: ${{ needs.prepare.outputs.git_ref }}
+      DEPLOY_IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+      DEPLOY_REGISTRY: ${{ needs.prepare.outputs.registry }}
+      DEPLOY_REGISTRY_SERVER: ${{ needs.prepare.outputs.registry_host }}
+      API_HEALTH_URL: ${{ needs.prepare.outputs.api_health_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.git_ref }}
+          fetch-depth: 0
 
       - name: Verify deploy secrets
         env:
@@ -99,7 +335,7 @@ jobs:
             printf '%s\n' "Add Repository OR Environment Secrets/Variables named exactly VPS_HOST VPS_USER VPS_SSH_KEY."
             printf '%s\n' "This job uses GitHub Environment: ${{ vars.PASTANE_GITHUB_ENVIRONMENT || 'production' }}."
             printf '%s\n' "Override env name: Repository variable PASTANE_GITHUB_ENVIRONMENT. VPS_SSH_KEY must be Secret. Optional VPS_PORT (default 22)."
-            printf '%s\n' "Docs: docs/GITHUB_CI_SSH.md"
+            printf '%s\n' "Docs: docs/github-actions-registry-deploy.md and docs/GITHUB_CI_SSH.md"
             exit 1
           fi
 
@@ -118,47 +354,36 @@ jobs:
         run: |
           set -euo pipefail
           VPS_PORT="${VPS_PORT_CONN:-22}"
-          ssh -i ~/.ssh/pastane_deploy_key -p "${VPS_PORT}" "${VPS_USER_CONN}@${VPS_HOST_CONN}" \
-            'cd /var/www/pastane-app/app && ./deploy.sh'
-
-      - name: Resolve API health URL
-        id: resolve_health_url
-        env:
-          EXPLICIT_HEALTH: ${{ vars.API_HEALTH_URL }}
-          DOMAIN_API_FALLBACK: ${{ vars.DOMAIN_API }}
-        run: |
-          set -euo pipefail
-          CAND="${EXPLICIT_HEALTH:-}"
-          if [[ -z "${CAND// }" ]] && [[ -n "${DOMAIN_API_FALLBACK:-}" ]]; then
-            CAND="https://${DOMAIN_API_FALLBACK}/health"
-          fi
-          if [[ -z "${CAND// }" ]]; then
-            echo "error: set repository variable API_HEALTH_URL (full URL including /health) or DOMAIN_API (e.g. api.azem.cloud)." >&2
-            exit 1
-          fi
-          printf 'url=%s\n' "${CAND}" >> "$GITHUB_OUTPUT"
+          printf -v remote_cmd 'cd %q && DEPLOY_GIT_REF=%q REGISTRY=%q REGISTRY_SERVER=%q IMAGE_TAG=%q ./deploy.sh' \
+            '/var/www/pastane-app/app' \
+            "${DEPLOY_GIT_REF}" \
+            "${DEPLOY_REGISTRY}" \
+            "${DEPLOY_REGISTRY_SERVER}" \
+            "${DEPLOY_IMAGE_TAG}"
+          ssh -i ~/.ssh/pastane_deploy_key -p "${VPS_PORT}" "${VPS_USER_CONN}@${VPS_HOST_CONN}" "${remote_cmd}"
 
       - name: Post-deploy API health check (from GitHub runner)
         id: api_health
-        env:
-          API_HEALTH_URL: ${{ steps.resolve_health_url.outputs.url }}
         run: bash scripts/post-deploy-health.sh
 
       - name: Post-deploy production smoke (read-only)
         if: steps.api_health.outcome == 'success'
-        env:
-          API_HEALTH_URL: ${{ steps.resolve_health_url.outputs.url }}
         run: |
           set -euo pipefail
           PROD_API_URL="${API_HEALTH_URL%/health}"
           export PROD_API_URL
           bash scripts/post-deploy-smoke-prod.sh
 
-      - name: Rollback VPS app images on unhealthy API
+      - name: Roll back app images on unhealthy API
         if: ${{ always() && steps.vps_deploy.outcome == 'success' && steps.api_health.outcome == 'failure' }}
         run: |
           set -euo pipefail
           VPS_PORT="${VPS_PORT_CONN:-22}"
           echo "::warning::Rolling back containers using IMAGE_TAG from .pastane-deploy-previous-tag on the VPS."
-          ssh -i ~/.ssh/pastane_deploy_key -p "${VPS_PORT}" "${VPS_USER_CONN}@${VPS_HOST_CONN}" \
-            'cd /var/www/pastane-app/app && if [ ! -f .pastane-deploy-previous-tag ]; then echo "error: missing .pastane-deploy-previous-tag"; exit 1; fi && IMAGE_TAG="$(tr -d "\r\n" < .pastane-deploy-previous-tag)" && export IMAGE_TAG && bash scripts/rollback-prod.sh'
+          printf -v remote_cmd 'cd %q && if [ ! -f .pastane-deploy-previous-tag ]; then echo %q; exit 1; fi && PREVIOUS_TAG="$(tr -d %q < .pastane-deploy-previous-tag)" && REGISTRY=%q REGISTRY_SERVER=%q IMAGE_TAG="$PREVIOUS_TAG" bash scripts/rollback-prod.sh' \
+            '/var/www/pastane-app/app' \
+            'error: missing .pastane-deploy-previous-tag' \
+            '\r\n' \
+            "${DEPLOY_REGISTRY}" \
+            "${DEPLOY_REGISTRY_SERVER}"
+          ssh -i ~/.ssh/pastane_deploy_key -p "${VPS_PORT}" "${VPS_USER_CONN}@${VPS_HOST_CONN}" "${remote_cmd}"

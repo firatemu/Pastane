@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Push current branch to origin, ardından VPS üzerinde `./deploy.sh` çalıştırır (--remote-only).
-# Yerelde üretim Docker yığını çalıştırılmaz; üretim yalnızca VPS'te `./deploy.sh` ile.
+# Push current branch to origin, ardından GitHub Actions registry deploy akışını tetikler.
+# Yerelde üretim Docker yığını çalıştırılmaz; VPS yalnızca hazır image'ları pull eder.
 #
 # Defaults:
 # - Branch must be `main`. Override with ALLOW_VPS_PUSH_NON_MAIN=1.
 # - Runs `pnpm typecheck` before push unless `--skip-checks`.
-# - VPS `./deploy.sh` başarısından sonra bu makinede ek Docker adımı yoktur.
+# - Git push sonrası deploy GitHub Actions tarafında devam eder; bu makinede ek Docker adımı yoktur.
 # - VPS_*: scripts/deploy-vps.env.local (see deploy-vps.env.example).
 #
 # Usage:
-#   pnpm push:vps                              # VPS `./deploy.sh` (önerilen)
+#   pnpm push:vps                              # git push + GitHub Actions deploy (önerilen)
 #   pnpm push:vps:fast                         # typecheck atlanır
 #   ALLOW_VPS_PUSH_NON_MAIN=1 pnpm push:vps    # ...
 #
@@ -59,7 +59,7 @@ fi
 echo "Git push origin ${BRANCH} …"
 git push -u origin "$BRANCH"
 
-DEPLOY_ARGS=(--remote-only)
+DEPLOY_ARGS=(--push-only)
 [[ "$SKIP_CHECKS" -eq 1 ]] && DEPLOY_ARGS+=(--skip-checks)
 DEPLOY_ARGS+=("${ALLOW_DIRTY_FORWARD[@]}")
 

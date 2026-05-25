@@ -1,82 +1,79 @@
-# GitHub Actions — production deploy SSH
+# GitHub Actions -> VPS SSH
 
-Workflow: [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
+Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
 
-Trigger: push to `main`, or manual **workflow_dispatch**.
+Bu belge, GitHub Actions job'ının VPS'e nasıl bağlandığını ve hangi SSH ayarlarının zorunlu olduğunu özetler. Registry/image tarafı için ayrıca bkz. [github-actions-registry-deploy.md](./github-actions-registry-deploy.md).
 
-## Secrets ve Actions Variables (`vars`)
+## Gerekli Secrets / Variables
 
-Workflow **`secrets.NAME` sonra `vars.NAME`** sırasıyla doldurur (Repository **Secrets** veya **Variables** ile aynı isimleri kullanın).
+Workflow değerleri şu sırayla okur:
 
-- **Secrets:** `https://github.com/YOUR_OWNER/Pastane/settings/secrets/actions`
-- **Variables:** `https://github.com/YOUR_OWNER/Pastane/settings/variables/actions`
+1. `secrets.NAME`
+2. `vars.NAME`
 
-`VPS_HOST`, `VPS_USER`, isteğe bağlı `VPS_PORT` Variables’ta saklanabilir.
+Gerekli isimler:
 
-**`VPS_SSH_KEY` mutlaka Secret olmalı** — Variable olarak private key yazmayın; Actions’ta düzgün maskelenmez ve daha kolay sızdırılabilir.
+| Name          | Required | Notes                                |
+| ------------- | -------- | ------------------------------------ |
+| `VPS_HOST`    | Yes      | Public IP veya DNS                   |
+| `VPS_USER`    | Yes      | Genelde `deploy`                     |
+| `VPS_SSH_KEY` | Yes      | Private key block, **Secret** olmalı |
+| `VPS_PORT`    | No       | Varsayılan `22`                      |
 
-İş akışı **`environment: production`** ile çalışır (GitHub’daki **Deployments → Environments → `production`** altındaki Secrets/Variables dahil edilir). Repository seviyesindeki Secret/Variable’lar da hâlâ geçerlidir.
+`VPS_SSH_KEY` yalnızca **Secret** olarak saklanmalıdır; Variable içine private key koymayın.
 
-Ortamınızın adı `production` değilse → **Settings → Secrets and variables → Actions → Variables**: **`PASTANE_GITHUB_ENVIRONMENT`** = sizin ortam adınız (ör. `pastane-prod`).
+## GitHub Environment
 
-Ekranda sadece bir “Environment variables” listesi görüyorsanız, büyük olasılıkla **Environment** sekmesindesiniz; o zaman `VPS_HOST` / `VPS_USER` ve **`VPS_SSH_KEY` (Secret)** tam olarak **o ortama** eklenmiş olmalı. `VPS_SSH_KEY`’i yalnızca **Secret** olarak ekleyin, Variable değil.
+Workflow varsayılan olarak `environment: production` altında çalışır. Environment adınız farklıysa repository variable olarak:
 
-### Private anahtar paylaşıldıysa (sohbet, ticket, yanlış alan)
-
-1. Sunucuda eşlenen **public key** satırını `deploy` için `authorized_keys` içinden kaldırın.
-2. Yeni anahtar çifti oluşturun; yalnızca `.pub` sunucuya eklenir.
-3. GitHub’da **`VPS_SSH_KEY` repository secret’ını** yeni private key ile güncelleyin; Variable’daki anahtarı **silin**.
-
-## İsimler (büyük/küçük harf dahil)
-
-| İsim          | Zorunlu | Not                                      |
-|---------------|---------|------------------------------------------|
-| `VPS_HOST`    | Evet    | Örn. `76.13.14.43`                       |
-| `VPS_USER`    | Evet    | Örn. `deploy`                            |
-| `VPS_SSH_KEY` | Evet    | Private key blok (**Secret**)            |
-| `VPS_PORT`    | Hayır   | Yoksa workflow **22** kullanır           |
-
-Fork’ta iş akışı çalışıyorsa Secrets/Variables **fork repoda** tanımlanmalıdır.
-
-## Required naming (English reference)
-
-| Name          | Example     | Notes |
-|---------------|-------------|--------|
-| `VPS_HOST`    | `76.13.14.43` | Public IPv4 |
-| `VPS_USER`    | `deploy`    | UNIX user |
-| `VPS_PORT`    | `22`        | Optional |
-| `VPS_SSH_KEY` | PEM / OpenSSH private key | Repository **Secret**, not plaintext in repo |
-
-Eksik değişkenler **`Verify deploy`** adımında hata üretir; boş **`VPS_PORT`** eskiden **`Bad port ''`** verirdi (şimdi fallback 22).
-
-```bash
-ssh ... 'cd /var/www/pastane-app/app && ./deploy.sh'
+```text
+PASTANE_GITHUB_ENVIRONMENT=<your-environment-name>
 ```
 
-## VPS prerequisites before Actions succeed
+tanımlayın.
 
-1. Repo cloned at `/var/www/pastane-app/app` with `origin` pointing at GitHub.
-2. `./deploy.sh` executable; `deploy` user in `docker` group.
-3. `/var/www/pastane-app/app/.env.production` present (`chmod 600`), no `change_me` / `placeholder`.
-4. **Host nginx** terminating TLS and proxying to `127.0.0.1:3000/3001/3002/3003` (and MinIO `:9000` if `storage.*` is used).
+## VPS önkoşulları
 
-The workflow does **not** run lint/test in CI; validation is `./deploy.sh` on the VPS (compose config, build, migrate deploy).
+Sunucuda en az şu hazırlıklar tamamlanmış olmalı:
 
-## Local developer — push + SSH deploy
+1. Repo `/var/www/pastane-app/app` altında klonlu ve `origin` GitHub repo'sunu gösteriyor olmalı.
+2. `deploy` kullanıcısı `docker` grubunda olmalı.
+3. `./deploy.sh` executable olmalı.
+4. `.env.production` mevcut olmalı, placeholder içermemeli, `chmod 600` ile korunmalı olmalı.
+5. Host Nginx `127.0.0.1:3000/3001/3002/3003` (ve gerekiyorsa MinIO `127.0.0.1:9000`) üzerine proxy yapmalı.
 
-Script: [`scripts/deploy-vps.sh`](../scripts/deploy-vps.sh)
+## Workflow'un SSH ile çalıştırdığı komut
 
-1. One-time: copy [`scripts/deploy-vps.env.example`](../scripts/deploy-vps.env.example) to `scripts/deploy-vps.env.local`, set `VPS_HOST` (and optionally `VPS_USER`, `VPS_PORT`, `VPS_APP_DIR`, `VPS_SSH_IDENTITY`). Git ignores `scripts/deploy-vps.env.local` (see root `.gitignore`).
-2. Ensure your SSH key can log in as `deploy@VPS_HOST` (agent or `VPS_SSH_IDENTITY`).
-3. Run from repo root:
+Workflow VPS'te `./deploy.sh` çağırırken şu değişkenleri de geçirir:
+
+- `DEPLOY_GIT_REF`
+- `REGISTRY`
+- `REGISTRY_SERVER`
+- `IMAGE_TAG`
+
+Bu sayede VPS doğru commit'teki ops script'lerini kullanır ve doğru image tag'ini pull eder.
+
+## Anahtar rotasyonu
+
+Eğer private key yanlış yerde paylaşıldıysa:
+
+1. Sunucudaki eşleşen public key'i `authorized_keys` içinden kaldırın.
+2. Yeni anahtar çifti üretin.
+3. GitHub'daki `VPS_SSH_KEY` secret'ını yeni private key ile güncelleyin.
+
+## Yerel manuel SSH fallback
+
+Varsayılan deploy yolu artık `pnpm push:vps` -> GitHub Actions'tır. Yine de manuel SSH fallback için:
 
 ```bash
-./scripts/deploy-vps.sh --dry-run --skip-checks   # commands only
-./scripts/deploy-vps.sh                             # typecheck, push main, then remote ./deploy.sh
-pnpm push:vps                                       # same intent: push current main then VPS deploy.sh
-pnpm push:vps:fast                                  # skips typecheck
-./scripts/deploy-vps.sh --push-only               # only push (let GitHub Actions deploy)
-./scripts/deploy-vps.sh --remote-only             # only SSH deploy (after code is already on origin)
+cp scripts/deploy-vps.env.example scripts/deploy-vps.env.local
+chmod 600 scripts/deploy-vps.env.local
+./scripts/deploy-vps.sh --remote-only --dry-run
+./scripts/deploy-vps.sh --remote-only
 ```
 
-Uncommitted changes abort the script unless you pass `--allow-dirty`.
+İsterseniz local ortamdan şu değerleri de forward edebilirsiniz:
+
+```bash
+DEPLOY_GIT_REF=<sha-or-branch> IMAGE_TAG=<tag> REGISTRY=ghcr.io/<owner> ./scripts/deploy-vps.sh --remote-only
+```

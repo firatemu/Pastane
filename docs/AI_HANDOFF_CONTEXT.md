@@ -127,7 +127,7 @@ Completed for Phase 4 **plus pre-VPS coverage pass**:
 - Permission-aware sidebar/layout (**OR** semantics on nav items; route-level `requirePermission`)
 - Dashboard
 - Catalog operations: categories, allergens, products, images, options
-- **Content management:** **Homepage banners** (`/banners`, sidebar group *İçerik yönetimi*): list/thumbnail/schedule/reorder, create–edit with desktop+mobile uploads via catalog proxy to API, permission-gated
+- **Content management:** **Homepage banners** (`/banners`, sidebar group _İçerik yönetimi_): list/thumbnail/schedule/reorder, create–edit with desktop+mobile uploads via catalog proxy to API, permission-gated
 - **Campaigns** (`/campaigns`): list, create, edit, soft-delete — `campaigns.*`
 - **Loyalty admin** (`/loyalty`): settings history + new row, manual point adjust — `loyalty.manageSettings`
 - Stores, delivery zones, stock management
@@ -154,6 +154,7 @@ Completed (core + Phase 4 alignment; 2026-05 operational enrichment):
 - **API errors**: Turkish messages keyed off `error.code` where helpful (`DELIVERY_NOT_FOUND`, transition invalid, etc.)
 - **Courier API base URL:** `getCourierApiBaseUrl()` mirrors admin/web Docker-vs-host behavior; dev Compose sets `RUNNING_IN_DOCKER=1` on the `courier` service
 - **Backend (`GET /deliveries/my`)** genişletildi: `order.createdAt`, `deliveryType`, `grandTotal`, `_count.items`, son `payments.status` — detay sorgusuna `payments` özeti eklendi
+
 ### Customer Web
 
 Completed for Phase 6:
@@ -326,7 +327,7 @@ Critical no-optimistic-update policy:
 
 - API: https://api.azem.cloud
 - Supabase Studio: https://studio.azem.cloud
-- Deploy: `pnpm push:vps` from `main` → VPS `./deploy.sh`
+- Deploy: `pnpm push:vps` from `main` -> GitHub Actions build/push -> VPS `./deploy.sh` pull-only deploy
 - Data sync local → VPS: `scripts/sync-local-to-vps.sh`
 
 **Canonical docs:** see [`docs/README.md`](README.md).
@@ -537,7 +538,6 @@ Currently out of scope unless explicitly approved:
 
 **Product / engineering:** React Native + Expo mobile app remains **out of scope** until explicitly approved.
 
-
 ## 23. Customer Account Area
 
 Customer account coverage now includes:
@@ -559,6 +559,7 @@ Important constraints:
 - Backend ownership checks remain authoritative.
 - No fake account data should be shown.
 - Keep the UI simple until a separate design-polish task is approved.
+
 ## Public Storefront Coverage
 
 - Customer public storefront consumes backend-managed public data only; do not show fake campaigns, fake stock, or fake delivery promises as real data.
@@ -568,6 +569,7 @@ Important constraints:
 - Product detail pages remain backend-authoritative for catalog data and show gallery, allergens, option groups/options, approved reviews, canonical metadata, breadcrumb JSON-LD, and Product JSON-LD.
 - Public reviews must only come from approved review endpoints; pending/rejected/deleted reviews must not be shown.
 - Public campaign visibility must follow backend `ACTIVE` + valid date-window behavior from `GET /api/v1/campaigns/active`.
+
 ## Authenticated Customer Coverage
 
 - Customer authenticated pages must consume backend-owned data only; do not invent frontend-only balances, totals, payment states, delivery states, or review eligibility.

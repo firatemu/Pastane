@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Üretime göndermeden önce doctor + kontroller + opsiyonel e2e, ardından `pnpm push:vps` sarmalı.
+ * `pnpm push:vps` artık GitHub Actions registry deploy akışını tetikler.
  *
  * `pnpm deploy:prod [--skip-doctor] [--with-e2e] -- [push:vps seçenekleri]`
  */
@@ -35,7 +36,7 @@ async function main(): Promise<number> {
     if (er !== 0) return er;
   }
 
-  section('VPS gönderimi (scripts/push-vps.sh)');
+  section('Git push + GitHub Actions deploy (scripts/push-vps.sh)');
   const pus = await runBash('scripts/push-vps.sh', vpsArgv);
   return pus === 0 ? 0 : pus;
 }

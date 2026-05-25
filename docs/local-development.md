@@ -105,7 +105,7 @@ Yeni dev imajları `node` kullanıcısıyla çalışır; yine de eski root dosya
 
 ## Yerel = dev, üretim = yalnızca VPS
 
-**Önerilen model:** Yerelde kodu **`docker-compose.dev.yml`** (`pnpm docker:dev:up`) veya **`pnpm dev:web-apps`** ile geliştirin. **Çalışan üretim** yalnızca VPS üzerindedir (**`ssh ... ./deploy.sh`** veya **`pnpm push:vps`** sonrası sunucuda aynı betik).
+**Önerilen model:** Yerelde kodu **`docker-compose.dev.yml`** (`pnpm docker:dev:up`) veya **`pnpm dev:web-apps`** ile geliştirin. **Çalışan production** yalnızca VPS üzerindedir; varsayılan deploy yolu **`pnpm push:vps`** ile GitHub Actions registry deploy akışını tetiklemektir.
 
 Yerelde **prod Docker yığını tutulmaz**: `docker/docker-compose.prod.yml` ve **`Dockerfile.*.prod`** yalnızca **sunucuya klonlanan repoda** `deploy.sh` ile kullanılır. Eski **`pastane_*_prod`** konteynerleri hâlâ açıksa port çakışır; durdurmak için:
 
@@ -116,20 +116,20 @@ pnpm docker:dev:up    # vitrin localhost:3000 (dev), API varsayılan 3003
 
 ### `localhost:3000` = dev vitrin
 
-Üretikten sonra **pastane_*_prod** konteynerleri hâlâ çalışıyorsa `127.0.0.1:3000` yanlış yığını gösterebilir. **`pnpm docker:dev:up-exclusive`** önce `scripts/docker-stop-local-prod.sh` çalıştırır; ardından dev stack ile **`pastane_web_dev`** ayağa kalkar (**host’taki `apps/web`**).
+Üretikten sonra **pastane\_\*\_prod** konteynerleri hâlâ çalışıyorsa `127.0.0.1:3000` yanlış yığını gösterebilir. **`pnpm docker:dev:up-exclusive`** önce `scripts/docker-stop-local-prod.sh` çalıştırır; ardından dev stack ile **`pastane_web_dev`** ayağa kalkar (**host’taki `apps/web`**).
 
 **API `Bind for …:3003 failed`:** Yerelde **`pastane_api_prod`** `:3003` tutuyorsa **`bash scripts/docker-stop-local-prod.sh`** kullanın — veya **`HOST_DEV_API_PORT`** ile dev API’yi başka bir host portuna taşıyın (`.env` ve `PUBLIC_API_URL` / `NEXT_PUBLIC_API_URL` aynı porta uysun).
 
-### `pnpm push:vps` (VPS’ye deploy)
+### `pnpm push:vps` (GitHub Actions deploy tetikleme)
 
 Repo kökünde:
 
 ```bash
-pnpm push:vps           # typecheck → git push origin main → VPS ./deploy.sh
-pnpm push:vps:fast      # typecheck atlanır; yine VPS
+pnpm push:vps           # typecheck -> git push origin main -> GitHub Actions deploy
+pnpm push:vps:fast      # typecheck atlanır
 ```
 
-Kökte **`.env.production`** dosyanız varsa (çoğu geliştirici yerelde tutmayabilir) `validate-env` push öncesi koşulur; yoksa atlanır (VPS üzerindeki gerçek env etkilenmez).
+Kökte **`.env.production`** dosyanız varsa (çoğu geliştirici yerelde tutmayabilir) `validate-env` push öncesi koşulur; yoksa atlanır (VPS üzerindeki gerçek env etkilenmez). SSH ile doğrudan fallback deploy gerekirse `./scripts/deploy-vps.sh --remote-only` kullanın.
 
 **RSC / Client Manifest (`global-error.js`, `stringify`):** Host’ta ve container’da aynı `apps/*` klasörü bind mount edildiğinde, biri tarafından üretilmiş bozuk veya başka kökten gelen `.next` önbelleği bazen `Could not find the module ".../global-error.js" in the React Client Manifest` hatasına yol açar. Çözüm: ilgili uygulama için `rm -rf apps/<app>/.next` (veya yazılabilir `NEXT_DIST_DIR`) ve `next dev`’i yeniden başlatın. Repoda her Next uygulaması için `app/global-error.tsx` vardır; manifest kaydı stabilize edilir.
 
@@ -143,15 +143,16 @@ pnpm doctor
 
 **Ortam dosyaları** bölümünde **«Dev vs prod veri özeti»** satırına bakın. Aşağı durumlarda uyarı/`fail` verilir:
 
-| Durum | Anlamı |
-|--------|--------|
-| `.env` ile `.env.production` içinde **aynı `DATABASE_URL`** | Dev kod büyük ihtimalle **üretim veritabanını** kullanıyor — **riskli.** |
-| `DATABASE_URL` host’u `postgres`, `localhost`, `127.0.0.1`, `host.docker.internal` **dışında** | Büyük olasılıkla **uzak** DB (staging/canlı/anlık geri yükleme). Bilinçli değilsen iyileştirin. |
-| `.env` `NODE_ENV=production` | Yerel için genelde **`development`** olmalı. |
-| `PUBLIC_API_URL`, `NEXT_PUBLIC_API_URL`, `WEB_URL` içinde **`azem.cloud`** (tek-kiracı şablonu) | Tarayıcı **canlı ortama** gidebilir; docker dev için `localhost` tercih edin. |
+| Durum                                                                                           | Anlamı                                                                                          |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `.env` ile `.env.production` içinde **aynı `DATABASE_URL`**                                     | Dev kod büyük ihtimalle **üretim veritabanını** kullanıyor — **riskli.**                        |
+| `DATABASE_URL` host’u `postgres`, `localhost`, `127.0.0.1`, `host.docker.internal` **dışında**  | Büyük olasılıkla **uzak** DB (staging/canlı/anlık geri yükleme). Bilinçli değilsen iyileştirin. |
+| `.env` `NODE_ENV=production`                                                                    | Yerel için genelde **`development`** olmalı.                                                    |
+| `PUBLIC_API_URL`, `NEXT_PUBLIC_API_URL`, `WEB_URL` içinde **`azem.cloud`** (tek-kiracı şablonu) | Tarayıcı **canlı ortama** gidebilir; docker dev için `localhost` tercih edin.                   |
 
-**Mimari kısaltma:**  
-- **`docker-compose.dev.yml`**: Postgres/Redis volume’ları **`postgres_dev_*`**, `.env`; API/Web **tek `.env`** okur (`NODE_ENV` genelde development).  
+**Mimari kısaltma:**
+
+- **`docker-compose.dev.yml`**: Postgres/Redis volume’ları **`postgres_dev_*`**, `.env`; API/Web **tek `.env`** okur (`NODE_ENV` genelde development).
 - **`docker-compose.prod.yml`**: Ayrı volume’lar, **`.env.production`**.
 
 ## Docker ile tam yığın

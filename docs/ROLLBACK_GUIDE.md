@@ -1,38 +1,56 @@
-# Üretim geri adımı (IMAGE_TAG rollback)
+# Üretim geri adımı (`IMAGE_TAG` rollback)
 
-Gerçek senaryoda uygulamayı önceki sürüm imajına döndürmek için VPS kabuğundan **Docker Compose** kullanılıyor ve veritabanını otomatik olarak downgrade etmeye çalışmıyoruz. Bunun arkası bilinçli bir sınırlama; veri yüzünden zarar oluşabilecek durumlarda yedekleme ve restore prosedürlerine güvenilir.
+Rollback yalnızca uygulama image'larını önceki etikete döndürür; veritabanını otomatik olarak downgrade etmeye çalışmaz. Veri katmanı için gerekirse [backup-and-restore.md](./backup-and-restore.md) yolunu izleyin.
 
-Her başarılı `deploy.sh` akışından önce, mevcut `IMAGE_TAG` değeri **`.pastane-deploy-previous-tag`** dosyasına yazılarak gerektiğinde bir önceki sürüm etiketi el altında kalır (**VPS** üzerindeki depo köküdür).
+## Tag dosyaları
+
+Production VPS üzerinde:
+
+- `.pastane-deploy-previous-tag`: bir sonraki deploy başarısız olursa geri dönülecek tag
+- `.pastane-deploy-current-tag`: son başarılı deploy tag'i
+
+`deploy.sh` yeni deploy başlamadan önce mevcut çalışan `api` image tag'ini `previous` dosyasına yazar. Başarılı deploy tamamlanınca da yeni tag `current` dosyasına yazılır.
+
+## Rollback nasıl çalışır
+
+`scripts/rollback-prod.sh` şu sırayı izler:
+
+1. `IMAGE_TAG` değerini alır
+2. Registry login yapar (gerekliyse)
+3. `api`, `web`, `admin`, `courier` image'larını o tag için `pull` eder
+4. `docker compose up -d --no-build` ile servisleri yeniden yaratır
+5. Loopback health check çalıştırır
 
 ## Yerel araçlar
 
-Komutların hepsi `scripts/deploy-vps.env.local` tanımlandığında VPS’e SSH açarak `rollback-prod.sh` içindeki mantığı kullanır.
+Komutların hepsi `scripts/deploy-vps.env.local` tanımlandığında VPS’e SSH açarak rollback mantığını uzaktan çalıştırır.
 
-| Komut | Ne yapılır |
-|--------|-------------|
-| `pnpm deploy:rollback --from-previous-tag` | `.pastane-deploy-previous-tag` dosyasında kayıtlı etiketi okuyup Compose’da servisleri o imaja geri oluşturur. |
-| `IMAGE_TAG=v0.9.0 pnpm deploy:rollback` | Etiketi kendiniz verirseniz dosya yerine doğrudan o değer kullanılır (iki seçenek aynı anda verilirse **ortamdaki IMAGE_TAG öncelenir**, dosya tamamen görmezden gelinir — mesaj basılır). |
-| `--skip-health` | Rollback başarısından sonra çalıştırılmak istenen yerel `pnpm health:check` adımını atlar. |
-
-`rollback-prod.sh` betiği `docker/docker-compose.prod.yml` üzerinde `api`, `web`, `admin`, `courier` servislerini yeniden yaratır; cutover sonrası deploy öncesi **supabase-db** yığınının ayakta olduğunu doğrular.
+| Komut                                      | Ne yapılır                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------- |
+| `pnpm deploy:rollback --from-previous-tag` | VPS’teki `.pastane-deploy-previous-tag` dosyasındaki etiketi kullanır. |
+| `IMAGE_TAG=<tag> pnpm deploy:rollback`     | Etiketi siz verirsiniz; dosya okunmaz.                                 |
+| `--skip-health`                            | Yerel `pnpm health:check` adımını atlar.                               |
 
 ## Veritabanı ve uyarılar
 
-- Prisma’nın **`migrate rollback` özelliği** üret akışına bağlanmıyordur — veri yüzünden zarar çıktığında klasik Postgres dump/restore yolunu izlemeniz gerekebilir (`docs/backup-and-restore.md`).
-- **Veritabanı:** production PostgreSQL yalnızca Supabase stack (`supabase-db`) üzerindedir; geri alma için yedek dump restore kullanın.
-- Mobil veya masaüstü istemcisinin eski sürümle uyumlu olduğundan da emin olun; yalın container geriye alınması bile yeterince olası değildir.
-- Yerel klasörümüz içinde oluşabilecek `./.pastane-deploy-previous-tag` dosya adı için `.gitignore` mevcuttur; **geri alma için doğru lokasyon VPS’tir.**
+- Prisma’nın `migrate rollback` özelliği production deploy akışına bağlı değildir.
+- Production PostgreSQL yalnızca Supabase stack (`supabase-db`) üzerindedir; veri geri alımı için dump/restore gerekir.
+- Eski image'a dönerken istemci uyumluluğunu da ayrıca doğrulayın.
 
 ## Deploy sonrası doğrulama
 
-```
+```bash
 pnpm health:check
 ```
 
-`.env.production` içinde HTTPS URL adresleri tanımlı olması ya da doğrudan `API_HEALTH_URL` ortam değişkenini vermeniz çoğu zaman yeterlidir.
+İhtiyaç halinde:
+
+```bash
+PROD_API_URL=https://api.azem.cloud bash scripts/post-deploy-smoke-prod.sh
+```
 
 ## Diğer belgeler
 
 - [Tam dağıtım akışı](./DEPLOYMENT_WORKFLOW.md)
+- [Registry deploy rehberi](./github-actions-registry-deploy.md)
 - [Felakete hazır yedekleme](./backup-and-restore.md)
-- [Örnek VPS yazısı](./azem-cloud-vps-deployment.md)

@@ -26,16 +26,16 @@ flowchart LR
 
 **Two Docker Compose projects on the VPS:**
 
-| Project | Compose file | Services |
-|---------|--------------|----------|
-| `supabase-prod` | [`docker/supabase/`](../docker/supabase/) + Pastane overrides | Full Supabase stack (db, studio, kong, …) |
-| `pastane-prod` | [`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml) | api, web, admin, courier, redis, minio |
+| Project         | Compose file                                                          | Services                                  |
+| --------------- | --------------------------------------------------------------------- | ----------------------------------------- |
+| `supabase-prod` | [`docker/supabase/`](../docker/supabase/) + Pastane overrides         | Full Supabase stack (db, studio, kong, …) |
+| `pastane-prod`  | [`docker/docker-compose.prod.yml`](../docker/docker-compose.prod.yml) | api, web, admin, courier, redis, minio    |
 
 - **PostgreSQL (production):** `supabase-db` on network `pastane_supabase` — **no** host port publish.
 - **Studio:** https://studio.azem.cloud → Supabase Studio on `127.0.0.1:54323` (Kong / Supavisor not exposed on host ports).
 - **Compose layers:** `docker/supabase/docker-compose.yml` + `docker-compose.pg17.yml` + `docker-compose.pastane.prod.yml`.
 
-Deploy helper: [`deploy.sh`](../deploy.sh) — ensures **supabase-prod** full stack, then app build/up, migrate, health + smoke.
+Deploy helper: [`deploy.sh`](../deploy.sh) — ensures **supabase-prod** full stack, then app pull/up (`--no-build`), migrate, health + smoke.
 
 Shared compose helpers: [`scripts/lib/compose-prod.sh`](../scripts/lib/compose-prod.sh).
 
@@ -45,16 +45,16 @@ Shared compose helpers: [`scripts/lib/compose-prod.sh`](../scripts/lib/compose-p
 
 ## Routine deploy on VPS
 
-From your dev machine (**`main`**, temiz çalışma ağacı, `scripts/deploy-vps.env.local` içinde **`VPS_HOST`**):
+Önerilen günlük akış, geliştirici makinesinden yalnızca git push yapmaktır. GitHub Actions image build/push ve VPS deploy adımlarını tamamlar.
 
 ```bash
-pnpm push:vps           # typecheck → git push → SSH ile sunucuda ./deploy.sh
-pnpm push:vps:fast      # typecheck atlanır (önce `pnpm typecheck` çalıştırdıysanız)
+pnpm push:vps           # typecheck -> git push -> GitHub Actions deploy
+pnpm push:vps:fast      # typecheck atlanır
 ```
 
-Şablon: [`scripts/deploy-vps.env.example`](../scripts/deploy-vps.env.example).
+Registry tabanlı ayrıntılar: [github-actions-registry-deploy.md](./github-actions-registry-deploy.md)
 
-Sunucuda doğrudan:
+Sunucuda doğrudan manuel fallback:
 
 ```bash
 cd /var/www/pastane-app/app
@@ -106,14 +106,14 @@ URL: https://studio.azem.cloud — login via `DASHBOARD_USERNAME` / `DASHBOARD_P
 
 ### Supabase env (`.env.production`)
 
-| Variable | Purpose |
-|----------|---------|
-| `JWT_SECRET` | Pastane API only — do not reuse for Supabase |
-| `SUPABASE_JWT_SECRET` | Supabase stack internal JWT |
-| `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Supabase API keys (HS256) |
-| `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` | Studio login |
-| `SUPABASE_PUBLIC_URL` | `https://studio.azem.cloud` |
-| `POSTGRES_*` / `DATABASE_URL` | Prisma → `pastane_db` @ `supabase-db` |
+| Variable                                          | Purpose                                      |
+| ------------------------------------------------- | -------------------------------------------- |
+| `JWT_SECRET`                                      | Pastane API only — do not reuse for Supabase |
+| `SUPABASE_JWT_SECRET`                             | Supabase stack internal JWT                  |
+| `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Supabase API keys (HS256)                    |
+| `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`       | Studio login                                 |
+| `SUPABASE_PUBLIC_URL`                             | `https://studio.azem.cloud`                  |
+| `POSTGRES_*` / `DATABASE_URL`                     | Prisma → `pastane_db` @ `supabase-db`        |
 
 ```bash
 bash scripts/generate-supabase-secrets.sh
@@ -157,7 +157,7 @@ See [`scripts/backup-prod.sh`](../scripts/backup-prod.sh), [`docs/backup-and-res
 
 ## Rollback
 
-- **App images:** [`docs/ROLLBACK_GUIDE.md`](ROLLBACK_GUIDE.md) — `IMAGE_TAG` via `scripts/rollback-prod.sh`
+- **App images:** [`docs/ROLLBACK_GUIDE.md`](ROLLBACK_GUIDE.md) — registry pull + `IMAGE_TAG` via `scripts/rollback-prod.sh`
 - **Database:** [`docs/backup-and-restore.md`](backup-and-restore.md) — dump restore via `scripts/restore-prod.sh`
 
 ## Post-deploy checklist
