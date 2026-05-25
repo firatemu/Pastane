@@ -10,6 +10,10 @@ describe('iyzico-text.util', () => {
     expect(sanitizeIyzicoText('Mağaza — Adres')).toBe('Mağaza - Adres');
   });
 
+  it('strips emoji and normalizes smart punctuation', () => {
+    expect(sanitizeIyzicoText('Yenişehir 📍 “Ev” …')).toBe('Yenişehir "Ev" ...');
+  });
+
   it('formats money with two decimals', () => {
     expect(formatIyzicoMoney(new Decimal('395'))).toBe('395.00');
   });

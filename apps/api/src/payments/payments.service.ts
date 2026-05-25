@@ -185,6 +185,10 @@ export class PaymentsService implements OnModuleInit {
     return digits.length ? `+${digits}` : '+905551234567';
   }
 
+  private resolveCheckoutChannel(idempotencyKey: string): 'web' | 'mobile' {
+    return idempotencyKey.includes('iyzico-mobile') ? 'mobile' : 'web';
+  }
+
   private buildIyzicoBuyerAndAddresses(order: Order & { user: { id: string; firstName: string; lastName: string; phone: string; email: string | null }; pickupStore: { name: string; city: string; district: string; address: string } | null }) {
     const contactName = `${order.user.firstName} ${order.user.lastName}`.trim() || 'Müşteri';
     const country = 'Turkey';
@@ -392,9 +396,8 @@ export class PaymentsService implements OnModuleInit {
   }
 
   async initiateCheckoutForm(userId: string, orderId: string, idempotencyKey: string): Promise<{ checkoutFormContent: string }> {
-    // Mobil ve web aynı iyzico sandbox hesabını kullanır; tek SDK istemcisi tutarlılık sağlar.
-    const iyzicoChannel = 'web' as const;
-    const clientSurface = idempotencyKey.includes('iyzico-mobile') ? 'mobile' : 'web';
+    const iyzicoChannel = this.resolveCheckoutChannel(idempotencyKey);
+    const clientSurface = iyzicoChannel;
     // #region agent log
     agentDebugLog(
       'payments.service.ts:initiateCheckoutForm',
@@ -535,7 +538,8 @@ export class PaymentsService implements OnModuleInit {
     if (!pay0) return failWeb();
 
     const mobScheme = (this.config.get<string>('MOBILE_PAYMENT_SCHEME') ?? process.env.MOBILE_PAYMENT_SCHEME ?? 'pastahane').replace(/\/$/, '');
-    const isMobileCheckout = pay0.idempotencyKey.includes('iyzico-mobile');
+    const checkoutChannel = this.resolveCheckoutChannel(pay0.idempotencyKey);
+    const isMobileCheckout = checkoutChannel === 'mobile';
     const mobileResult = (orderId: string, outcome: 'success' | 'failure'): string =>
       `${mobScheme}://payment-result?${new URLSearchParams({ orderId, status: outcome }).toString()}`;
     const failRedirect = (orderId?: string) =>
@@ -556,7 +560,7 @@ export class PaymentsService implements OnModuleInit {
           token,
           conversationId: pay0.conversationId,
         },
-        isMobileCheckout ? 'mobile' : 'web',
+        checkoutChannel,
       );
     } catch {
       return failRedirect(pay0.orderId);

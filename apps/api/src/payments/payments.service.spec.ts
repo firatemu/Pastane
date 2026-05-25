@@ -338,6 +338,103 @@ describe('PaymentsService initiateCheckoutForm', () => {
     expect(provider.checkoutFormInitialize).not.toHaveBeenCalled();
   });
 
+  it('uses the mobile iyzico channel for mobile checkout init requests', async () => {
+    const config = { get: jest.fn() } as unknown as ConfigService;
+    const paymentCreate = jest.fn().mockResolvedValue({ id: 'pay-mobile-new' });
+    const checkoutFormInitialize = jest.fn().mockImplementation(async (_request, channel: 'web' | 'mobile') => {
+      if (channel !== 'mobile') {
+        return {
+          status: 'failure',
+          errorMessage: 'wrong channel',
+        };
+      }
+
+      return {
+        status: 'success',
+        token: 'tok-mobile',
+        checkoutFormContent: checkoutForm,
+        conversationId: 'conv-mobile',
+      };
+    });
+    const prismaMock = {
+      order: { findFirst: jest.fn().mockResolvedValue(payableOrder()) },
+      payment: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: paymentCreate,
+      },
+    };
+    const prisma = prismaMock as unknown as PrismaService;
+    const provider = {
+      assertCheckoutConfigured: jest.fn(),
+      checkoutFormInitialize,
+    };
+
+    const service = new PaymentsService(
+      config,
+      prisma,
+      new OrderStatusService(),
+      provider as never,
+      { schedulePaymentTimeout: jest.fn() } as never,
+      { log: jest.fn() } as never,
+      { createOrderStatusNotification: jest.fn() } as never,
+    );
+
+    const result = await service.initiateCheckoutForm('user-1', 'order-1', 'order-1:iyzico-mobile');
+    expect(result.checkoutFormContent).toBe(checkoutForm);
+    expect(provider.assertCheckoutConfigured).toHaveBeenCalledWith('mobile');
+    expect(checkoutFormInitialize).toHaveBeenCalledWith(expect.anything(), 'mobile');
+    expect(paymentCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ idempotencyKey: 'order-1:iyzico-mobile' }),
+      }),
+    );
+  });
+
+  it('keeps using the web iyzico channel for web checkout init requests', async () => {
+    const config = { get: jest.fn() } as unknown as ConfigService;
+    const paymentCreate = jest.fn().mockResolvedValue({ id: 'pay-web-new' });
+    const checkoutFormInitialize = jest.fn().mockResolvedValue({
+      status: 'success',
+      token: 'tok-web',
+      checkoutFormContent: checkoutForm,
+      conversationId: 'conv-web',
+    });
+    const prismaMock = {
+      order: { findFirst: jest.fn().mockResolvedValue(payableOrder()) },
+      payment: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: paymentCreate,
+      },
+    };
+    const prisma = prismaMock as unknown as PrismaService;
+    const provider = {
+      assertCheckoutConfigured: jest.fn(),
+      checkoutFormInitialize,
+    };
+
+    const service = new PaymentsService(
+      config,
+      prisma,
+      new OrderStatusService(),
+      provider as never,
+      { schedulePaymentTimeout: jest.fn() } as never,
+      { log: jest.fn() } as never,
+      { createOrderStatusNotification: jest.fn() } as never,
+    );
+
+    const result = await service.initiateCheckoutForm('user-1', 'order-1', 'order-1:iyzico-web');
+    expect(result.checkoutFormContent).toBe(checkoutForm);
+    expect(provider.assertCheckoutConfigured).toHaveBeenCalledWith('web');
+    expect(checkoutFormInitialize).toHaveBeenCalledWith(expect.anything(), 'web');
+    expect(paymentCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ idempotencyKey: 'order-1:iyzico-web' }),
+      }),
+    );
+  });
+
   it('supersedes stale same-key payment without form and creates a fresh checkout row', async () => {
     const config = { get: jest.fn() } as unknown as ConfigService;
     const paymentUpdate = jest.fn().mockResolvedValue({});
