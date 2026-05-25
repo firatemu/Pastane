@@ -324,7 +324,7 @@ export default function CheckoutScreen(): React.JSX.Element {
         }),
       }).catch(() => undefined);
       // #endregion
-      const mapped = mapUnknownErrorToTurkish('customer', e, 'Ödeme başlatılamadı.');
+      const mapped = e instanceof ApiRequestError ? e.message : mapUnknownErrorToTurkish('customer', e, 'Ödeme başlatılamadı.');
       const showCode = process.env.EXPO_PUBLIC_CHECKOUT_DEBUG === '1';
       setError(showCode && errCode ? `${mapped} (${errCode})` : mapped);
     } finally {
@@ -665,10 +665,10 @@ export default function CheckoutScreen(): React.JSX.Element {
               onLoadStart={() => setWebViewLoading(true)}
               onNavigationStateChange={onWebViewNav}
               onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
-              originWhitelist={['https://*', 'pastahane://*']}
+              originWhitelist={['*']}
               mixedContentMode="never"
               setSupportMultipleWindows={false}
-              source={{ html: paymentHtml }}
+              source={{ html: paymentHtml, baseUrl: getWebBaseUrl() }}
               style={{ flex: 1 }}
             />
           ) : null}
