@@ -410,6 +410,16 @@ export default function CheckoutScreen(): React.JSX.Element {
       return;
     }
 
+    // iyzico callback URL'ini yakala (API base URL'e yönlenme)
+    const apiBase = getApiBaseUrl();
+    if (url.startsWith(apiBase) && url.includes('/iyzico/form-return')) {
+      if (pendingOrder?.id) {
+        setCheckoutHtml(null);
+        void checkPaymentStatus(pendingOrder.id);
+      }
+      return;
+    }
+
     const webBase = getWebBaseUrl();
     if (!url.startsWith('https://') && !url.startsWith(webBase)) return;
     if (!url.startsWith(webBase) && !url.includes('/odeme')) return;
@@ -437,6 +447,7 @@ export default function CheckoutScreen(): React.JSX.Element {
       handlePaymentRedirectUrl(url);
       return false;
     }
+    // iyzico callback URL'ine yönlenmeye izin ver (onNavigationStateChange yakalayacak)
     return true;
   }
 
@@ -461,7 +472,7 @@ export default function CheckoutScreen(): React.JSX.Element {
   }, [checkoutHtml, closePaymentModal, webViewCanGoBack]);
 
   const paymentHtml = checkoutHtml
-    ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" /></head><body>${checkoutHtml}</body></html>`
+    ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" /></head><body><div id="iyzipay-checkout-form" class="responsive"></div>${checkoutHtml}</body></html>`
     : null;
 
   if (!ready || initialLoading) {
