@@ -117,14 +117,23 @@ async function ensureBucket() {
 }
 
 async function uploadImage(slug, fileName) {
-  const localPath = path.join(process.cwd(), 'images', 'products', fileName);
+  let actualFileName = fileName;
+  let localPath = path.join(process.cwd(), 'images', 'products', actualFileName);
+  
   if (!existsSync(localPath)) {
-    console.warn(`  File not found: ${localPath}`);
-    return null;
+    const pngName = fileName.replace(/\.jpg$/, '.png');
+    const pngPath = path.join(process.cwd(), 'images', 'products', pngName);
+    if (existsSync(pngPath)) {
+      actualFileName = pngName;
+      localPath = pngPath;
+    } else {
+      console.warn(`  File not found: ${localPath}`);
+      return null;
+    }
   }
 
   const fileBuffer = readFileSync(localPath);
-  const extension = path.extname(fileName);
+  const extension = path.extname(actualFileName);
   const objectKey = `products/${slug}${extension}`;
 
   try {
