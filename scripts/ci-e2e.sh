@@ -106,10 +106,39 @@ else
 fi
 
 echo "[e2e] waiting for HTTP readiness"
-bash scripts/wait-for-http.sh "http://127.0.0.1:3003/health" 180
-bash scripts/wait-for-http.sh "http://127.0.0.1:3000/" 180
-bash scripts/wait-for-http.sh "http://127.0.0.1:3001/login" 180
-bash scripts/wait-for-http.sh "http://127.0.0.1:3002/login" 180
+if [[ "${CI_MODE}" -eq 1 ]]; then
+  # In CI prefer container-side readiness checks (runner networking can be flaky).
+  wait_for_node_fetch() {
+    local service="${1:?service required}"
+    local url="${2:?url required}"
+    local attempt=1
+    local max_attempts=90
+    while (( attempt <= max_attempts )); do
+      if "${COMPOSE[@]}" exec -T "${service}" node -e "
+        fetch('${url}', { redirect: 'follow' })
+          .then(r => { if (r.ok) process.exit(0); console.error('HTTP', r.status); process.exit(1); })
+          .catch(err => { console.error(String(err)); process.exit(1); });
+      " >/dev/null 2>&1; then
+        echo \"healthy(${service}): ${url}\"
+        return 0
+      fi
+      sleep 2
+      attempt=$((attempt + 1))
+    done
+    echo \"::error::timeout waiting for ${service} ${url}\" >&2
+    return 1
+  }
+
+  wait_for_node_fetch api "http://localhost:3003/health"
+  wait_for_node_fetch web "http://localhost:3000/"
+  wait_for_node_fetch admin "http://localhost:3001/login"
+  wait_for_node_fetch courier "http://localhost:3002/login"
+else
+  bash scripts/wait-for-http.sh "http://127.0.0.1:3003/health" 180
+  bash scripts/wait-for-http.sh "http://127.0.0.1:3000/" 180
+  bash scripts/wait-for-http.sh "http://127.0.0.1:3001/login" 180
+  bash scripts/wait-for-http.sh "http://127.0.0.1:3002/login" 180
+fi
 
 if [[ "${CI_MODE}" -eq 0 ]]; then
   echo "[e2e] prisma migrate deploy (api container)"
