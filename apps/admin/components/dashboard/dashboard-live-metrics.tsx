@@ -81,14 +81,14 @@ export function DashboardLiveMetrics(): JSX.Element {
   }, []);
 
   return (
-    <div className="flex flex-col gap-stack-md">
+    <div className="flex flex-col gap-4">
       <PollingNote seconds={20} />
       {error ? (
         <ErrorState message={error} />
       ) : !data ? (
         <LoadingState label="Operasyon özeti güncelleniyor…" />
       ) : (
-        <div className="grid grid-cols-1 gap-gutter md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
           {TILES.map((cfg) => {
             const numeric = Number(data[cfg.key] ?? 0);
             const sub = cfg.subtitle(numeric);
@@ -106,9 +106,9 @@ export function DashboardLiveMetrics(): JSX.Element {
             };
 
             return sub !== undefined ? (
-              <BakeryStatCard key={cfg.key} {...cardProps} subtitle={sub} />
+              <BakeryStatCard key={cfg.key} {...cardProps} size="compact" subtitle={sub} />
             ) : (
-              <BakeryStatCard key={cfg.key} {...cardProps} />
+              <BakeryStatCard key={cfg.key} {...cardProps} size="compact" />
             );
           })}
         </div>

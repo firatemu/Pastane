@@ -13,7 +13,7 @@ export default function GlobalError({
 }>): React.JSX.Element {
   return (
     <html lang="tr">
-      <body style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem', maxWidth: '32rem' }}>
+      <body style={{ fontFamily: 'DM Sans, Arial, sans-serif', padding: '2rem', maxWidth: '32rem' }}>
         <h1 style={{ fontSize: '1.25rem' }}>Bir şeyler ters gitti</h1>
         <p style={{ color: '#444', marginTop: '1rem' }}>{error.message || 'Beklenmeyen hata.'}</p>
         {error.digest ? (

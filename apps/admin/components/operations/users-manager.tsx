@@ -6,22 +6,20 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { adminFetch } from '../../lib/api/catalog';
 import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-errors';
-import { can } from '../../lib/permissions/can';
 import { adminUserUpdateSchema } from '../../lib/operations/schemas';
 import type { AdminRoleRow, AdminUserRow } from '../../lib/operations/types';
+import { can } from '../../lib/permissions/can';
 import { ErrorState, LoadingState } from '../shared/async-state';
-import {
-  adminInputClass,
-  adminSelectClass,
-} from '../shared/admin-form-controls';
-import { UsersStatsBar } from './users-stats-bar';
-import { UsersList } from './users-list';
+import { adminInputClass, adminSelectClass } from '../shared/admin-form-controls';
+import { ConfirmSoftDeleteDialog } from './confirm-soft-delete-dialog';
 import { UserDetailModal } from './user-detail-modal';
 import { UserFormSheet } from './user-form-sheet';
+import { UsersList } from './users-list';
+import { UsersStatsBar } from './users-stats-bar';
 
 type UserForm = z.infer<typeof adminUserUpdateSchema>;
 
-const ROLE_OPTIONS = ['ADMIN', 'ORDER_OPERATOR', 'PRODUCT_MANAGER', 'COURIER', 'CUSTOMER'] as const;
+const ROLE_OPTIONS = ['ADMIN', 'ORDER_OPERATOR', 'PRODUCT_MANAGER', 'COURIER'] as const;
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Sistem Yöneticisi',
@@ -45,14 +43,14 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
   const [roles, setRoles] = useState<AdminRoleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Design element state matching ProductsManager
   const [selected, setSelected] = useState<AdminUserRow | null>(null);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const form = useForm<UserForm>({
     resolver: zodResolver(adminUserUpdateSchema),
@@ -60,15 +58,16 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
   });
 
   const canEdit = can(permissions, ['users.update']);
+  const canDelete = can(permissions, ['users.delete']);
 
   async function load(): Promise<void> {
     try {
       setError(null);
-      const data = await adminFetch<AdminUserRow[]>('/users');
+      const data = await adminFetch<AdminUserRow[]>('/users?scope=staff');
       setRows(data);
-      setSelected((prev) => (prev ? data.find((u) => u.id === prev.id) ?? null : null));
-    } catch (e) {
-      setError(adminMessageFromUnknownError(e, 'Kullanıcılar yüklenemedi.'));
+      setSelected((prev) => (prev ? data.find((user) => user.id === prev.id) ?? null : null));
+    } catch (caught) {
+      setError(adminMessageFromUnknownError(caught, 'Personel hesapları yüklenemedi.'));
     } finally {
       setLoading(false);
     }
@@ -89,19 +88,19 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
     void loadRoles();
   }, [permissions]);
 
-  // Filtering logic matching ProductsManager useMemo
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
     return rows.filter((user) => {
       if (roleFilter && user.role.name !== roleFilter) return false;
       if (statusFilter && user.status !== statusFilter) return false;
-      if (!q) return true;
+      if (!query) return true;
+
       return (
-        user.firstName.toLowerCase().includes(q) ||
-        user.lastName.toLowerCase().includes(q) ||
-        (user.email?.toLowerCase().includes(q) ?? false) ||
-        user.phone.includes(q) ||
-        roleLabel(user.role.name).toLowerCase().includes(q)
+        user.firstName.toLowerCase().includes(query) ||
+        user.lastName.toLowerCase().includes(query) ||
+        (user.email?.toLowerCase().includes(query) ?? false) ||
+        user.phone.includes(query) ||
+        roleLabel(user.role.name).toLowerCase().includes(query)
       );
     });
   }, [rows, search, roleFilter, statusFilter]);
@@ -113,7 +112,8 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
       const body: Record<string, unknown> = {};
       if (values.firstName !== undefined) body.firstName = values.firstName;
       if (values.lastName !== undefined) body.lastName = values.lastName;
-      if (values.email !== undefined && values.email !== '') body.email = values.email;
+      if (values.phone !== undefined) body.phone = values.phone;
+      if (values.email !== undefined) body.email = values.email;
       if (values.status !== undefined) body.status = values.status;
       if (values.roleName !== undefined) body.roleName = values.roleName;
 
@@ -127,8 +127,8 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
       setFormOpen(false);
       form.reset({});
       await load();
-    } catch (e) {
-      setError(adminMessageFromUnknownError(e, 'Kullanıcı güncellenemedi.'));
+    } catch (caught) {
+      setError(adminMessageFromUnknownError(caught, 'Personel hesabı güncellenemedi.'));
     }
   }
 
@@ -141,8 +141,26 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
         body: JSON.stringify({ status: newStatus }),
       });
       await load();
-    } catch (e) {
-      setError(adminMessageFromUnknownError(e, 'Kullanıcı durumu güncellenemedi.'));
+    } catch (caught) {
+      setError(adminMessageFromUnknownError(caught, 'Personel durumu güncellenemedi.'));
+    }
+  }
+
+  async function deleteUser(): Promise<void> {
+    if (!deleteTarget) return;
+    try {
+      setDeleteBusy(true);
+      setError(null);
+      await adminFetch(`/users/${deleteTarget.id}`, { method: 'DELETE' });
+      setSelected((prev) => (prev?.id === deleteTarget.id ? null : prev));
+      setEditing((prev) => (prev?.id === deleteTarget.id ? null : prev));
+      setDeleteTarget(null);
+      setFormOpen(false);
+      await load();
+    } catch (caught) {
+      setError(adminMessageFromUnknownError(caught, 'Personel hesabı kaldırılamadı.'));
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -151,6 +169,7 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
     form.reset({
       firstName: user.firstName,
       lastName: user.lastName,
+      phone: user.phone,
       email: user.email ?? '',
       status: user.status as 'ACTIVE' | 'INACTIVE' | 'BANNED',
       roleName: user.role.name as UserForm['roleName'],
@@ -165,7 +184,10 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
   }
 
   const roleOptions = useMemo(() => {
-    const roleNames = roles.length ? roles.map((role) => role.name) : [...ROLE_OPTIONS];
+    const roleNames = roles.length
+      ? roles.map((role) => role.name).filter((roleName) => roleName !== 'CUSTOMER')
+      : [...ROLE_OPTIONS];
+
     return roleNames
       .filter((roleName, index, self) => self.indexOf(roleName) === index)
       .sort((a, b) => roleSortIndex(a) - roleSortIndex(b));
@@ -174,24 +196,25 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
   return (
     <section className="space-y-stack-md">
       <header>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface">Kullanıcılar</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface">
+          Personel ve Sistem Hesapları
+        </h1>
         <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-on-surface-variant">
-          Sistem kullanıcıları ve müşteri hesaplarını arayın, filtreleyin ve detay panelinden profil bilgileri ile yetkilerini yönetin.
+          Operasyon ekibini, sistem yöneticilerini ve kurye hesaplarını yönetin. Profil, rol, erişim ve güvenli
+          soft delete işlemleri bu çalışma alanından yürütülür.
         </p>
       </header>
 
       {loading ? (
-        <LoadingState label="Kullanıcılar yükleniyor…" />
+        <LoadingState label="Personel hesapları yükleniyor…" />
       ) : error && rows.length === 0 ? (
         <ErrorState message={error} />
       ) : (
         <div className="space-y-stack-md">
           {error ? <ErrorState message={error} /> : null}
 
-          {/* New UsersStatsBar matching ProductsStatsBar */}
           <UsersStatsBar users={rows} />
 
-          {/* Search and filter row matching ProductsManager exactly */}
           <div className="flex flex-col gap-3 rounded-card border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-bakery lg:flex-row lg:items-end lg:justify-between">
             <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="block space-y-1.5 text-sm font-medium text-on-surface">
@@ -202,15 +225,15 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
                   </span>
                   <input
                     className={`${adminInputClass} pl-10`}
-                    placeholder="Ad, soyad, e-posta veya telefon…"
+                    placeholder="Ad, soyad, telefon veya rol…"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(event) => setSearch(event.target.value)}
                   />
                 </div>
               </label>
               <label className="block space-y-1.5 text-sm font-medium text-on-surface">
                 <span className="text-on-surface-variant">Rol</span>
-                <select className={adminSelectClass} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+                <select className={adminSelectClass} value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
                   <option value="">Tümü</option>
                   {roleOptions.map((roleName) => (
                     <option key={roleName} value={roleName}>
@@ -221,7 +244,7 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
               </label>
               <label className="block space-y-1.5 text-sm font-medium text-on-surface">
                 <span className="text-on-surface-variant">Durum</span>
-                <select className={adminSelectClass} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <select className={adminSelectClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="">Tümü</option>
                   <option value="ACTIVE">Aktif</option>
                   <option value="INACTIVE">Pasif</option>
@@ -233,23 +256,23 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
 
           <p className="text-sm text-on-surface-variant">
             {filtered.length === rows.length
-              ? `${rows.length} kullanıcı listeleniyor`
-              : `${filtered.length} / ${rows.length} kullanıcı (filtreli)`}
+              ? `${rows.length} personel hesabı listeleniyor`
+              : `${filtered.length} / ${rows.length} personel hesabı (filtreli)`}
           </p>
 
-          {/* New custom UsersList table matching ProductsList */}
           <UsersList
             users={filtered}
             selectedId={selected?.id ?? null}
             onSelect={setSelected}
             onEdit={openEdit}
             onToggleStatus={toggleStatus}
+            onDelete={(user) => setDeleteTarget(user)}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         </div>
       )}
 
-      {/* Centered tabs detail modal matching ProductDetailModal */}
       <UserDetailModal
         user={selected}
         roles={roles}
@@ -260,10 +283,13 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
           setSelected(null);
           openEdit(user);
         }}
+        onDelete={() => {
+          if (!selected) return;
+          setDeleteTarget(selected);
+        }}
         onClose={() => setSelected(null)}
       />
 
-      {/* Slide-over form side sheet matching ProductFormSheet */}
       {canEdit ? (
         <UserFormSheet
           open={formOpen}
@@ -274,6 +300,20 @@ export function UsersManager({ permissions }: { permissions: string[] }): React.
           onSubmit={submit}
         />
       ) : null}
+
+      <ConfirmSoftDeleteDialog
+        open={deleteTarget !== null}
+        busy={deleteBusy}
+        title="Personel hesabını kaldır"
+        description={
+          deleteTarget
+            ? `${deleteTarget.firstName} ${deleteTarget.lastName} hesabı aktif listelerden kaldırılacak, oturumları kapatılacak ve tarihsel operasyon kayıtları korunacaktır.`
+            : ''
+        }
+        confirmLabel="Personeli kaldır"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={deleteUser}
+      />
     </section>
   );
 }

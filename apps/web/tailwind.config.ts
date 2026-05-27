@@ -25,8 +25,8 @@ const config: Config = {
         error: '#ba1a1a',
       },
       fontFamily: {
-        display: ['var(--font-display)', 'Georgia', 'serif'],
-        body: ['var(--font-body)', 'Arial', 'sans-serif'],
+        display: ['var(--font-heading)', 'var(--font-fallback)'],
+        body: ['var(--font-body)', 'var(--font-fallback)'],
       },
       boxShadow: {
         ambient: '0 28px 80px rgba(26, 28, 26, 0.08)',

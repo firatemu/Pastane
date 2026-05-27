@@ -5,5 +5,6 @@ import { requireAdminSession } from '../../../lib/auth/session';
 export default async function RolesPage(): Promise<React.JSX.Element> {
   const session = await requireAdminSession();
   requirePermission(session, ['roles.view']);
-  return <RolesDirectory />;
+  const canManage = session.permissions.includes('permissions.manage');
+  return <RolesDirectory canManage={canManage} />;
 }

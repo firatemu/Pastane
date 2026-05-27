@@ -6,7 +6,7 @@ import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-er
 import { can } from '../../lib/permissions/can';
 import type { Courier, OrderDetail, OrderStatus } from '../../lib/operations/types';
 
-const LOCKED_STATUSES: OrderStatus[] = ['OUT_FOR_DELIVERY', 'DELIVERED', 'DELIVERY_FAILED'];
+const LOCKED_STATUSES: OrderStatus[] = ['OUT_FOR_DELIVERY', 'DELIVERED'];
 
 /** Adrese teslim siparişlerde kurye atama / yeniden atama (yolda veya teslim edildiyse kapalı). */
 export function OrderDetailCourierAssignment({
@@ -32,7 +32,7 @@ export function OrderDetailCourierAssignment({
   const canAssign = can(permissions, ['orders.assignCourier']);
   const canListCouriers = can(permissions, ['couriers.view']);
   const isHome = order.deliveryType === 'HOME_DELIVERY';
-  const editableStatuses: OrderStatus[] = ['READY', 'ASSIGNED_TO_COURIER'];
+  const editableStatuses: OrderStatus[] = ['PREPARING', 'READY', 'ASSIGNED_TO_COURIER', 'DELIVERY_FAILED'];
   const courierEditable =
     isHome &&
     editableStatuses.includes(order.status) &&
@@ -59,7 +59,12 @@ export function OrderDetailCourierAssignment({
   }, [courierEditable]);
 
   async function submit(): Promise<void> {
-    if (!selectedCourierId || selectedCourierId === assignedId) return;
+    if (
+      !selectedCourierId ||
+      (order.status !== 'DELIVERY_FAILED' && selectedCourierId === assignedId)
+    ) {
+      return;
+    }
     setBusy(true);
     setAssignError(null);
     try {
@@ -129,14 +134,31 @@ export function OrderDetailCourierAssignment({
             <button
               type="button"
               disabled={
-                busy || !selectedCourierId || selectedCourierId === assignedId || !!courierError
+                busy ||
+                !selectedCourierId ||
+                (order.status !== 'DELIVERY_FAILED' && selectedCourierId === assignedId) ||
+                !!courierError
               }
               className="rounded-2xl bg-amber-600 px-4 py-2 font-medium text-white disabled:opacity-50"
               onClick={() => void submit()}
             >
-              {order.status === 'READY' ? 'Ata' : 'Kuryeyi değiştir'}
+              {order.status === 'ASSIGNED_TO_COURIER'
+                ? 'Kuryeyi değiştir'
+                : order.status === 'DELIVERY_FAILED'
+                  ? 'Yeniden ata'
+                  : 'Kurye ata'}
             </button>
           </div>
+          {order.status === 'PREPARING' || order.status === 'READY' ? (
+            <p className="text-xs text-stone-500">
+              Kurye atandığında sipariş otomatik olarak <strong>Kuryeye atandı</strong> durumuna geçer.
+            </p>
+          ) : null}
+          {order.status === 'DELIVERY_FAILED' ? (
+            <p className="text-xs text-stone-500">
+              Yeniden atama, teslimat kaydını tekrar aktif hale getirir ve siparişi yeniden dağıtıma açar.
+            </p>
+          ) : null}
           {assignError ? <p className="text-sm text-red-700">{assignError}</p> : null}
         </>
       ) : (

@@ -104,203 +104,296 @@ export function DeliveriesList(): React.JSX.Element {
   }, [groups.completedToday, groups.failedToday, query, queueFilter, rows, sortMode, statusFilter]);
 
   return (
-    <section className="space-y-6">
-      <div className="overflow-hidden rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-sky-50 text-stone-950 shadow-xl">
-        <div className="grid gap-5 p-5 lg:grid-cols-[1.35fr_0.65fr] lg:p-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-700">
-              Kurye operasyon paneli
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Teslimat Kontrol Merkezi
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-              Atanan işleri önceliklendirin, riskli teslimatları görün, ödeme ve müşteri bilgilerine
-              hızlı ulaşın.
-            </p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <HeroMetric label="Aktif görev" value={report.active} tone="amber" />
-              <HeroMetric label="Bugün teslim" value={report.deliveredToday} tone="green" />
-              <HeroMetric label="Başarı oranı" value={`${report.successRate}%`} tone="blue" />
+    <section className="space-y-4">
+      {/* ─── Unified Dashboard ─── */}
+      <div className="rounded-xl border border-stone-200 bg-white shadow-sm">
+        {/* Üst şerit: Başlık + polling */}
+        <div className="flex flex-col gap-3 border-b border-stone-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
+              <svg className="h-4.5 w-4.5 text-amber-700" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25m-3.75 0V5.625m0 12.75v-2.25m0-5.625v2.25m0-2.25H5.625c-.621 0-1.125.504-1.125 1.125v5.25c0 .621.504 1.125 1.125 1.125m5.625-7.5h3.75m-3.75 0V5.625m0 0A2.625 2.625 0 0 1 13.875 3h.375a2.625 2.625 0 0 1 2.625 2.625V5.625m0 0h1.5" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-stone-900">Teslimatlar</h1>
+              <p className="text-xs text-stone-500">Atanan teslimat görevlerinizi yönetin</p>
             </div>
           </div>
-          <div className="rounded-3xl border border-white bg-white/80 p-4 shadow-sm ring-1 ring-amber-100">
-            <p className="text-sm font-semibold text-stone-950">Canlı durum</p>
-            <div className="mt-4 space-y-3 text-sm text-stone-600">
-              <ReportLine
-                label="Bugünkü ciro"
-                value={formatTryAmount(report.deliveredRevenue) ?? '₺0,00'}
-              />
-              <ReportLine label="Ortalama teslim süresi" value={report.averageDurationLabel} />
-              <ReportLine label="İstanbul günü" value={todayIstanbulKey()} />
-              {meta ? (
-                <ReportLine label="Kayıt kapsamı" value={`${rows.length}/${meta.total}`} />
-              ) : null}
+          <div className="flex items-center gap-3">
+            {/* Canlı durum indicator */}
+            <div className="hidden items-center gap-1.5 sm:flex">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+              </span>
+              <span className="text-xs text-stone-500">{todayIstanbulKey()}</span>
             </div>
-            <div className="mt-4">
-              <PollingNote
-                seconds={15}
-                lastRefreshedAt={lastRefreshedAt}
-                pollWarning={pollWarning}
-              />
-            </div>
+            <PollingNote seconds={15} lastRefreshedAt={lastRefreshedAt} pollWarning={pollWarning} />
+          </div>
+        </div>
+
+        {/* Dashboard grid */}
+        <div className="p-4 sm:p-5">
+          {/* Ana metrikler: 2 satır x 4 sütun */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+            {/* Satır 1: Operasyonel */}
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />}
+              label="Aktif"
+              value={report.active}
+              color="amber"
+            />
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
+              label="Teslim"
+              value={report.deliveredToday}
+              color="emerald"
+            />
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />}
+              label="Başarı"
+              value={`${report.successRate}%`}
+              color="sky"
+            />
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />}
+              label="Sorunlu"
+              value={report.failedToday}
+              color="red"
+            />
+            {/* Satır 2: Durum dağılımı */}
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c.649 0 1.2.277 1.6.723" />}
+              label="Atanmış"
+              value={report.assigned}
+              color="stone"
+            />
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25m-3.75 0V5.625m0 12.75v-2.25m0-5.625v2.25m0-2.25H5.625c-.621 0-1.125.504-1.125 1.125v5.25c0 .621.504 1.125 1.125 1.125m5.625-7.5h3.75m-3.75 0V5.625m0 0A2.625 2.625 0 0 1 13.875 3h.375a2.625 2.625 0 0 1 2.625 2.625V5.625m0 0h1.5" />}
+              label="Yolda"
+              value={report.inTransit}
+              color="stone"
+            />
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />}
+              label="Ürün"
+              value={report.itemCount}
+              color="stone"
+            />
+            <MetricCell
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
+              label="Ciro"
+              value={formatTryAmount(report.deliveredRevenue) ?? '₺0'}
+              color="amber"
+            />
+          </div>
+
+          {/* Alt bilgi şeridi */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-stone-100 pt-3 text-xs text-stone-500">
+            <span className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+              </svg>
+              Ort. süre: <span className="font-medium text-stone-700">{report.averageDurationLabel}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              {report.staleActive > 0 ? (
+                <><span className="font-medium text-amber-700">{report.staleActive}</span> görev 45+ dk güncellenmedi</>
+              ) : (
+                <span className="text-emerald-700">Tüm görevler güncel</span>
+              )}
+            </span>
+            {meta ? (
+              <span className="flex items-center gap-1">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+                </svg>
+                Kapsam: <span className="font-medium text-stone-700">{rows.length}/{meta.total}</span>
+              </span>
+            ) : null}
+            {report.withScheduledTime > 0 ? (
+              <span className="flex items-center gap-1">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                </svg>
+                <span className="font-medium text-stone-700">{report.withScheduledTime}</span> planlı teslimat
+              </span>
+            ) : null}
+          </div>
+
+          {/* Görev dağılımı progress bar'ları */}
+          <div className="mt-3 grid grid-cols-5 gap-2 border-t border-stone-100 pt-3 sm:gap-3">
+            <MiniBar label="Atandı" value={report.assigned} total={rows.length} color="bg-amber-500" />
+            <MiniBar label="Alındı" value={report.pickedUp} total={rows.length} color="bg-sky-500" />
+            <MiniBar label="Yolda" value={report.outForDelivery} total={rows.length} color="bg-blue-600" />
+            <MiniBar label="Teslim" value={report.deliveredToday} total={rows.length} color="bg-emerald-500" />
+            <MiniBar label="Sorun" value={report.failedToday} total={rows.length} color="bg-red-500" />
           </div>
         </div>
       </div>
 
+      {/* ─── Loading / Error / Empty States ─── */}
       {loading ? <LoadingState label="Teslimatlar yükleniyor…" /> : null}
       {!loading && error && rows.length === 0 ? <ErrorState message={error} /> : null}
       {!loading && rows.length === 0 && !error ? <EmptyState /> : null}
 
       {rows.length > 0 ? (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {error ? <ErrorState message={error} /> : null}
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Atanmış" value={report.assigned} hint="Depodan teslim alınacak" />
-            <MetricCard label="Yolda" value={report.inTransit} hint="Müşteriye giden işler" />
-            <MetricCard
-              label="Sorunlu"
-              value={report.failedToday}
-              hint="Bugün başarısız"
-              tone="red"
-            />
-            <MetricCard
-              label="Ürün adedi"
-              value={report.itemCount}
-              hint="Listelenen siparişlerde"
-            />
-          </div>
+          {/* ─── Filtre Çubuğu ─── */}
+          <div className="rounded-xl border border-stone-200 bg-white p-3 shadow-sm sm:p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              {/* Arama */}
+              <div className="flex-1">
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg className="h-4 w-4 text-stone-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                    </svg>
+                  </div>
+                  <input
+                    className="h-10 w-full rounded-lg border border-stone-200 bg-stone-50 pl-9 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="Sipariş no, müşteri, telefon veya adres"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                </div>
+              </div>
 
-          <div className="rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px_180px]">
-              <label className="block space-y-1.5 text-sm font-medium text-stone-800">
-                <span className="text-stone-500">Ara</span>
-                <input
-                  className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm outline-none transition focus:border-amber-500 focus:bg-white"
-                  placeholder="Sipariş no, müşteri, telefon veya adres"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-              <label className="block space-y-1.5 text-sm font-medium text-stone-800">
-                <span className="text-stone-500">Kuyruk</span>
+              {/* Filtreler - mobilde 2x2 grid */}
+              <div className="grid grid-cols-3 gap-2 sm:flex sm:items-end">
                 <select
-                  className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 text-sm outline-none focus:border-amber-500 focus:bg-white"
+                  className="h-10 rounded-lg border border-stone-200 bg-stone-50 px-2.5 text-xs text-stone-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 sm:px-3 sm:text-sm"
                   value={queueFilter}
                   onChange={(event) => setQueueFilter(event.target.value as QueueFilter)}
                 >
                   <option value="ALL">Tümü</option>
-                  <option value="ACTIVE">Aktif işler</option>
-                  <option value="DONE_TODAY">Bugün teslim</option>
-                  <option value="FAILED_TODAY">Bugün sorunlu</option>
+                  <option value="ACTIVE">Aktif</option>
+                  <option value="DONE_TODAY">Teslim</option>
+                  <option value="FAILED_TODAY">Sorunlu</option>
                 </select>
-              </label>
-              <label className="block space-y-1.5 text-sm font-medium text-stone-800">
-                <span className="text-stone-500">Durum</span>
                 <select
-                  className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 text-sm outline-none focus:border-amber-500 focus:bg-white"
+                  className="h-10 rounded-lg border border-stone-200 bg-stone-50 px-2.5 text-xs text-stone-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 sm:px-3 sm:text-sm"
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as DeliveryStatus | '')}
                 >
-                  <option value="">Tümü</option>
+                  <option value="">Durum</option>
                   {(Object.keys(statusLabels) as DeliveryStatus[]).map((status) => (
                     <option key={status} value={status}>
                       {statusLabels[status]}
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="block space-y-1.5 text-sm font-medium text-stone-800">
-                <span className="text-stone-500">Sıralama</span>
                 <select
-                  className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-3 text-sm outline-none focus:border-amber-500 focus:bg-white"
+                  className="h-10 rounded-lg border border-stone-200 bg-stone-50 px-2.5 text-xs text-stone-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 sm:px-3 sm:text-sm"
                   value={sortMode}
                   onChange={(event) => setSortMode(event.target.value as SortMode)}
                 >
-                  <option value="PRIORITY">Operasyon önceliği</option>
-                  <option value="NEWEST">En yeni sipariş</option>
-                  <option value="OLDEST">En eski sipariş</option>
-                  <option value="TOTAL_DESC">Tutar yüksek</option>
+                  <option value="PRIORITY">Öncelik</option>
+                  <option value="NEWEST">En yeni</option>
+                  <option value="OLDEST">En eski</option>
+                  <option value="TOTAL_DESC">Tutar ↓</option>
                 </select>
-              </label>
+              </div>
             </div>
-            <p className="mt-3 text-xs text-stone-500">
-              {filteredRows.length === rows.length
-                ? `${rows.length} teslimat listeleniyor`
-                : `${filteredRows.length} / ${rows.length} teslimat filtrelendi`}
-            </p>
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-xs text-stone-400">
+                {filteredRows.length === rows.length
+                  ? `${rows.length} teslimat`
+                  : `${filteredRows.length} / ${rows.length} filtrelendi`}
+              </p>
+            </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-            <div className="space-y-4">
-              {filteredRows.length > 0 ? (
-                filteredRows.map((row) => <DeliveryCard key={row.id} delivery={row} />)
-              ) : (
-                <div className="rounded-[1.5rem] border border-dashed border-stone-300 bg-white p-8 text-center text-sm text-stone-600">
-                  Bu filtrelerle teslimat bulunamadı.
-                </div>
-              )}
-            </div>
-
-            <aside className="space-y-4">
-              <ReportPanel title="Görev dağılımı">
-                <StatusBar
-                  label="Atandı"
-                  value={report.assigned}
-                  total={rows.length}
-                  className="bg-amber-500"
-                />
-                <StatusBar
-                  label="Teslim alındı"
-                  value={report.pickedUp}
-                  total={rows.length}
-                  className="bg-sky-500"
-                />
-                <StatusBar
-                  label="Yolda"
-                  value={report.outForDelivery}
-                  total={rows.length}
-                  className="bg-blue-600"
-                />
-                <StatusBar
-                  label="Teslim edildi"
-                  value={report.deliveredToday}
-                  total={rows.length}
-                  className="bg-green-600"
-                />
-                <StatusBar
-                  label="Başarısız"
-                  value={report.failedToday}
-                  total={rows.length}
-                  className="bg-red-600"
-                />
-              </ReportPanel>
-              <ReportPanel title="Operasyon notları">
-                <ul className="space-y-3 text-sm text-stone-700">
-                  <li className="rounded-2xl bg-amber-50 p-3">
-                    <span className="font-semibold text-stone-900">{report.staleActive}</span> aktif
-                    görev 45 dakikadan uzun süredir güncellenmedi.
-                  </li>
-                  <li className="rounded-2xl bg-stone-50 p-3">
-                    <span className="font-semibold text-stone-900">{report.withScheduledTime}</span>{' '}
-                    teslimatta planlanan zaman var.
-                  </li>
-                  <li className="rounded-2xl bg-green-50 p-3">
-                    Bugün tamamlanan işlerde ortalama süre:{' '}
-                    <span className="font-semibold text-stone-900">
-                      {report.averageDurationLabel}
-                    </span>
-                  </li>
-                </ul>
-              </ReportPanel>
-            </aside>
+          {/* ─── Teslimat Kartları ─── */}
+          <div className="space-y-3">
+            {filteredRows.length > 0 ? (
+              filteredRows.map((row) => <DeliveryCard key={row.id} delivery={row} />)
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-300 bg-white px-6 py-12 text-center">
+                <svg className="mb-3 h-10 w-10 text-stone-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+                <p className="text-sm font-medium text-stone-600">Bu filtrelerle teslimat bulunamadı</p>
+                <p className="mt-1 text-xs text-stone-400">Filtreleri değiştirerek tekrar deneyin</p>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
     </section>
   );
 }
+
+/* ─────────────────────── Alt Bileşenler ─────────────────────── */
+
+function MetricCell({
+  icon,
+  label,
+  value,
+  color = 'stone',
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  color?: 'amber' | 'emerald' | 'sky' | 'red' | 'stone';
+}) {
+  const colorMap = {
+    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', border: 'border-amber-100' },
+    emerald: { bg: 'bg-emerald-50', icon: 'text-emerald-600', border: 'border-emerald-100' },
+    sky: { bg: 'bg-sky-50', icon: 'text-sky-600', border: 'border-sky-100' },
+    red: { bg: 'bg-red-50', icon: 'text-red-600', border: 'border-red-200' },
+    stone: { bg: 'bg-stone-50', icon: 'text-stone-500', border: 'border-stone-200' },
+  };
+  const c = colorMap[color];
+
+  return (
+    <div className={`rounded-lg border ${c.border} ${c.bg} p-2.5 sm:p-3`}>
+      <div className="flex items-center gap-1.5">
+        <svg className={`h-3.5 w-3.5 ${c.icon}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+          {icon}
+        </svg>
+        <span className="text-[10px] font-medium uppercase tracking-wider text-stone-500">{label}</span>
+      </div>
+      <p className={`mt-1 text-lg font-bold sm:text-xl ${color === 'red' ? 'text-red-700' : 'text-stone-900'}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function MiniBar({
+  label,
+  value,
+  total,
+  color,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  color: string;
+}) {
+  const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="text-center">
+      <p className="text-xs font-bold text-stone-900">{value}</p>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${color}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <p className="mt-1 text-[10px] text-stone-500">{label}</p>
+    </div>
+  );
+}
+
+/* ─────────────────────── Yardımcı Fonksiyonlar ─────────────────────── */
 
 function buildReport(rows: DeliveryListItem[]) {
   const groups = groupDeliveries(rows);
@@ -398,95 +491,4 @@ function formatDurationMinutes(minutes: number): string {
   const now = new Date();
   const start = new Date(now.getTime() - minutes * 60_000);
   return formatDeliveryDuration(start.toISOString(), now.toISOString()) ?? `${minutes} dk`;
-}
-
-function HeroMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  tone: 'amber' | 'green' | 'blue';
-}) {
-  const tones = {
-    amber: 'bg-amber-100 text-amber-800 ring-amber-200',
-    green: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
-    blue: 'bg-sky-100 text-sky-800 ring-sky-200',
-  };
-  return (
-    <div className={`rounded-3xl p-4 ring-1 ${tones[tone]}`}>
-      <p className="text-xs font-medium uppercase tracking-[0.16em]">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-stone-950">{value}</p>
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  hint,
-  tone = 'stone',
-}: {
-  label: string;
-  value: number;
-  hint: string;
-  tone?: 'stone' | 'red';
-}) {
-  return (
-    <div
-      className={`rounded-[1.5rem] border bg-white p-4 shadow-sm ${tone === 'red' ? 'border-red-100' : 'border-stone-200'}`}
-    >
-      <p className="text-sm font-medium text-stone-500">{label}</p>
-      <p
-        className={`mt-2 text-3xl font-semibold ${tone === 'red' ? 'text-red-700' : 'text-stone-950'}`}
-      >
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-stone-500">{hint}</p>
-    </div>
-  );
-}
-
-function ReportPanel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-stone-950">{title}</h2>
-      <div className="mt-4 space-y-3">{children}</div>
-    </section>
-  );
-}
-
-function ReportLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span>{label}</span>
-      <span className="font-semibold text-stone-950">{value}</span>
-    </div>
-  );
-}
-
-function StatusBar({
-  label,
-  value,
-  total,
-  className,
-}: {
-  label: string;
-  value: number;
-  total: number;
-  className: string;
-}) {
-  const percent = total > 0 ? Math.round((value / total) * 100) : 0;
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-stone-600">{label}</span>
-        <span className="font-semibold text-stone-950">{value}</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100">
-        <div className={`h-full rounded-full ${className}`} style={{ width: `${percent}%` }} />
-      </div>
-    </div>
-  );
 }

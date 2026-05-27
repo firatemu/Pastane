@@ -51,7 +51,7 @@ export function ProductFormSheet({
   const selectedUnit = units.find((unit) => unit.id === unitId);
   const needsQuantity = selectedUnit != null && selectedUnit.kind !== 'COUNT';
 
-  const canMedia = Boolean(editing) && can(permissions, ['media.upload', 'media.delete']);
+  const canMedia = Boolean(editing) && can(permissions, ['media.view', 'media.upload', 'media.delete', 'media.attach']);
   const canOptions = Boolean(editing) && can(permissions, ['products.manageOptions']);
 
   const tabs = (
@@ -265,7 +265,7 @@ export function ProductFormSheet({
                 </fieldset>
               </div>
             ) : tab === 'media' && editing && canMedia ? (
-              <ProductMediaPanel product={editing} onChanged={onChanged ?? (async () => undefined)} embedded />
+              <ProductMediaPanel product={editing} permissions={permissions} onChanged={onChanged ?? (async () => undefined)} embedded />
             ) : tab === 'options' && editing && canOptions ? (
               <ProductOptionsPanel product={editing} onChanged={onChanged ?? (async () => undefined)} embedded />
             ) : (

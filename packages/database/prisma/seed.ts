@@ -52,10 +52,11 @@ if (process.env.DIRECT_URL) {
 const prisma = new PrismaClient();
 const permissions = [
   'users.view','users.create','users.update','users.delete','users.changeStatus',
+  'customers.view','customers.update','customers.delete',
   'roles.view','roles.create','roles.update','roles.delete','permissions.view','permissions.manage',
   'products.view','products.create','products.update','products.delete','products.manageImages','products.manageOptions','products.manageAllergens',
   'categories.view','categories.create','categories.update','categories.delete',
-  'allergens.view','productUnits.view','productUnits.manage','media.upload','media.delete',
+  'allergens.view','productUnits.view','productUnits.manage','media.view','media.upload','media.delete','media.attach',
   'orders.view','orders.viewOwn','orders.viewAll','orders.create','orders.updateStatus','orders.cancel','orders.assignCourier',
   'payments.view','payments.initiate','payments.refund','payments.viewAll',
   'couriers.view','couriers.create','couriers.update','couriers.performance',
@@ -92,8 +93,8 @@ async function main(): Promise<void> {
   const permissionByCode = new Map(permissionRows.map((permission) => [permission.code, permission]));
   const rolePermissions: Record<RoleType, string[]> = {
     ADMIN: permissions,
-    ORDER_OPERATOR: ['orders.viewAll','orders.updateStatus','orders.assignCourier','orders.cancel','couriers.view','loyalty.scan','loyalty.redeem','reviews.view','notifications.send','reports.sales','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
-    PRODUCT_MANAGER: ['products.view','products.create','products.update','products.manageImages','products.manageOptions','products.manageAllergens','categories.view','categories.create','categories.update','allergens.view','productUnits.view','productUnits.manage','media.upload','media.delete','reports.products','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
+    ORDER_OPERATOR: ['orders.viewAll','orders.updateStatus','orders.assignCourier','orders.cancel','couriers.view','loyalty.scan','loyalty.redeem','reviews.view','notifications.send','reports.sales','banners.view','banners.create','banners.update','banners.delete','banners.reorder','customers.view','customers.update','media.view'],
+    PRODUCT_MANAGER: ['products.view','products.create','products.update','products.manageImages','products.manageOptions','products.manageAllergens','categories.view','categories.create','categories.update','allergens.view','productUnits.view','productUnits.manage','media.view','media.upload','media.delete','media.attach','reports.products','banners.view','banners.create','banners.update','banners.delete','banners.reorder'],
     COURIER: ['deliveries.viewOwn','deliveries.updateOwn','orders.viewOwn','notifications.viewOwn'],
     CUSTOMER: ['products.view','categories.view','cart.manageOwn','orders.create','orders.viewOwn','orders.cancel','payments.initiate','payments.view','addresses.manageOwn','loyalty.viewOwn','reviews.create','reviews.view','notifications.viewOwn'],
   };

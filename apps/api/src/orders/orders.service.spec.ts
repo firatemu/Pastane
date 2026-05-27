@@ -48,10 +48,33 @@ describe('OrdersService admin operations', () => {
   });
 
   it('rejects assigning pickup orders transactionally', async () => {
-    const tx = { order: { findFirst: jest.fn().mockResolvedValue({ id: 'order-1', deliveryType: DeliveryType.PICKUP, status: OrderStatus.READY }) } };
+    const tx = { order: { findFirst: jest.fn().mockResolvedValue({ id: 'order-1', deliveryType: DeliveryType.PICKUP, status: OrderStatus.PREPARING }) } };
     const prisma = { $transaction: jest.fn((fn) => fn(tx)) } as never;
     const service = new OrdersService(prisma, ...baseDeps);
     await expect(service.assignCourier('order-1', { courierId: 'courier-1' })).rejects.toThrow('Pickup orders cannot be assigned');
+  });
+
+  it('blocks admin status updates from skipping courier-owned delivery steps', async () => {
+    const tx = {
+      order: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'order-1',
+          deletedAt: null,
+          deliveryType: DeliveryType.HOME_DELIVERY,
+          status: OrderStatus.PREPARING,
+        }),
+      },
+    };
+    const prisma = { $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)) } as never;
+    const service = new OrdersService(prisma, ...baseDeps);
+
+    await expect(
+      service.updateStatus(
+        'order-1',
+        { status: OrderStatus.DELIVERED },
+        { sub: 'operator-1', phone: '1', role: 'ORDER_OPERATOR', permissions: ['orders.updateStatus'] },
+      ),
+    ).rejects.toThrow('Kurye atandıktan sonraki teslimat durumları yalnızca kurye uygulamasından ilerletilebilir.');
   });
 
   it('reassigns courier when assigned order delivery is still ASSIGNED', async () => {
@@ -110,6 +133,66 @@ describe('OrdersService admin operations', () => {
       'Courier can only be reassigned before the delivery has started',
     );
     expect(tx.delivery.update).not.toHaveBeenCalled();
+  });
+
+  it('reopens failed deliveries by assigning a courier again', async () => {
+    const notifications = { createOrderStatusNotification: jest.fn() };
+    const audit = { log: jest.fn() };
+    const orderRow = {
+      id: 'order-1',
+      deletedAt: null,
+      deliveryType: DeliveryType.HOME_DELIVERY,
+      status: OrderStatus.DELIVERY_FAILED,
+      userId: 'user-1',
+      orderNumber: 'ON1',
+      delivery: { courierId: 'old-courier', status: DeliveryStatus.FAILED, orderId: 'order-1' },
+    };
+    const updatedDelivery = { id: 'delivery-1', courierId: 'new-courier', status: DeliveryStatus.ASSIGNED };
+    const tx = {
+      order: {
+        findFirst: jest.fn().mockResolvedValue(orderRow),
+        update: jest.fn().mockResolvedValue({ id: 'order-1', status: OrderStatus.ASSIGNED_TO_COURIER }),
+      },
+      courier: { findFirst: jest.fn().mockResolvedValue({ id: 'new-courier' }) },
+      delivery: {
+        upsert: jest.fn().mockResolvedValue(updatedDelivery),
+        update: jest.fn(),
+      },
+      orderStatusHistory: { create: jest.fn() },
+    };
+    const prisma = { $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)) } as never;
+    const service = new OrdersService(
+      prisma,
+      { validateForCheckout: jest.fn() } as never,
+      new OrderStatusService(),
+      {} as never,
+      audit as never,
+      {} as never,
+      notifications as never,
+    );
+
+    await expect(service.assignCourier('order-1', { courierId: 'new-courier' })).resolves.toEqual({
+      orderId: 'order-1',
+      delivery: updatedDelivery,
+    });
+    expect(tx.delivery.upsert).toHaveBeenCalledWith({
+      where: { orderId: 'order-1' },
+      update: { courierId: 'new-courier', status: DeliveryStatus.ASSIGNED, failedReason: null },
+      create: { orderId: 'order-1', courierId: 'new-courier', status: DeliveryStatus.ASSIGNED },
+    });
+    expect(tx.order.update).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      data: { status: OrderStatus.ASSIGNED_TO_COURIER },
+    });
+    expect(tx.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: { orderId: 'order-1', status: OrderStatus.ASSIGNED_TO_COURIER },
+    });
+    expect(notifications.createOrderStatusNotification).toHaveBeenCalledWith(
+      tx,
+      'user-1',
+      'ON1',
+      OrderStatus.ASSIGNED_TO_COURIER,
+    );
   });
 
   it('adds backend-owned delivery fee for home delivery orders', async () => {

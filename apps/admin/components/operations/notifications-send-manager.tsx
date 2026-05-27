@@ -80,7 +80,7 @@ export function NotificationsSendManager(): React.JSX.Element {
     async function loadUsers(): Promise<void> {
       try {
         setUserLoadError(null);
-        setUsers(await adminFetch<AdminUserRow[]>('/users'));
+        setUsers(await adminFetch<AdminUserRow[]>('/users?scope=all'));
       } catch (caught) {
         setUserLoadError(adminMessageFromUnknownError(caught, 'Kullanıcı listesi alınamadı.'));
       }

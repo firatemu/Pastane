@@ -7,9 +7,9 @@ export function Price({
   value: string;
   previous?: string | null;
   size?: 'default' | 'compact';
-  tone?: 'default' | 'danger';
+  tone?: 'default' | 'danger' | 'light';
 }>): React.JSX.Element {
-  const colorClass = tone === 'danger' ? 'text-error' : 'text-primary';
+  const colorClass = tone === 'danger' ? 'text-error' : tone === 'light' ? 'text-gold' : 'text-primary';
   const valueClass = size === 'compact' ? `font-body text-lg font-extrabold ${colorClass}` : `font-body text-2xl font-extrabold ${colorClass}`;
   return (
     <div className="flex items-baseline gap-2">

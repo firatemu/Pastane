@@ -1,6 +1,5 @@
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { Prisma, ProductStatus } from '@prisma/client';
-import type { Client } from 'minio';
 import { AuditService } from '../audit/audit.service';
 import { ERROR_CODES } from '../common/constants/error-codes';
 import { AppException } from '../common/exceptions/app.exception';
@@ -9,7 +8,6 @@ import { isTimeWindowValid } from '../common/utils/time-window.util';
 import { normalizePagination } from '../common/utils/pagination.util';
 import { slugify } from '../common/utils/slug.util';
 import { PrismaService } from '../database/prisma.service';
-import { MINIO_CLIENT } from '../media/providers/minio.provider';
 import type { CreateOptionDto } from './dto/create-option.dto';
 import type { CreateOptionGroupDto } from './dto/create-option-group.dto';
 import type { CreateProductDto } from './dto/create-product.dto';
@@ -20,12 +18,9 @@ import { withProductPresentation } from './product-presentation.util';
 
 @Injectable()
 export class ProductsService {
-  private readonly logger = new Logger(ProductsService.name);
-
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuditService) private readonly audit: AuditService,
-    @Inject(MINIO_CLIENT) private readonly minio: Client,
   ) {}
 
   async list(query: QueryProductDto) {
@@ -146,15 +141,6 @@ export class ProductsService {
 
   async remove(id: string, actor?: AuthUser) {
     const current = await this.get(id);
-    for (const img of current.images) {
-      if (img.bucket && img.objectKey) {
-        try {
-          await this.minio.removeObject(img.bucket, img.objectKey);
-        } catch (err) {
-          this.logger.warn(`MinIO removeObject failed (${img.bucket}/${img.objectKey}): ${err instanceof Error ? err.message : err}`);
-        }
-      }
-    }
     const removed = await this.prisma.$transaction([
       this.prisma.productImage.updateMany({
         where: { productId: id, deletedAt: null },

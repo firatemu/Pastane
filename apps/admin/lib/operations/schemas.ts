@@ -67,9 +67,12 @@ export const settingKeyPatchSchema = z.object({
 export const adminUserUpdateSchema = z.object({
   firstName: z.string().min(1, requiredText).optional(),
   lastName: z.string().min(1, requiredText).optional(),
+  phone: z.string().min(1, requiredText).optional(),
   email: z.union([z.literal(''), z.string().email('Geçerli bir e-posta adresi girin.')]).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'BANNED']).optional(),
   roleName: z
     .enum(['ADMIN', 'ORDER_OPERATOR', 'PRODUCT_MANAGER', 'COURIER', 'CUSTOMER'])
     .optional(),
 });
+
+export const customerAdminUpdateSchema = adminUserUpdateSchema.omit({ roleName: true });

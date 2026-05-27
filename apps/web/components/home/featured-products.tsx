@@ -5,42 +5,42 @@ import { ProductGrid } from '../catalog/product-grid';
 export function FeaturedProducts({ products }: Readonly<{ products: Product[] }>): React.JSX.Element {
   const showcaseProducts = products.slice(0, 3);
   return (
-    <section className="py-20" id="collections">
-      <div className="mb-14 text-center">
-        <p className="stitch-eyebrow">Vitrin seçkisi</p>
-        <h2 className="mt-3 font-display text-4xl font-semibold text-primary">Bugün öne çıkanlar</h2>
-        <div className="mx-auto mt-5 h-px w-12 bg-outline-soft" />
-      </div>
-      {showcaseProducts.length ? (
-        <div className="mb-16 grid gap-6 md:grid-cols-3">
-          {showcaseProducts.map((product) => {
-            const image = product.images.find((item) => item.isPrimary) ?? product.images[0];
-            return (
-              <article className="group relative overflow-hidden rounded-3xl border border-outline-soft/50 bg-surface-lowest" key={product.id}>
-                <div className="aspect-[4/5] overflow-hidden">
-                  <img
-                    alt={image?.altText ?? product.name}
-                    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                    src={image?.url ?? stitchImages.pastry}
-                  />
-                </div>
-                <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-primary/85 to-transparent p-6 opacity-0 transition duration-300 group-hover:opacity-100">
-                  <h3 className="font-display text-2xl font-semibold text-white">{product.name}</h3>
-                  <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-gold">{product.category.name}</p>
-                </div>
-              </article>
-            );
-          })}
+    <section className="bg-background py-16 sm:py-20" id="collections">
+      <div className="stitch-container">
+        <div className="mb-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+          <div>
+            <p className="stitch-eyebrow">Çok satanlar</p>
+            <h2 className="mt-2 font-display text-4xl font-bold leading-tight text-primary sm:text-5xl">Bugünün iştah açan vitrini</h2>
+            <p className="mt-4 max-w-xl text-base leading-7 text-muted">Pastalar, tatlılar, dondurma ve fırından çıkan sıcak lezzetler. Sepete ekle butonu her kartta hazır.</p>
+          </div>
+          {showcaseProducts.length ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {showcaseProducts.map((product) => {
+                const image = product.images.find((item) => item.isPrimary) ?? product.images[0];
+                return (
+                  <a className="group relative min-h-48 overflow-hidden rounded-3xl bg-primary text-white shadow-soft" href={`/urun/${product.slug}`} key={product.id}>
+                    <img
+                      alt={image?.altText ?? product.name}
+                      className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                      src={image?.url ?? stitchImages.pastry}
+                    />
+                    <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <span className="absolute inset-x-0 bottom-0 p-4">
+                      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-gold">{product.category.name}</span>
+                      <span className="mt-1 block font-display text-xl font-bold leading-tight">{product.name}</span>
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
-      ) : null}
-      <div className="mb-8 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="stitch-eyebrow">Öne çıkan lezzetler</p>
-          <h2 className="mt-2 font-display text-4xl font-bold text-primary">Bugünün vitrini</h2>
+        <div className="mb-7 flex items-center justify-between gap-4">
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-muted">Hızlı sipariş</p>
+          <a className="text-sm font-bold uppercase tracking-[0.14em] text-primary hover:text-secondary" href="/shop">Tümünü gör</a>
         </div>
-        <a className="text-sm font-bold uppercase tracking-[0.14em] text-primary hover:text-secondary" href="/shop">Tümünü gör</a>
+        <ProductGrid products={products.slice(0, 12)} />
       </div>
-      <ProductGrid products={products} />
     </section>
   );
 }

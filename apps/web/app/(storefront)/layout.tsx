@@ -1,7 +1,11 @@
 import { StorefrontShell } from '../../components/layout/storefront-shell';
 import { getCustomerSession } from '../../lib/auth/session';
+import { getProducts } from '../../lib/catalog/queries';
 
 export default async function StorefrontLayout({ children }: Readonly<{ children: React.ReactNode }>): Promise<React.JSX.Element> {
-  const session = await getCustomerSession();
-  return <StorefrontShell session={session ?? undefined}>{children}</StorefrontShell>;
+  const [session, products] = await Promise.all([
+    getCustomerSession(),
+    getProducts({ page: 1, limit: 100 }),
+  ]);
+  return <StorefrontShell searchProducts={products.items} session={session ?? undefined}>{children}</StorefrontShell>;
 }

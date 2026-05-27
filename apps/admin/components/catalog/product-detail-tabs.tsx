@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type JSX } from 'react';
+import { useCallback, useState, type JSX } from 'react';
 import type { Product } from '../../lib/catalog/types';
 import { can } from '../../lib/permissions/can';
 import { formatTry } from '../../lib/format/format-try';
@@ -27,8 +27,10 @@ export function ProductDetailTabs({
   readOnly?: boolean;
 }>): JSX.Element {
   const [tab, setTab] = useState<TabId>('overview');
+  const [headerLightbox, setHeaderLightbox] = useState(false);
+  const closeHeaderLightbox = useCallback(() => setHeaderLightbox(false), []);
 
-  const canMedia = readOnly || can(permissions, ['media.upload', 'media.delete']);
+  const canMedia = readOnly || can(permissions, ['media.view', 'media.upload', 'media.delete', 'media.attach']);
   const canOptions = readOnly || can(permissions, ['products.manageOptions']);
 
   const tabs = (
@@ -46,14 +48,24 @@ export function ProductDetailTabs({
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-surface-container-lowest">
       {readOnly ? (
         <p className="border-b border-outline-variant/25 bg-surface-container-low px-6 py-2 text-center text-xs font-medium text-on-surface-variant">
-          İnceleme modu — değişiklik için Düzenle&apos;ye tıklayın
+          İnceleme modu — değişiklik için Düzenle'ye tıklayın
         </p>
       ) : null}
       <header className="flex flex-col gap-4 border-b border-outline-variant/30 p-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-surface-container text-secondary">
             {primaryImage ? (
-              <img src={primaryImage.url} alt={primaryImage.altText ?? product.name} className="h-full w-full object-cover" />
+              <button
+                type="button"
+                className="group/header relative h-full w-full"
+                onClick={() => setHeaderLightbox(true)}
+                aria-label="Görseli büyüt"
+              >
+                <img src={primaryImage.url} alt={primaryImage.altText ?? product.name} className="h-full w-full object-cover transition group-hover/header:brightness-90" />
+                <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/0 transition group-hover/header:bg-black/30">
+                  <span className="material-symbols-outlined text-[24px] text-white opacity-0 transition group-hover/header:opacity-100">zoom_in</span>
+                </span>
+              </button>
             ) : (
               <span className="material-symbols-outlined text-[36px]">bakery_dining</span>
             )}
@@ -151,13 +163,48 @@ export function ProductDetailTabs({
           </div>
         ) : null}
         {tab === 'media' && canMedia ? (
-          <ProductMediaPanel product={product} onChanged={onChanged} embedded readOnly={readOnly} />
+          <ProductMediaPanel product={product} permissions={permissions} onChanged={onChanged} embedded readOnly={readOnly} />
         ) : null}
         {tab === 'options' && canOptions ? (
           <ProductOptionsPanel product={product} onChanged={onChanged} embedded readOnly={readOnly} />
         ) : null}
       </div>
+
+      {/* Header görsel lightbox */}
+      {headerLightbox && primaryImage ? (
+        <HeaderLightbox
+          src={primaryImage.url}
+          alt={primaryImage.altText ?? product.name}
+          onClose={closeHeaderLightbox}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function HeaderLightbox({
+  src,
+  alt,
+  onClose,
+}: Readonly<{ src: string; alt: string; onClose: () => void }>): JSX.Element {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="absolute -right-3 -top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-on-surface shadow-lg transition hover:bg-surface-container"
+          onClick={onClose}
+          aria-label="Kapat"
+        >
+          <span className="material-symbols-outlined text-[22px]">close</span>
+        </button>
+        <img src={src} alt={alt} className="max-h-[85vh] rounded-xl object-contain shadow-2xl" />
+        <p className="mt-3 text-center text-sm font-medium text-white/80">{alt}</p>
+      </div>
+    </div>
   );
 }
 

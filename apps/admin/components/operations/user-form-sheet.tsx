@@ -111,6 +111,9 @@ export function UserFormSheet({
             <Field label="Soyad" error={form.formState.errors.lastName?.message}>
               <input className={adminInputClass} {...form.register('lastName')} />
             </Field>
+            <Field label="Telefon" error={form.formState.errors.phone?.message}>
+              <input className={adminInputClass} {...form.register('phone')} />
+            </Field>
             <Field label="E-posta" error={form.formState.errors.email?.message}>
               <input className={adminInputClass} type="email" {...form.register('email')} />
             </Field>

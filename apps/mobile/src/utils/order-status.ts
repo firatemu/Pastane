@@ -3,7 +3,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   PAYMENT_PENDING: 'Ödeme bekleniyor',
   CONFIRMED: 'Sipariş alındı',
   PREPARING: 'Hazırlanıyor',
-  READY: 'Teslime hazır',
+  READY: 'Hazırlık tamamlandı',
   ASSIGNED_TO_COURIER: 'Kuryeye atandı',
   OUT_FOR_DELIVERY: 'Yolda',
   DELIVERED: 'Teslim edildi',
@@ -19,7 +19,7 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   TIMEOUT: 'Ödeme süresi doldu',
 };
 
-export const CUSTOMER_TIMELINE = ['PAYMENT_PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'ASSIGNED_TO_COURIER', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
+export const CUSTOMER_TIMELINE = ['PAYMENT_PENDING', 'CONFIRMED', 'PREPARING', 'ASSIGNED_TO_COURIER', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
 export const ACTIVE_ORDER_STATUSES = new Set([
   'PAYMENT_PENDING',
   'CONFIRMED',

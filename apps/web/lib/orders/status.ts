@@ -3,7 +3,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   PAYMENT_PENDING: 'Ödeme bekleniyor',
   CONFIRMED: 'Sipariş alındı',
   PREPARING: 'Hazırlanıyor',
-  READY: 'Teslime hazır',
+  READY: 'Hazırlık tamamlandı',
   ASSIGNED_TO_COURIER: 'Kuryeye atandı',
   OUT_FOR_DELIVERY: 'Yolda',
   DELIVERED: 'Teslim edildi',
@@ -27,9 +27,13 @@ export const DELIVERY_STATUS_LABELS: Record<string, string> = {
   FAILED: 'Teslimat başarısız',
 };
 
-export const CUSTOMER_TIMELINE = ['PAYMENT_PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'ASSIGNED_TO_COURIER', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
+export const CUSTOMER_TIMELINE = ['PAYMENT_PENDING', 'CONFIRMED', 'PREPARING', 'ASSIGNED_TO_COURIER', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const;
 export const ACTIVE_ORDER_STATUSES = new Set(['PAYMENT_PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'ASSIGNED_TO_COURIER', 'OUT_FOR_DELIVERY']);
 export const CANCELLABLE_STATUSES = new Set(['PAYMENT_PENDING', 'CONFIRMED']);
+
+export function timelineStatus(status: string): string {
+  return status === 'READY' ? 'PREPARING' : status;
+}
 
 export function statusLabel(status: string): string { return ORDER_STATUS_LABELS[status] ?? status; }
 export function paymentStatusLabel(status?: string): string { return status ? PAYMENT_STATUS_LABELS[status] ?? status : 'Ödeme bilgisi yok'; }

@@ -76,3 +76,23 @@ ios/
 
 # automation reports (pnpm doctor --report vb.)
 reports/
+
+# Mobile build artifacts
+apps/mobile/*.apk
+apps/mobile/artifacts/
+
+# Temporary local scripts
+check-payments.js
+scripts/check-payment-content.js
+scripts/curl-test.sh
+scripts/generate-token.js
+scripts/list-orders.js
+scripts/list-prod-orders.js
+scripts/query-db.js
+scripts/test-checkout-form-init.js
+scripts/test-checkout-init.js
+scripts/test-iyzico-mobile-creds.js
+scripts/test-iyzico-mobile.js
+scripts/test-iyzico-raw.js
+scripts/test-iyzico.js
+scripts/test-provider.js

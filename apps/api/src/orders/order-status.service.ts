@@ -4,8 +4,8 @@ import { AppException } from '../common/exceptions/app.exception';
 import { ERROR_CODES } from '../common/constants/error-codes';
 
 /**
- * Admin/manual order status changes. Ödeme başarılı olunca CONFIRMED geçişi ödeme servisinde yapılır;
- * bu yüzden PAYMENT_PENDING → CONFIRMED burada listede yoktur.
+ * Tüm sipariş durumu geçişleri. Admin ve kurye katmanları kendi ek yetki/bağlam kontrollerini ayrıca uygular.
+ * Ödeme başarılı olunca CONFIRMED geçişi ödeme servisinde yapılır; bu yüzden PAYMENT_PENDING → CONFIRMED burada listede yoktur.
  */
 @Injectable()
 export class OrderStatusService {
@@ -13,11 +13,12 @@ export class OrderStatusService {
     NEW: [OrderStatus.PAYMENT_PENDING],
     PAYMENT_PENDING: [OrderStatus.CANCELLED],
     CONFIRMED: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-    PREPARING: [OrderStatus.READY],
+    PREPARING: [OrderStatus.ASSIGNED_TO_COURIER, OrderStatus.DELIVERED],
+    // Legacy compatibility: older rows may still be in READY.
     READY: [OrderStatus.ASSIGNED_TO_COURIER, OrderStatus.DELIVERED],
     ASSIGNED_TO_COURIER: [OrderStatus.OUT_FOR_DELIVERY],
     OUT_FOR_DELIVERY: [OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.DELIVERY_FAILED],
-    DELIVERY_FAILED: [OrderStatus.CANCELLED, OrderStatus.READY],
+    DELIVERY_FAILED: [OrderStatus.CANCELLED, OrderStatus.ASSIGNED_TO_COURIER],
     DELIVERED: [OrderStatus.CANCELLED],
     CANCELLED: [],
   };

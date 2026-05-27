@@ -18,19 +18,32 @@ export default async function DashboardPage(): Promise<JSX.Element> {
   }).format(new Date());
 
   return (
-    <section className="flex flex-col gap-stack-lg pb-24">
-      <header className="flex flex-wrap items-center justify-between gap-4 pb-6">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Yönetim paneli • Genel görünüm</p>
-          <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <h1 className="font-display text-4xl font-semibold tracking-tight text-on-surface md:text-5xl">Özet</h1>
-            <time className="text-[15px] font-semibold text-on-surface-variant" dateTime={new Date().toISOString()} suppressHydrationWarning>
+    <section className="flex flex-col gap-6 pb-10">
+      <header className="rounded-card border border-outline-variant/70 bg-surface-container-lowest/90 p-4 shadow-bakery">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-secondary/15 bg-secondary-container px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                Yönetim paneli
+              </span>
+              <span className="rounded-full border border-outline-variant/60 bg-surface-container-low px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-on-surface-variant">
+                Canlı operasyon özeti
+              </span>
+            </div>
+            <h1 className="mt-4 text-[1.75rem] font-semibold tracking-[-0.03em] text-on-surface md:text-[2rem]">Operasyon özeti</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+              Sipariş kuyruğu, katalog sağlığı ve teslimat akışı için kritik sinyalleri tek bakışta izleyin.
+            </p>
+          </div>
+          <div className="rounded-card border border-outline-variant/60 bg-surface-container-low px-4 py-3 xl:max-w-xs">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Bugün</p>
+            <time className="mt-2 block text-sm font-semibold text-on-surface" dateTime={new Date().toISOString()} suppressHydrationWarning>
               {now}
             </time>
+            <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+              Öncelikli takip alanı: bekleyen aksiyonlar, kurye atamaları ve katalog görünürlüğü.
+            </p>
           </div>
-          <p className="mt-3 max-w-2xl text-base text-on-surface-variant">
-            Digital Bakery tasarım diline uygun sıcak krem yüzey, Playfair başlıklar ve Artisanal pastel tonları ile operasyonu tek ekranda izleyin.
-          </p>
         </div>
       </header>
 
@@ -38,7 +51,7 @@ export default async function DashboardPage(): Promise<JSX.Element> {
         <>
           <DashboardLiveMetrics />
 
-          <div className="grid grid-cols-1 gap-gutter xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
             {showRecentOrders ? (
               <>
                 <div className="xl:col-span-3">
@@ -56,7 +69,7 @@ export default async function DashboardPage(): Promise<JSX.Element> {
           </div>
         </>
       ) : (
-        <p className="rounded-card border border-outline-variant bg-surface-container-low px-6 py-6 text-[15px] text-on-surface-variant">
+        <p className="rounded-card border border-outline-variant/60 bg-surface-container-lowest px-4 py-4 text-sm text-on-surface-variant shadow-bakery">
           Bu rol için canlı gösterge paneli metrikleri görünür değil. Erişiminiz olduğundan emin değilseniz bir süper yönetici ile iletişime geçin.
         </p>
       )}

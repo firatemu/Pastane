@@ -4,8 +4,9 @@ import { AllergenList } from '../../../../components/product/allergen-list';
 import { ProductGallery } from '../../../../components/product/product-gallery';
 import { ProductOptionsForm } from '../../../../components/product/product-options-form';
 import { ProductReviews } from '../../../../components/product/product-reviews';
+import { ProductGrid } from '../../../../components/catalog/product-grid';
 import { Price } from '../../../../components/shared/price';
-import { getProductBySlug, getProductReviews } from '../../../../lib/catalog/queries';
+import { getProductBySlug, getProductReviews, getProducts } from '../../../../lib/catalog/queries';
 import { productLabel } from '../../../../lib/catalog/product-label';
 import { absoluteUrl } from '../../../../lib/seo/metadata';
 import { breadcrumbJsonLd, productJsonLd } from '../../../../lib/seo/structured-data';
@@ -29,7 +30,10 @@ export async function generateMetadata({ params }: Readonly<{ params: Promise<{ 
 export default async function ProductPage({ params }: Readonly<{ params: Promise<{ slug: string }> }>): Promise<React.JSX.Element> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  const reviews = await getProductReviews(product.id);
+  const [reviews, relatedProducts] = await Promise.all([
+    getProductReviews(product.id),
+    getProducts({ categoryId: product.category.id, page: 1, limit: 5 }),
+  ]);
   const breadcrumbs = breadcrumbJsonLd([
     { name: 'Ana sayfa', path: '/' },
     { name: product.category.name, path: `/kategori/${product.category.slug}` },
@@ -52,9 +56,24 @@ export default async function ProductPage({ params }: Readonly<{ params: Promise
           <p className="mt-6 text-base leading-7 text-muted">{product.description ?? product.shortDescription ?? 'Taze hazırlanır.'}</p>
           <AllergenList allergens={product.allergens} />
           <ProductOptionsForm product={product} />
+          <div className="mt-6 grid gap-3 border-t border-outline-soft/30 pt-6 text-sm text-muted sm:grid-cols-3">
+            <p className="rounded-2xl bg-surface-low px-4 py-3">Günlük taze üretim</p>
+            <p className="rounded-2xl bg-surface-low px-4 py-3">Güvenli ödeme</p>
+            <p className="rounded-2xl bg-surface-low px-4 py-3">Özenli paketleme</p>
+          </div>
         </div>
       </section>
       <ProductReviews reviews={reviews} />
+      <section className="mt-14 border-t border-outline-soft/30 pt-10">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="stitch-eyebrow">Benzer ürünler</p>
+            <h2 className="mt-2 font-display text-3xl font-bold text-primary">Bu kategoriden diğer lezzetler</h2>
+          </div>
+          <a className="text-sm font-bold uppercase tracking-[0.14em] text-primary hover:text-secondary" href={`/kategori/${product.category.slug}`}>Kategoriye git</a>
+        </div>
+        <ProductGrid products={relatedProducts.items.filter((item) => item.id !== product.id).slice(0, 4)} emptyLabel="Bu kategoride başka ürün bulunmuyor." />
+      </section>
     </main>
   );
 }

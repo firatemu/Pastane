@@ -35,12 +35,14 @@ export function DeliveryZonesManager({
   const [rows, setRows] = useState<DeliveryZone[]>([]);
   const [selected, setSelected] = useState<DeliveryZone | null>(null);
   const [editing, setEditing] = useState<DeliveryZone | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeliveryZone | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [feeFilter, setFeeFilter] = useState('');
+  const [deletingZoneId, setDeletingZoneId] = useState<string | null>(null);
 
   const form = useForm<Form>({
     resolver: zodResolver(zoneSchema),
@@ -122,6 +124,32 @@ export function DeliveryZonesManager({
       await load();
     } catch (caught) {
       setError(adminMessageFromUnknownError(caught, 'Bölge durumu güncellenemedi.'));
+    }
+  }
+
+  function openDeleteDialog(zone: DeliveryZone): void {
+    setDeleteTarget(zone);
+  }
+
+  function closeDeleteDialog(): void {
+    if (deletingZoneId) return;
+    setDeleteTarget(null);
+  }
+
+  async function deleteZone(): Promise<void> {
+    if (!deleteTarget) return;
+    try {
+      setDeletingZoneId(deleteTarget.id);
+      setError(null);
+      await adminFetch(`/delivery-zones/${deleteTarget.id}`, { method: 'DELETE' });
+      setSelected((prev) => (prev?.id === deleteTarget.id ? null : prev));
+      setEditing((prev) => (prev?.id === deleteTarget.id ? null : prev));
+      setDeleteTarget(null);
+      await load();
+    } catch (caught) {
+      setError(adminMessageFromUnknownError(caught, 'Teslimat bölgesi silinemedi.'));
+    } finally {
+      setDeletingZoneId(null);
     }
   }
 
@@ -236,7 +264,9 @@ export function DeliveryZonesManager({
             selectedId={selected?.id ?? null}
             onSelect={setSelected}
             onEdit={openEdit}
+            onDelete={openDeleteDialog}
             onToggleActive={toggleActive}
+            deletingZoneId={deletingZoneId}
             canEdit={canSubmit}
           />
         </div>
@@ -249,6 +279,10 @@ export function DeliveryZonesManager({
         onEdit={() => {
           if (selected) openEdit(selected);
         }}
+        onDelete={() => {
+          if (selected) openDeleteDialog(selected);
+        }}
+        deleting={selected?.id === deletingZoneId}
       />
 
       {canSubmit ? (
@@ -260,6 +294,13 @@ export function DeliveryZonesManager({
           onSubmit={submit}
         />
       ) : null}
+
+      <DeliveryZoneDeleteDialog
+        zone={deleteTarget}
+        deleting={deleteTarget?.id === deletingZoneId}
+        onCancel={closeDeleteDialog}
+        onConfirm={deleteZone}
+      />
     </section>
   );
 }
@@ -284,14 +325,18 @@ function DeliveryZonesList({
   selectedId,
   onSelect,
   onEdit,
+  onDelete,
   onToggleActive,
+  deletingZoneId,
   canEdit,
 }: Readonly<{
   zones: DeliveryZone[];
   selectedId: string | null;
   onSelect: (zone: DeliveryZone) => void;
   onEdit: (zone: DeliveryZone) => void;
+  onDelete: (zone: DeliveryZone) => void;
   onToggleActive: (zone: DeliveryZone) => void | Promise<void>;
+  deletingZoneId: string | null;
   canEdit: boolean;
 }>): React.JSX.Element {
   if (!zones.length) {
@@ -311,6 +356,7 @@ function DeliveryZonesList({
       {zones.map((zone) => {
         const selected = selectedId === zone.id;
         const free = Number(zone.deliveryFee) === 0;
+        const deleting = deletingZoneId === zone.id;
         return (
           <article
             key={zone.id}
@@ -358,6 +404,7 @@ function DeliveryZonesList({
                   type="button"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant transition hover:text-chocolate"
                   title={zone.isActive ? 'Pasifleştir' : 'Aktifleştir'}
+                  disabled={deleting}
                   onClick={() => void onToggleActive(zone)}
                 >
                   <span className="material-symbols-outlined text-[18px]">
@@ -368,9 +415,21 @@ function DeliveryZonesList({
                   type="button"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant transition hover:text-chocolate"
                   title="Düzenle"
+                  disabled={deleting}
                   onClick={() => onEdit(zone)}
                 >
                   <span className="material-symbols-outlined text-[18px]">edit</span>
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-error/30 bg-error-container/20 text-error transition hover:bg-error hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  title="Sil"
+                  disabled={deleting}
+                  onClick={() => onDelete(zone)}
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {deleting ? 'progress_activity' : 'delete'}
+                  </span>
                 </button>
               </div>
             ) : null}
@@ -386,11 +445,15 @@ function DeliveryZoneDetailModal({
   canEdit,
   onClose,
   onEdit,
+  onDelete,
+  deleting,
 }: Readonly<{
   zone: DeliveryZone | null;
   canEdit: boolean;
   onClose: () => void;
   onEdit: () => void;
+  onDelete: () => void;
+  deleting: boolean;
 }>): React.JSX.Element | null {
   if (!zone) return null;
   return (
@@ -436,10 +499,21 @@ function DeliveryZoneDetailModal({
         </div>
         {canEdit ? (
           <div className="flex justify-end gap-2 border-t border-outline-variant/35 p-5">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-error/35 bg-error-container/20 px-4 py-2.5 text-sm font-semibold text-error transition hover:bg-error hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={deleting}
+              onClick={onDelete}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {deleting ? 'progress_activity' : 'delete'}
+              </span>
+              {deleting ? 'Siliniyor…' : 'Sil'}
+            </button>
             <button type="button" className={adminSecondaryButtonClass} onClick={onClose}>
               Kapat
             </button>
-            <button type="button" className={adminPrimaryButtonClass} onClick={onEdit}>
+            <button type="button" className={adminPrimaryButtonClass} disabled={deleting} onClick={onEdit}>
               <span className="material-symbols-outlined text-[20px]">edit</span>
               Düzenle
             </button>
@@ -550,6 +624,79 @@ function DeliveryZoneFormSheet({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function DeliveryZoneDeleteDialog({
+  zone,
+  deleting,
+  onCancel,
+  onConfirm,
+}: Readonly<{
+  zone: DeliveryZone | null;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void | Promise<void>;
+}>): React.JSX.Element | null {
+  if (!zone) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-chocolate/45 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-[1.75rem] border border-error/20 bg-surface-container-lowest shadow-2xl">
+        <div className="border-b border-outline-variant/35 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-error-container text-error">
+              <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-error">
+                Yıkıcı işlem
+              </p>
+              <h2 className="mt-1 font-display text-2xl font-semibold text-on-surface">
+                Teslimat bölgesi silinsin mi?
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                <span className="font-semibold text-on-surface">{zone.name}</span> bölgesi panelden
+                kaldırılacak ve yeni siparişlerde kullanılamayacak.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 p-5">
+          <div className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-4">
+            <p className="text-sm font-semibold text-on-surface">Silme sonrası</p>
+            <ul className="mt-2 space-y-2 text-sm leading-6 text-on-surface-variant">
+              <li>Bölge listeden kaldırılır ve yeni teslimat seçimleri dışında kalır.</li>
+              <li>Bu işlem yönetim arayüzünden geri alınamaz.</li>
+              <li>Silme reddedilirse sunucudan gelen hata mesajı burada gösterilir.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-outline-variant/35 p-5">
+          <button
+            type="button"
+            className={adminSecondaryButtonClass}
+            disabled={deleting}
+            onClick={onCancel}
+          >
+            Vazgeç
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-error/35 bg-error px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={deleting}
+            onClick={() => void onConfirm()}
+          >
+            <span className="material-symbols-outlined text-[20px]">
+              {deleting ? 'progress_activity' : 'delete_forever'}
+            </span>
+            {deleting ? 'Siliniyor…' : 'Evet, sil'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

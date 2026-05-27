@@ -66,6 +66,7 @@ export function OrderDetailPanel({
           <OrderStatusActions
             orderId={order.id}
             status={order.status}
+            deliveryType={order.deliveryType}
             payments={order.payments}
             permissions={permissions}
             onChanged={load}

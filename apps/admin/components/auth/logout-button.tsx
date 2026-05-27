@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 
-/** Shared sign-out triggered from toolbar or sidebar (Stitch-inspired admin chrome). */
+/** Shared sign-out action for the compact admin chrome. */
 export function LogoutButton({
   variant = 'subtle',
   className,
@@ -16,8 +16,8 @@ export function LogoutButton({
   }
   const base =
     variant === 'danger'
-      ? 'flex items-center gap-2 rounded-xl px-4 py-3 text-base font-semibold text-error transition hover:bg-error-container/50 active:scale-[0.98]'
-      : 'rounded-full border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant/40';
+      ? 'flex items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-highlight px-3 py-2 text-[13px] font-semibold text-sidebar-foreground transition hover:border-secondary/25 hover:bg-secondary-container active:scale-[0.98]'
+      : 'rounded-xl border border-outline-variant/80 bg-surface-container-lowest px-3 py-2 text-[13px] font-medium text-on-surface shadow-sm transition hover:bg-surface-container-low';
   return (
     <button className={[base, className ?? ''].join(' ')} onClick={() => void logout()} type="button">
       {children ?? 'Çıkış'}

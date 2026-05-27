@@ -9,6 +9,7 @@ function cartEstimate(cart: Cart): string {
 export function CartSummary({ cart }: Readonly<{ cart: Cart }>): React.JSX.Element {
   return (
     <aside className="sticky top-28 h-fit rounded-3xl bg-primary p-6 text-white shadow-ambient">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-gold">Güvenli ödeme</p>
       <h2 className="font-display text-2xl font-semibold sm:text-3xl">Sipariş özeti</h2>
       <p className="mt-3 text-sm text-white/70">{cart.items.length} ürün satırı</p>
       <dl className="mt-8 space-y-4 text-base">
@@ -23,6 +24,10 @@ export function CartSummary({ cart }: Readonly<{ cart: Cart }>): React.JSX.Eleme
       >
         Ödemeye geç
       </a>
+      <div className="mt-5 grid gap-2 text-xs leading-5 text-white/65">
+        <p>Ürünler ödeme adımında stok ve teslimat için tekrar doğrulanır.</p>
+        <p>Ödeme iyzico güvenli ödeme altyapısı ile tamamlanır.</p>
+      </div>
     </aside>
   );
 }

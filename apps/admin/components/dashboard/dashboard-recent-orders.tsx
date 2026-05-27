@@ -36,11 +36,18 @@ export function DashboardRecentOrders(): JSX.Element {
   }, []);
 
   return (
-    <section className="rounded-card bg-surface-container-lowest p-6 shadow-bakery lg:col-span-2">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-display text-2xl font-semibold tracking-tight text-on-surface">Son siparişler</h3>
-        <Link className="text-sm font-semibold text-secondary transition hover:text-chocolate" href="/orders">
+    <section className="rounded-card border border-outline-variant/70 bg-surface-container-lowest p-4 shadow-bakery lg:col-span-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Sipariş akışı</p>
+          <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-on-surface">Son siparişler</h3>
+        </div>
+        <Link
+          className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant/70 bg-surface-container-low px-3 py-1.5 text-[13px] font-semibold text-secondary transition hover:border-secondary/20 hover:bg-secondary-container/80"
+          href="/orders"
+        >
           Tümünü gör
+          <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
         </Link>
       </div>
       {error ? (
@@ -50,10 +57,10 @@ export function DashboardRecentOrders(): JSX.Element {
       ) : rows.length === 0 ? (
         <p className="text-sm text-on-surface-variant">Listelenecek sipariş bulunmadı.</p>
       ) : (
-        <div className="-mx-gutter overflow-x-auto px-gutter">
+        <div className="-mx-4 overflow-x-auto px-4">
           <table className="w-full min-w-[640px] border-collapse text-left">
             <thead>
-              <tr className="border-b border-outline-variant/35">
+              <tr className="border-b border-outline-variant/45">
                 <TableHead>Sipariş</TableHead>
                 <TableHead>Müşteri</TableHead>
                 <TableHead>Teslim</TableHead>
@@ -62,21 +69,24 @@ export function DashboardRecentOrders(): JSX.Element {
                 <TableHead className="text-right">Ayrıntı</TableHead>
               </tr>
             </thead>
-            <tbody className="divide-y divide-outline-variant/15 text-[15px]">
+            <tbody className="divide-y divide-outline-variant/20 text-sm">
               {rows.map((o) => (
-                <tr className="group transition hover:bg-surface-variant/35" key={o.id}>
-                  <td className="py-4 pr-4 font-semibold text-on-surface">{o.orderNumber}</td>
-                  <td className="py-4 pr-4 text-on-surface-variant">
+                <tr className="group transition hover:bg-surface-container-low/60" key={o.id}>
+                  <td className="py-3 pr-4 font-semibold text-on-surface">{o.orderNumber}</td>
+                  <td className="py-3 pr-4 text-on-surface-variant">
                     {o.user.firstName} {o.user.lastName}
                   </td>
-                  <td className="py-4 pr-4 text-on-surface-variant">{DELIVERY_TYPE_LABELS[o.deliveryType] ?? o.deliveryType}</td>
-                  <td className="py-4 pr-4 font-medium text-on-surface">{formatTry(o.grandTotal)}</td>
-                  <td className="py-4 pr-4">
+                  <td className="py-3 pr-4 text-on-surface-variant">{DELIVERY_TYPE_LABELS[o.deliveryType] ?? o.deliveryType}</td>
+                  <td className="py-3 pr-4 font-medium text-on-surface">{formatTry(o.grandTotal)}</td>
+                  <td className="py-3 pr-4">
                     <StatusPill tone={toneFor(o.status)} label={STATUS_LABELS[o.status] ?? o.status} />
                   </td>
-                  <td className="py-4 text-right">
-                    <Link className="inline-flex items-center rounded-full px-3 py-1 text-secondary hover:bg-secondary-container hover:text-secondary" href={`/orders/${o.id}`}>
-                      <span className="material-symbols-outlined text-[22px]">chevron_right</span>
+                  <td className="py-3 text-right">
+                    <Link
+                      className="inline-flex items-center rounded-full border border-outline-variant/70 bg-surface-container-lowest px-2.5 py-1 text-secondary transition hover:border-secondary/20 hover:bg-secondary-container/80"
+                      href={`/orders/${o.id}`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                     </Link>
                   </td>
                 </tr>
@@ -109,14 +119,18 @@ function StatusPill({ label, tone }: Readonly<{ label: string; tone: StatusTone 
         : tone === 'danger'
           ? 'border border-error/35 bg-error-container text-error'
           : tone === 'neutral'
-            ? 'border border-outline-variant bg-surface-container-high text-on-surface'
+            ? 'border border-outline-variant/60 bg-surface-container text-on-surface'
             : tone === 'muted'
               ? 'border border-outline-variant/40 bg-surface-variant text-on-surface-variant'
               : 'border border-outline-variant/35 bg-primary-container text-on-surface';
 
-  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${cls}`}>{label}</span>;
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${cls}`}>{label}</span>;
 }
 
 function TableHead({ children, className }: Readonly<{ children: ReactNode; className?: string }>): JSX.Element {
-  return <th className={`py-3 pr-4 text-xs font-semibold uppercase tracking-wide text-on-surface-variant ${className ?? ''}`}>{children}</th>;
+  return (
+    <th className={`py-3 pr-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant ${className ?? ''}`}>
+      {children}
+    </th>
+  );
 }

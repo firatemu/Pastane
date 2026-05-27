@@ -24,7 +24,8 @@ export class PublicFilesService {
   private allowedBucket(name: string): boolean {
     const banners = this.config.get('MINIO_BUCKET_BANNERS', 'banners');
     const products = this.config.get('MINIO_BUCKET_PRODUCTS', 'product-images');
-    return name === banners || name === products;
+    const media = this.config.get('MINIO_BUCKET_MEDIA', 'media-assets');
+    return name === banners || name === products || name === media;
   }
 
   async stream(bucket: string, objectKey: string): Promise<StreamableFile> {

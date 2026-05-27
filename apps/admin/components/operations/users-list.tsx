@@ -21,20 +21,24 @@ export function UsersList({
   onSelect,
   onEdit,
   onToggleStatus,
+  onDelete,
   canEdit,
+  canDelete,
 }: Readonly<{
   users: AdminUserRow[];
   selectedId: string | null;
   onSelect: (user: AdminUserRow) => void;
   onEdit: (user: AdminUserRow) => void;
   onToggleStatus: (user: AdminUserRow) => Promise<void>;
+  onDelete: (user: AdminUserRow) => void;
   canEdit: boolean;
+  canDelete: boolean;
 }>): JSX.Element {
   if (users.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-outline-variant bg-surface-container-low px-8 py-16 text-center">
         <span className="material-symbols-outlined text-[48px] text-outline">search_off</span>
-        <p className="mt-4 font-display text-lg font-semibold text-on-surface">Kullanıcı bulunamadı</p>
+        <p className="mt-4 font-display text-lg font-semibold text-on-surface">Personel hesabı bulunamadı</p>
         <p className="mt-2 text-sm text-on-surface-variant">Arama veya filtreleri değiştirin.</p>
       </div>
     );
@@ -43,13 +47,15 @@ export function UsersList({
   return (
     <div className="overflow-hidden rounded-card border border-outline-variant/35 bg-surface-container-lowest shadow-bakery">
       <div className="-mx-gutter overflow-x-auto px-gutter">
-        <table className="w-full min-w-[720px] border-collapse">
+        <table className="w-full min-w-[980px] border-collapse">
           <thead>
             <tr className="border-b border-outline-variant/35">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Kullanıcı</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Hesap</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Telefon</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">E-posta</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Rol</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Doğrulama</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Operasyon</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Durum</th>
               <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-on-surface-variant">İşlem</th>
             </tr>
@@ -105,6 +111,34 @@ export function UsersList({
                     </div>
                   </td>
                   <td className="py-4 pr-4">
+                    {user.isPhoneVerified ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-tertiary/25 bg-tertiary-container px-2.5 py-0.5 text-xs font-semibold text-tertiary whitespace-nowrap">
+                        <span className="material-symbols-outlined text-[14px]">verified</span>
+                        Telefon doğrulandı
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-outline-variant/35 bg-surface-container px-2.5 py-0.5 text-xs font-semibold text-on-surface-variant whitespace-nowrap">
+                        <span className="material-symbols-outlined text-[14px]">pending</span>
+                        Bekliyor
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-4 pr-4">
+                    {user.role.name === 'COURIER' ? (
+                      <div className="space-y-1 text-xs text-on-surface-variant">
+                        <div className="inline-flex items-center gap-1 rounded-full border border-secondary/20 bg-secondary-container px-2.5 py-0.5 font-semibold text-secondary">
+                          <span className="material-symbols-outlined text-[14px]">local_shipping</span>
+                          {user.courier?._count?.deliveries ?? 0} teslimat
+                        </div>
+                        <p className="whitespace-nowrap">
+                          Kurye durumu: {user.courier?.status === 'ACTIVE' ? 'Aktif' : 'Pasif'}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-on-surface-variant">Operasyon ekibi hesabı</span>
+                    )}
+                  </td>
+                  <td className="py-4 pr-4">
                     {s === 'ACTIVE' ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-tertiary/25 bg-tertiary-container px-2.5 py-0.5 text-xs font-semibold text-tertiary whitespace-nowrap">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
@@ -127,32 +161,49 @@ export function UsersList({
                     )}
                   </td>
                   <td className="py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                    {canEdit ? (
+                    {canEdit || canDelete ? (
                       <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-chocolate transition shadow-sm hover:scale-105 active:scale-95"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void onToggleStatus(user);
-                          }}
-                          title={user.status === 'ACTIVE' ? 'Pasifleştir' : 'Aktifleştir'}
-                        >
-                          <span className="material-symbols-outlined text-[18px]">
-                            {user.status === 'ACTIVE' ? 'visibility_off' : 'visibility'}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-chocolate transition shadow-sm hover:scale-105 active:scale-95"
-                          onClick={(e: MouseEvent) => {
-                            e.stopPropagation();
-                            onEdit(user);
-                          }}
-                          title="Düzenle"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
+                        {canEdit ? (
+                          <>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-chocolate transition shadow-sm hover:scale-105 active:scale-95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void onToggleStatus(user);
+                              }}
+                              title={user.status === 'ACTIVE' ? 'Pasifleştir' : 'Aktifleştir'}
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                {user.status === 'ACTIVE' ? 'visibility_off' : 'visibility'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-chocolate transition shadow-sm hover:scale-105 active:scale-95"
+                              onClick={(e: MouseEvent) => {
+                                e.stopPropagation();
+                                onEdit(user);
+                              }}
+                              title="Düzenle"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                            </button>
+                          </>
+                        ) : null}
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-error/25 bg-error-container/40 text-error transition shadow-sm hover:scale-105 hover:bg-error-container active:scale-95"
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              onDelete(user);
+                            }}
+                            title="Hesabı kaldır"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <span className="text-xs text-outline italic">—</span>

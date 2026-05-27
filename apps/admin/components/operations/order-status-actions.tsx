@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { adminFetch } from '../../lib/api/catalog';
 import { adminMessageFromUnknownError } from '../../lib/messages/admin-facing-errors';
-import { NEXT_STATUS, STATUS_LABELS } from '../../lib/operations/status';
+import { getAdminWorkflowTargets, NEXT_STATUS, STATUS_LABELS } from '../../lib/operations/status';
 import type { OrderStatus } from '../../lib/operations/types';
 import { can } from '../../lib/permissions/can';
+import { StatusBadge } from '../shared/status-badge';
 
 const PAYMENT_SUCCESS = 'SUCCESS';
 
@@ -16,12 +17,14 @@ function paymentReceived(payments?: Array<{ status: string }>): boolean {
 export function OrderStatusActions({
   orderId,
   status,
+  deliveryType,
   payments,
   permissions,
   onChanged,
 }: {
   orderId: string;
   status: OrderStatus;
+  deliveryType: 'HOME_DELIVERY' | 'PICKUP';
   payments?: Array<{ status: string }>;
   permissions: string[];
   onChanged: () => Promise<void>;
@@ -58,16 +61,109 @@ export function OrderStatusActions({
 
   if (!can(permissions, ['orders.updateStatus'])) return null;
 
-  const transitions = NEXT_STATUS[status];
+  const transitions = getAdminWorkflowTargets({ status, deliveryType });
   const flowTargets = transitions.filter((s) => s !== 'CANCELLED');
   const canCancelViaFlow = transitions.includes('CANCELLED');
+  const nextFlowStatus = flowTargets[0] ?? null;
 
   const showPaymentBlocked = status === 'PAYMENT_PENDING' && !hasPaidSuccess;
   const showWrongStateForFulfillment =
     !hasPaidSuccess && status !== 'PAYMENT_PENDING' && flowTargets.length > 0;
+  const courierAssignmentManaged =
+    deliveryType === 'HOME_DELIVERY' &&
+    (status === 'PREPARING' || status === 'READY' || status === 'DELIVERY_FAILED');
+  const courierManagedProgress =
+    deliveryType === 'HOME_DELIVERY' &&
+    (status === 'ASSIGNED_TO_COURIER' || status === 'OUT_FOR_DELIVERY');
+  const visibleNextStatus: OrderStatus | null = showPaymentBlocked
+    ? 'CONFIRMED'
+    : courierAssignmentManaged || courierManagedProgress
+      ? NEXT_STATUS[status].find((candidate) => candidate !== 'CANCELLED') ?? null
+      : nextFlowStatus;
+  const statusActionHint = showPaymentBlocked
+    ? 'Ödeme tamamlanana kadar manuel durum değişikliği yapılamaz. Başarılı ödeme sonrası sipariş otomatik olarak onaylanır; bu alanda şimdilik yalnızca iptal işlemi yapılabilir.'
+    : courierAssignmentManaged
+      ? status === 'DELIVERY_FAILED'
+        ? 'Teslim edilemeyen siparişi yeniden dağıtıma çıkarmak için kurye atamasını kurye bölümünden yapın.'
+        : 'Adrese teslim siparişlerde hazırlık tamamlandığında kurye atamasını kurye bölümünden yapın. Bu alanda artık ayrı bir "Hazır" adımı yok.'
+      : courierManagedProgress
+        ? 'Kurye atandıktan sonraki teslimat adımları yalnızca kurye uygulamasından ilerler. Admin bu bölümde sadece bilgilendirme görür.'
+    : flowTargets.length > 0
+      ? 'Siparişin şu anki durumunu ve sıradaki uygun adımı burada görür, ardından aşağıdaki butonlarla durumu hemen güncellersiniz.'
+      : canCancelViaFlow
+        ? 'Normal iş akışı tamamlandı. Gerekirse bu alandan yalnızca iptal işlemi yapılabilir.'
+        : 'Bu sipariş için tamamlanmış iş akışı dışında ek durum değişikliği bulunmuyor.';
 
   return (
     <div className="space-y-4">
+      <div className="rounded-3xl border border-sky-200 bg-sky-50 p-4">
+        <div className="space-y-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-sky-950">Sipariş durumunu bu bölümden değiştirin</p>
+              <p className="mt-1 text-sm leading-6 text-sky-900">{statusActionHint}</p>
+            </div>
+            {flowTargets.length > 0 ? (
+              <span className="inline-flex w-fit rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-950">
+                Aşağıdaki butonlardan birini seçin
+              </span>
+            ) : null}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+            <div className="rounded-2xl border border-white bg-white/90 p-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">Şu anki durum</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <StatusBadge status={status} />
+                <span className="text-sm text-stone-600">Sipariş şu anda bu aşamada.</span>
+              </div>
+            </div>
+            <div
+              className="hidden items-center justify-center text-2xl font-semibold text-sky-300 lg:flex"
+              aria-hidden="true"
+            >
+              →
+            </div>
+            <div className="rounded-2xl border border-white bg-white/90 p-3">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">
+                {showPaymentBlocked ? 'Sıradaki otomatik durum' : 'Sıradaki durum'}
+              </p>
+              {visibleNextStatus ? (
+                <>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <StatusBadge status={visibleNextStatus} />
+                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700">
+                      {showPaymentBlocked ? 'Otomatik ilerler' : 'Önerilen adım'}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-stone-600">
+                    {showPaymentBlocked
+                      ? `"${STATUS_LABELS[visibleNextStatus]}" durumu, ödeme onayı geldikten sonra sistem tarafından otomatik uygulanır.`
+                      : courierAssignmentManaged
+                        ? `"${STATUS_LABELS[visibleNextStatus]}" durumuna geçiş, kurye atama işlemiyle yapılır.`
+                        : courierManagedProgress
+                          ? `Bu siparişin sıradaki teslimat adımı "${STATUS_LABELS[visibleNextStatus]}". İlerletme işlemi yalnızca kurye panelinden yapılabilir.`
+                        : `Siparişi bir sonraki aşama olan "${STATUS_LABELS[visibleNextStatus]}" durumuna geçirebilirsiniz.`}
+                  </p>
+                </>
+              ) : canCancelViaFlow ? (
+                <>
+                  <p className="mt-2 text-sm font-semibold text-stone-900">Normal akış tamamlandı</p>
+                  <p className="mt-1 text-sm text-stone-600">
+                    Bu noktadan sonra standart ilerleme yerine yalnızca iptal işlemi yapılabilir.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 text-sm font-semibold text-stone-900">Geçiş kalmadı</p>
+                  <p className="mt-1 text-sm text-stone-600">
+                    Sipariş için seçilebilir yeni bir durum bulunmuyor.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
       {showPaymentBlocked ? (
         <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950">
           Bu sipariş ödeme bekliyor; admin panelinden &quot;Onaylandı&quot; veya sonraki aşamalara geçiş yapılmaz —
@@ -80,21 +176,41 @@ export function OrderStatusActions({
         </p>
       ) : null}
       {flowTargets.length > 0 ? (
-        <div>
-          <p className="mb-2 text-sm font-medium text-stone-700">İş akışı sonraki durumları</p>
-          <div className="flex flex-wrap gap-2">
-            {flowTargets.map((s) => (
+        <div className="rounded-3xl border border-stone-200 bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-stone-900">Durumu değiştir</p>
+              <p className="mt-1 text-xs leading-5 text-stone-600">
+                {flowTargets.length > 1
+                  ? 'Sipariş durumunu değiştirmek için aşağıdaki seçeneklerden birine tıklayın. İlk buton önerilen sıradaki adımdır.'
+                  : 'Sipariş durumunu değiştirmek için aşağıdaki butona tıklayın.'}
+              </p>
+            </div>
+            {nextFlowStatus ? (
+              <span className="inline-flex w-fit rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-700">
+                Önerilen: {STATUS_LABELS[nextFlowStatus]}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {flowTargets.map((s, index) => (
               <button
                 disabled={
                   busy ||
                   (!hasPaidSuccess && flowTargets.length > 0 && status !== 'PAYMENT_PENDING')
                 }
-                className="rounded-2xl border px-3 py-2 text-sm disabled:opacity-60"
+                className={`rounded-2xl border px-4 py-2 text-sm font-semibold disabled:opacity-60 ${
+                  index === 0
+                    ? 'border-stone-900 bg-stone-900 text-white'
+                    : 'border-stone-300 bg-white text-stone-900'
+                }`}
                 key={s}
                 type="button"
                 onClick={() => void patchStatus(s)}
               >
-                → {STATUS_LABELS[s]}
+                {index === 0
+                  ? `${STATUS_LABELS[s]} durumuna geçir`
+                  : `${STATUS_LABELS[s]} olarak güncelle`}
               </button>
             ))}
           </div>

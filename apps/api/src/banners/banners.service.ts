@@ -1,23 +1,20 @@
-import { HttpStatus, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Client } from 'minio';
 import type { Banner, Prisma } from '@prisma/client';
-import { BannerMediaType } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import {
+  BannerMediaType,
+  MediaAssetKind,
+  MediaAssetSource,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { ERROR_CODES } from '../common/constants/error-codes';
 import { AppException } from '../common/exceptions/app.exception';
 import { parseMinioPublicObjectUrl } from '../common/utils/parse-minio-public-object-url.util';
-import { detectBannerMedia } from '../common/utils/mime.util';
-import { ensureBucketWithPublicRead } from '../common/utils/minio-public-bucket.util';
 import type { AuthUser } from '../common/types/auth-user.type';
 import { PrismaService } from '../database/prisma.service';
-import { MINIO_CLIENT } from '../media/providers/minio.provider';
+import { MediaService } from '../media/media.service';
 import type { CreateBannerDto } from './dto/create-banner.dto';
 import type { UpdateBannerDto } from './dto/update-banner.dto';
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 
 export type PublicBannerDto = {
   id: string;
@@ -33,26 +30,13 @@ export type PublicBannerDto = {
 };
 
 @Injectable()
-export class BannersService implements OnModuleInit {
-  private readonly logger = new Logger(BannersService.name);
-
+export class BannersService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(MediaService) private readonly media: MediaService,
     @Inject(ConfigService) private readonly config: ConfigService,
-    @Inject(MINIO_CLIENT) private readonly minio: Client,
   ) {}
-
-  async onModuleInit(): Promise<void> {
-    const bucket = this.config.get('MINIO_BUCKET_BANNERS', 'banners');
-    try {
-      await ensureBucketWithPublicRead(this.minio, bucket);
-    } catch (err) {
-      this.logger.warn(
-        `Banner bucket public read policy could not be applied (${bucket}): ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
 
   async listHome(): Promise<PublicBannerDto[]> {
     const now = new Date();
@@ -60,6 +44,8 @@ export class BannersService implements OnModuleInit {
       where: {
         deletedAt: null,
         isActive: true,
+        desktopMediaUrl: { not: null },
+        mobileMediaUrl: { not: null },
         AND: [
           { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
           { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
@@ -83,7 +69,15 @@ export class BannersService implements OnModuleInit {
         sortOrder: true,
       },
     });
-    return rows.map((r) => this.mapHomeRow(r));
+    return rows
+      .filter((row) => row.desktopMediaUrl && row.mobileMediaUrl)
+      .map((row) =>
+        this.mapHomeRow({
+          ...row,
+          desktopMediaUrl: row.desktopMediaUrl!,
+          mobileMediaUrl: row.mobileMediaUrl!,
+        }),
+      );
   }
 
   async listAdmin(): Promise<Banner[]> {
@@ -98,6 +92,10 @@ export class BannersService implements OnModuleInit {
 
   async create(dto: CreateBannerDto, actor?: AuthUser) {
     const sortOrder = dto.sortOrder ?? (await this.nextSortOrder());
+    const [desktopAsset, mobileAsset] = await Promise.all([
+      this.resolveBannerMediaAsset(dto.mediaType, dto.desktopMediaBucket, dto.desktopMediaObjectKey, dto.desktopMediaUrl),
+      this.resolveBannerMediaAsset(dto.mediaType, dto.mobileMediaBucket, dto.mobileMediaObjectKey, dto.mobileMediaUrl),
+    ]);
     const item = await this.prisma.banner.create({
       data: {
         title: dto.title,
@@ -107,9 +105,11 @@ export class BannersService implements OnModuleInit {
         desktopMediaUrl: dto.desktopMediaUrl,
         desktopMediaBucket: dto.desktopMediaBucket ?? null,
         desktopMediaObjectKey: dto.desktopMediaObjectKey ?? null,
+        desktopMediaAssetId: desktopAsset?.id ?? null,
         mobileMediaUrl: dto.mobileMediaUrl,
         mobileMediaBucket: dto.mobileMediaBucket ?? null,
         mobileMediaObjectKey: dto.mobileMediaObjectKey ?? null,
+        mobileMediaAssetId: mobileAsset?.id ?? null,
         buttonText: dto.buttonText,
         buttonUrl: dto.buttonUrl,
         sortOrder,
@@ -130,17 +130,39 @@ export class BannersService implements OnModuleInit {
 
   async update(id: string, dto: UpdateBannerDto, actor?: AuthUser) {
     const old = await this.getNonDeleted(id);
-
-    if (dto.desktopMediaUrl !== undefined && dto.desktopMediaUrl !== old.desktopMediaUrl) {
-      await this.removeStoredObject(old.desktopMediaBucket, old.desktopMediaObjectKey);
-    }
-    if (dto.mobileMediaUrl !== undefined && dto.mobileMediaUrl !== old.mobileMediaUrl) {
-      await this.removeStoredObject(old.mobileMediaBucket, old.mobileMediaObjectKey);
-    }
+    const [desktopMediaAssetId, mobileMediaAssetId] = await Promise.all([
+      this.shouldResolveMediaAsset(
+        dto.desktopMediaUrl,
+        dto.desktopMediaBucket,
+        dto.desktopMediaObjectKey,
+      )
+        ? this.resolveBannerMediaAsset(
+            dto.mediaType ?? old.mediaType,
+            dto.desktopMediaBucket,
+            dto.desktopMediaObjectKey,
+            dto.desktopMediaUrl,
+          ).then((asset) => asset?.id ?? null)
+        : Promise.resolve(undefined),
+      this.shouldResolveMediaAsset(
+        dto.mobileMediaUrl,
+        dto.mobileMediaBucket,
+        dto.mobileMediaObjectKey,
+      )
+        ? this.resolveBannerMediaAsset(
+            dto.mediaType ?? old.mediaType,
+            dto.mobileMediaBucket,
+            dto.mobileMediaObjectKey,
+            dto.mobileMediaUrl,
+          ).then((asset) => asset?.id ?? null)
+        : Promise.resolve(undefined),
+    ]);
 
     const item = await this.prisma.banner.update({
       where: { id },
-      data: this.buildUpdateData(dto),
+      data: this.buildUpdateData(dto, {
+        desktopMediaAssetId,
+        mobileMediaAssetId,
+      }),
     });
     await this.audit.log({
       actorId: actor?.sub,
@@ -155,7 +177,6 @@ export class BannersService implements OnModuleInit {
 
   async remove(id: string, actor?: AuthUser) {
     const old = await this.getNonDeleted(id);
-    await this.deleteBannerStoredFiles(old);
     const item = await this.prisma.banner.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
     await this.audit.log({
       actorId: actor?.sub,
@@ -208,46 +229,30 @@ export class BannersService implements OnModuleInit {
     variant: 'desktop' | 'mobile',
     expectKind?: BannerMediaType,
   ) {
-    if (!file?.buffer) {
-      throw new AppException(ERROR_CODES.VALIDATION_FAILED, 'File is required', HttpStatus.BAD_REQUEST);
-    }
-    const detected = detectBannerMedia(file.buffer);
-    if (!detected) {
-      throw new AppException(
-        ERROR_CODES.MEDIA_INVALID_TYPE,
-        'Desteklenmeyen dosya türü. Görseller: JPEG, PNG, WebP veya GIF; video: MP4 veya WebM kullanın.',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    const max = detected.kind === 'IMAGE' ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
-    if (file.size > max) {
-      throw new AppException(ERROR_CODES.MEDIA_FILE_TOO_LARGE, 'File is too large', HttpStatus.BAD_REQUEST);
-    }
-    if (expectKind !== undefined) {
-      const want: 'IMAGE' | 'VIDEO' = expectKind === BannerMediaType.IMAGE ? 'IMAGE' : 'VIDEO';
-      if (detected.kind !== want) {
-        throw new AppException(ERROR_CODES.BANNER_MEDIA_MISMATCH, 'File does not match selected media type', HttpStatus.BAD_REQUEST);
-      }
-    }
-
-    const bucket = this.config.get('MINIO_BUCKET_BANNERS', 'banners');
-    await ensureBucketWithPublicRead(this.minio, bucket);
-    const ext = extensionForMime(detected.mime);
-    const key = `home/${variant}/${randomUUID()}${ext}`;
-    try {
-      await this.minio.putObject(bucket, key, file.buffer, file.size, { 'Content-Type': detected.mime });
-    } catch {
-      throw new AppException(ERROR_CODES.MEDIA_UPLOAD_FAILED, 'Media upload failed', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-    const minioUrl = `${this.config.get('MINIO_PUBLIC_URL', 'http://localhost:9000')}/${bucket}/${key}`;
-    const url = this.proxiedMediaUrl(bucket, key, minioUrl);
+    const expectedKind = expectKind
+      ? expectKind === BannerMediaType.VIDEO
+        ? MediaAssetKind.VIDEO
+        : MediaAssetKind.IMAGE
+      : undefined;
+    const asset = await this.media.createAssetFromUpload(file, {
+      source: MediaAssetSource.BANNER_UPLOAD,
+      bucketConfigKey: 'MINIO_BUCKET_BANNERS',
+      defaultBucket: 'banners',
+      folder: `home/${variant}`,
+      expectedKind,
+      title: file?.originalname,
+      mismatchErrorCode: ERROR_CODES.BANNER_MEDIA_MISMATCH,
+      mismatchMessage: 'File does not match selected media type',
+    });
     return {
       variant,
-      url,
-      bucket,
-      objectKey: key,
-      detectedMediaType: detected.kind === 'IMAGE' ? BannerMediaType.IMAGE : BannerMediaType.VIDEO,
-      mime: detected.mime,
+      assetId: asset.id,
+      url: this.proxiedMediaUrl(asset.bucket, asset.objectKey, asset.url) ?? asset.url,
+      bucket: asset.bucket,
+      objectKey: asset.objectKey,
+      detectedMediaType:
+        asset.kind === MediaAssetKind.VIDEO ? BannerMediaType.VIDEO : BannerMediaType.IMAGE,
+      mime: asset.mimeType,
     };
   }
 
@@ -273,8 +278,12 @@ export class BannersService implements OnModuleInit {
       subtitle: row.subtitle,
       description: row.description,
       mediaType: row.mediaType,
-      desktopMediaUrl: this.proxiedMediaUrl(row.desktopMediaBucket, row.desktopMediaObjectKey, row.desktopMediaUrl),
-      mobileMediaUrl: this.proxiedMediaUrl(row.mobileMediaBucket, row.mobileMediaObjectKey, row.mobileMediaUrl),
+      desktopMediaUrl:
+        this.proxiedMediaUrl(row.desktopMediaBucket, row.desktopMediaObjectKey, row.desktopMediaUrl) ??
+        row.desktopMediaUrl,
+      mobileMediaUrl:
+        this.proxiedMediaUrl(row.mobileMediaBucket, row.mobileMediaObjectKey, row.mobileMediaUrl) ??
+        row.mobileMediaUrl,
       buttonText: row.buttonText,
       buttonUrl: row.buttonUrl,
       sortOrder: row.sortOrder,
@@ -289,12 +298,14 @@ export class BannersService implements OnModuleInit {
     };
   }
 
-  private proxiedMediaUrl(bucket: string | null, objectKey: string | null, storedUrl: string): string {
+  private proxiedMediaUrl(bucket: string | null, objectKey: string | null, storedUrl: string | null): string | null {
+    if (!storedUrl) return null;
     const base = (this.config.get<string>('PUBLIC_API_URL') ?? this.config.get<string>('API_URL') ?? '').trim();
     if (!base) return storedUrl;
     const banners = this.config.get('MINIO_BUCKET_BANNERS', 'banners');
     const products = this.config.get('MINIO_BUCKET_PRODUCTS', 'product-images');
-    const allowed = new Set([banners, products]);
+    const media = this.config.get('MINIO_BUCKET_MEDIA', 'media-assets');
+    const allowed = new Set([banners, products, media]);
     let b = bucket ?? null;
     let k = objectKey ?? null;
     if (!b || !k) {
@@ -308,8 +319,14 @@ export class BannersService implements OnModuleInit {
     return `${base.replace(/\/$/, '')}/api/v1/files/${b}/${encodeURIComponent(k)}`;
   }
 
-  private buildUpdateData(dto: UpdateBannerDto): Prisma.BannerUpdateInput {
-    const data: Prisma.BannerUpdateInput = {};
+  private buildUpdateData(
+    dto: UpdateBannerDto,
+    assetIds?: {
+      desktopMediaAssetId?: string | null;
+      mobileMediaAssetId?: string | null;
+    },
+  ): Prisma.BannerUncheckedUpdateInput {
+    const data: Prisma.BannerUncheckedUpdateInput = {};
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.subtitle !== undefined) data.subtitle = dto.subtitle;
     if (dto.description !== undefined) data.description = dto.description;
@@ -317,9 +334,11 @@ export class BannersService implements OnModuleInit {
     if (dto.desktopMediaUrl !== undefined) data.desktopMediaUrl = dto.desktopMediaUrl;
     if (dto.desktopMediaBucket !== undefined) data.desktopMediaBucket = dto.desktopMediaBucket;
     if (dto.desktopMediaObjectKey !== undefined) data.desktopMediaObjectKey = dto.desktopMediaObjectKey;
+    if (assetIds?.desktopMediaAssetId !== undefined) data.desktopMediaAssetId = assetIds.desktopMediaAssetId;
     if (dto.mobileMediaUrl !== undefined) data.mobileMediaUrl = dto.mobileMediaUrl;
     if (dto.mobileMediaBucket !== undefined) data.mobileMediaBucket = dto.mobileMediaBucket;
     if (dto.mobileMediaObjectKey !== undefined) data.mobileMediaObjectKey = dto.mobileMediaObjectKey;
+    if (assetIds?.mobileMediaAssetId !== undefined) data.mobileMediaAssetId = assetIds.mobileMediaAssetId;
     if (dto.buttonText !== undefined) data.buttonText = dto.buttonText;
     if (dto.buttonUrl !== undefined) data.buttonUrl = dto.buttonUrl;
     if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
@@ -340,52 +359,26 @@ export class BannersService implements OnModuleInit {
     return item;
   }
 
-  private async deleteBannerStoredFiles(row: {
-    desktopMediaBucket: string | null;
-    desktopMediaObjectKey: string | null;
-    mobileMediaBucket: string | null;
-    mobileMediaObjectKey: string | null;
-  }): Promise<void> {
-    await Promise.all([
-      this.removeStoredObjectBestEffort(row.desktopMediaBucket, row.desktopMediaObjectKey),
-      this.removeStoredObjectBestEffort(row.mobileMediaBucket, row.mobileMediaObjectKey),
-    ]);
+  private shouldResolveMediaAsset(
+    url: string | undefined,
+    bucket: string | null | undefined,
+    objectKey: string | null | undefined,
+  ): boolean {
+    return url !== undefined || bucket !== undefined || objectKey !== undefined;
   }
 
-  private async removeStoredObjectBestEffort(bucket: string | null, objectKey: string | null): Promise<void> {
-    if (!bucket || !objectKey) return;
-    try {
-      await this.minio.removeObject(bucket, objectKey);
-    } catch (err) {
-      this.logger.warn(`MinIO removeObject failed (${bucket}/${objectKey}): ${err instanceof Error ? err.message : err}`);
-    }
-  }
-
-  private async removeStoredObject(bucket: string | null, objectKey: string | null) {
-    if (!bucket || !objectKey) return;
-    try {
-      await this.minio.removeObject(bucket, objectKey);
-    } catch {
-      throw new AppException(ERROR_CODES.MEDIA_DELETE_FAILED, 'Media delete failed', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-}
-
-function extensionForMime(mime: string): string {
-  switch (mime) {
-    case 'image/jpeg':
-      return '.jpg';
-    case 'image/png':
-      return '.png';
-    case 'image/webp':
-      return '.webp';
-    case 'image/gif':
-      return '.gif';
-    case 'video/mp4':
-      return '.mp4';
-    case 'video/webm':
-      return '.webm';
-    default:
-      return '.bin';
+  private resolveBannerMediaAsset(
+    mediaType: BannerMediaType,
+    bucket?: string | null,
+    objectKey?: string | null,
+    url?: string | null,
+  ) {
+    return this.media.resolveAssetReference({
+      bucket,
+      objectKey,
+      url,
+      source: MediaAssetSource.BANNER_UPLOAD,
+      kind: mediaType === BannerMediaType.VIDEO ? MediaAssetKind.VIDEO : MediaAssetKind.IMAGE,
+    });
   }
 }

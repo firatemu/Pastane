@@ -22,12 +22,14 @@ export function UserDetailModal({
   roles,
   permissions,
   onEdit,
+  onDelete,
   onClose,
 }: Readonly<{
   user: AdminUserRow | null;
   roles: AdminRoleRow[];
   permissions: string[];
   onEdit: () => void;
+  onDelete: () => void;
   onClose: () => void;
 }>): JSX.Element | null {
   useEffect(() => {
@@ -71,6 +73,7 @@ export function UserDetailModal({
             roles={roles}
             permissions={permissions}
             onEdit={onEdit}
+            onDelete={onDelete}
             onClose={onClose}
             readOnly
           />
@@ -87,6 +90,7 @@ export function UserDetailTabs({
   roles,
   permissions,
   onEdit,
+  onDelete,
   onClose,
   readOnly = false,
 }: Readonly<{
@@ -94,6 +98,7 @@ export function UserDetailTabs({
   roles: AdminRoleRow[];
   permissions: string[];
   onEdit: () => void;
+  onDelete: () => void;
   onClose: () => void;
   readOnly?: boolean;
 }>): JSX.Element {
@@ -168,6 +173,12 @@ export function UserDetailTabs({
               Düzenle
             </button>
           ) : null}
+          {can(permissions, ['users.delete']) ? (
+            <button type="button" className={adminSecondaryButtonClass} onClick={onDelete}>
+              <span className="material-symbols-outlined text-[20px]">delete</span>
+              Kaldır
+            </button>
+          ) : null}
           <button type="button" className={adminSecondaryButtonClass} onClick={onClose} aria-label="Detayı kapat">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -204,6 +215,16 @@ export function UserDetailTabs({
             <OverviewBlock title="Soyad" body={user.lastName} />
             <OverviewBlock title="E-posta Adresi" body={user.email} empty="E-posta tanımlanmamış." />
             <OverviewBlock title="Telefon Numarası" body={user.phone} empty="Telefon numarası tanımlanmamış." />
+            <OverviewBlock
+              title="Hesap Oluşturma"
+              body={user.createdAt ? new Date(user.createdAt).toLocaleString('tr-TR') : null}
+              empty="Kayıt tarihi bulunamadı."
+            />
+            <OverviewBlock
+              title="Son Güncelleme"
+              body={user.updatedAt ? new Date(user.updatedAt).toLocaleString('tr-TR') : null}
+              empty="Güncelleme tarihi bulunamadı."
+            />
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Telefon Doğrulama</h3>
               <div className="mt-2">
@@ -225,6 +246,21 @@ export function UserDetailTabs({
               <p className="mt-2 text-[15px] leading-relaxed text-on-surface font-semibold">
                 {s === 'ACTIVE' ? 'Aktif' : s === 'INACTIVE' ? 'Pasif' : 'Yasaklı'}
               </p>
+            </div>
+            <div className="sm:col-span-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Operasyon Özeti</h3>
+              <div className="mt-2 rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+                {user.role.name === 'COURIER' ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary-container px-3 py-1 text-xs font-semibold text-secondary">
+                      Kurye durumu: {user.courier?.status === 'ACTIVE' ? 'Aktif' : 'Pasif'}
+                    </span>
+                    <span>{user.courier?._count?.deliveries ?? 0} teslimat kaydı</span>
+                  </div>
+                ) : (
+                  <span>Bu hesap operasyon paneli erişimine sahip personel kullanıcısıdır.</span>
+                )}
+              </div>
             </div>
           </div>
         ) : null}

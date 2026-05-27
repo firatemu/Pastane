@@ -43,7 +43,11 @@ export class AuthService {
     if (!session) throw new AppException(ERROR_CODES.AUTH_REFRESH_TOKEN_INVALID, 'Refresh token is invalid', HttpStatus.UNAUTHORIZED);
     await this.prisma.refreshToken.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
     void tokenHash;
-    return this.createSession(payload.sub);
+    return this.createSession(
+      payload.sub,
+      ERROR_CODES.AUTH_REFRESH_TOKEN_INVALID,
+      'Refresh token is invalid',
+    );
   }
 
   async logout(rawToken: string): Promise<{ loggedOut: true }> {
@@ -53,11 +57,18 @@ export class AuthService {
     return { loggedOut: true };
   }
 
-  private async createSession(userId: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
+  private async createSession(
+    userId: string,
+    errorCode: (typeof ERROR_CODES)[keyof typeof ERROR_CODES] = ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+    errorMessage = 'Invalid credentials',
+  ) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null, status: UserStatus.ACTIVE },
       include: { role: { include: { permissions: { include: { permission: true } } } } },
     });
+    if (!user) {
+      throw new AppException(errorCode, errorMessage, HttpStatus.UNAUTHORIZED);
+    }
     const authUser: AuthUser = { sub: user.id, phone: user.phone, role: user.role.name, permissions: user.role.permissions.map((item) => item.permission.code) };
     const accessToken = await this.jwt.signAsync(authUser, { secret: this.config.getOrThrow('JWT_SECRET'), expiresIn: this.config.get('JWT_ACCESS_EXPIRES_IN', '15m') });
     const refreshToken = await this.jwt.signAsync({ sub: user.id, jti: randomUUID() }, { secret: this.config.getOrThrow('JWT_REFRESH_SECRET'), expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '30d') });

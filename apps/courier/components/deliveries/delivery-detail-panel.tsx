@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAdaptivePolling } from '@pastane/ui';
@@ -26,49 +27,92 @@ function latestPaymentStatus(order: DeliveryDetail['order']): string | null {
   return order.payments?.[0]?.status ?? null;
 }
 
-function InfoTile({
-  label,
-  value,
-  tone = 'default',
-}: {
-  label: string;
-  value: React.ReactNode;
-  tone?: 'default' | 'dark' | 'success';
-}): React.JSX.Element {
-  const toneClass =
-    tone === 'dark'
-      ? 'border-amber-200 bg-amber-50 text-amber-950'
-      : tone === 'success'
-        ? 'border-green-100 bg-green-50 text-green-950'
-        : 'border-stone-200 bg-white text-stone-950';
+/* ─────────────────────── Panel Bileşenleri ─────────────────────── */
 
+function SectionCard({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}): React.JSX.Element {
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${toneClass}`}>
-      <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${tone === 'dark' ? 'text-amber-700' : 'text-stone-500'}`}>
-        {label}
-      </p>
-      <div className="mt-1 text-base font-semibold leading-6">{value}</div>
+    <div className={`rounded-xl border border-stone-200 bg-white shadow-sm ${className}`}>
+      {children}
     </div>
   );
 }
 
-function DetailSection({
-  children,
-  eyebrow,
+function SectionHeader({
+  icon,
   title,
+  subtitle,
 }: {
-  children: React.ReactNode;
-  eyebrow?: string;
+  icon: React.ReactNode;
   title: string;
+  subtitle?: string;
 }): React.JSX.Element {
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
-      {eyebrow ? <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">{eyebrow}</p> : null}
-      <h2 className="text-lg font-semibold tracking-tight text-stone-950">{title}</h2>
-      <div className="mt-4">{children}</div>
-    </section>
+    <div className="flex items-start gap-3 border-b border-stone-100 px-4 py-3 sm:px-5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-100">
+        <svg className="h-4 w-4 text-stone-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+          {icon}
+        </svg>
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
+        {subtitle ? <p className="text-xs text-stone-500">{subtitle}</p> : null}
+      </div>
+    </div>
   );
 }
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <span className="text-xs text-stone-500">{label}</span>
+      <span className="text-sm font-medium text-stone-900">{value}</span>
+    </div>
+  );
+}
+
+function MetricTile({
+  icon,
+  label,
+  value,
+  color = 'stone',
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color?: 'amber' | 'emerald' | 'sky' | 'stone';
+}): React.JSX.Element {
+  const colorMap = {
+    amber: 'bg-amber-50 border-amber-100',
+    emerald: 'bg-emerald-50 border-emerald-100',
+    sky: 'bg-sky-50 border-sky-100',
+    stone: 'bg-stone-50 border-stone-200',
+  };
+  const iconColorMap = {
+    amber: 'text-amber-600',
+    emerald: 'text-emerald-600',
+    sky: 'text-sky-600',
+    stone: 'text-stone-500',
+  };
+  return (
+    <div className={`rounded-lg border p-3 ${colorMap[color]}`}>
+      <div className="flex items-center gap-1.5">
+        <svg className={`h-3.5 w-3.5 ${iconColorMap[color]}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+          {icon}
+        </svg>
+        <span className="text-[10px] font-medium uppercase tracking-wider text-stone-500">{label}</span>
+      </div>
+      <p className="mt-1.5 text-lg font-bold text-stone-900">{value}</p>
+    </div>
+  );
+}
+
+/* ─────────────────────── Ana Panel ─────────────────────── */
 
 export function DeliveryDetailPanel({ id }: { id: string }): React.JSX.Element {
   const [delivery, setDelivery] = useState<DeliveryDetail | null>(null);
@@ -144,264 +188,343 @@ export function DeliveryDetailPanel({ id }: { id: string }): React.JSX.Element {
   const deliveryFeeLabel = formatTryAmount(delivery.order.deliveryFee);
   const serviceFeeLabel = formatTryAmount(delivery.order.serviceFee);
   const loyaltyDiscountLabel = formatTryAmount(delivery.order.loyaltyDiscount);
+  const isFailed = delivery.status === 'FAILED';
+  const isTerminal = delivery.status === 'DELIVERED' || delivery.status === 'FAILED';
 
   const history = [...delivery.order.statusHistory].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
   return (
-    <section className="space-y-5 py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section className="space-y-4 px-3 py-4 sm:px-4 lg:px-0">
+      {/* ─── Üst Başlık ─── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <a className="text-sm font-semibold text-stone-600 underline-offset-4 hover:text-stone-950 hover:underline" href="/deliveries">
+          <Link
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 transition hover:text-stone-900"
+            href="/deliveries"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
             Teslimatlara dön
-          </a>
-          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-500">Teslimat detayı</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">{delivery.order.orderNumber}</h1>
+          </Link>
+          <div className="mt-2 flex items-center gap-3">
+            <h1 className="text-xl font-bold tracking-tight text-stone-900 sm:text-2xl">
+              {delivery.order.orderNumber}
+            </h1>
+            <DeliveryStatusBadge status={delivery.status} />
+          </div>
         </div>
-        <PollingNote seconds={15} lastRefreshedAt={lastRefreshedAt} pollWarning={pollWarning} />
+        <div className="flex items-center gap-3">
+          <PollingNote seconds={15} lastRefreshedAt={lastRefreshedAt} pollWarning={pollWarning} />
+          <a
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
+            href={`tel:${phoneClean}`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+            </svg>
+            <span className="hidden sm:inline">Müşteriyi ara</span>
+            <span className="sm:hidden">Ara</span>
+          </a>
+        </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-5">
-          <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <DeliveryStatusBadge status={delivery.status} />
-                  <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-800">
-                    {deliveryTypeLabel(delivery.order.deliveryType)}
-                  </span>
-                  {payStatus ? (
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${paymentStatusBadgeClass(payStatus)}`}>
-                      Ödeme: {paymentStatusLabel(payStatus)}
+      {/* ─── Ana İçerik ─── */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_380px]">
+        {/* Sol Kolon */}
+        <div className="space-y-4 min-w-0">
+          {/* Müşteri & Durum Kartı */}
+          <SectionCard>
+            <div className="p-4 sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 ring-1 ring-inset ring-violet-600/20">
+                      {deliveryTypeLabel(delivery.order.deliveryType)}
                     </span>
-                  ) : null}
+                    {payStatus ? (
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${paymentStatusBadgeClass(payStatus)}`}>
+                        {paymentStatusLabel(payStatus)}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center rounded-md bg-stone-50 px-2 py-0.5 text-[11px] font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10">
+                      {orderStatusLabel(delivery.order.status)}
+                    </span>
+                  </div>
+                  <h2 className="mt-2 text-lg font-bold text-stone-900 sm:text-xl">{customerName}</h2>
+                  <p className="mt-1 text-sm text-stone-500">
+                    {scheduled ? `Planlanan: ${scheduled}` : `Sipariş: ${orderCreated ?? '—'}`}
+                  </p>
                 </div>
-                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-stone-950">{customerName}</h2>
-                <p className="mt-2 text-sm leading-6 text-stone-600">
-                  Sipariş durumu <span className="font-semibold text-stone-900">{orderStatusLabel(delivery.order.status)}</span>
-                  {scheduled ? ` · Planlanan ${scheduled}` : ''}
-                </p>
               </div>
-              <a
-                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-green-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-green-800"
-                href={`tel:${phoneClean}`}
-              >
-                Ara: {delivery.order.user.phone}
-              </a>
-            </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <InfoTile label="Toplam" value={grandTotalLabel ?? 'Tutar yok'} tone="dark" />
-              <InfoTile label="Ürün satırı" value={`${delivery.order.items.length} kalem`} />
-              <InfoTile label="Süre" value={duration ?? 'Devam ediyor'} tone={duration ? 'success' : 'default'} />
+              {/* Metrikler */}
+              <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                <MetricTile
+                  icon={<path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
+                  label="Toplam"
+                  value={grandTotalLabel ?? '—'}
+                  color="amber"
+                />
+                <MetricTile
+                  icon={<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />}
+                  label="Kalem"
+                  value={`${delivery.order.items.length} adet`}
+                  color="sky"
+                />
+                <MetricTile
+                  icon={<path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />}
+                  label="Süre"
+                  value={duration ?? 'Devam ediyor'}
+                  color={duration ? 'emerald' : 'stone'}
+                />
+              </div>
             </div>
-          </section>
+          </SectionCard>
 
-          {delivery.status === 'FAILED' && delivery.failedReason ? (
-            <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-950 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-800">Başarısızlık nedeni</p>
-              <p className="mt-2 leading-6">{delivery.failedReason}</p>
-            </section>
+          {/* Başarısızlık / Not */}
+          {isFailed && delivery.failedReason ? (
+            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+              <svg className="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Başarısızlık nedeni</p>
+                <p className="mt-1 text-sm text-red-800">{delivery.failedReason}</p>
+              </div>
+            </div>
           ) : null}
 
           {delivery.order.note ? (
-            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">Sipariş notu</p>
-              <p className="mt-2 leading-6">{delivery.order.note}</p>
-            </section>
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Sipariş notu</p>
+                <p className="mt-1 text-sm text-amber-900">{delivery.order.note}</p>
+              </div>
+            </div>
           ) : null}
 
-          <DetailSection eyebrow="Rota" title="Teslimat adresi">
-            <p className="text-base leading-7 text-stone-800">{formatAddressSnapshot(delivery.order.addressSnapshot)}</p>
-            {delivery.order.deliveryType === 'HOME_DELIVERY' && navCoords ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <a
-                  className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-green-700 bg-green-700 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-green-800"
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${navCoords.lat},${navCoords.lng}`}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  Google Maps
-                </a>
-                <a
-                  className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-semibold text-stone-950 shadow-sm transition hover:bg-stone-50"
-                  href={`https://yandex.com/maps/?rtext=~${navCoords.lat},${navCoords.lng}&rtt=auto`}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  Yandex Navi
-                </a>
+          {/* Teslimat Adresi */}
+          <SectionCard>
+            <SectionHeader
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />}
+              title="Teslimat Adresi"
+              subtitle="Rota bilgileri"
+            />
+            <div className="p-4 sm:p-5">
+              <div className="flex items-start gap-2.5 rounded-lg bg-stone-50 p-3">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                </svg>
+                <p className="text-sm leading-relaxed text-stone-700">
+                  {formatAddressSnapshot(delivery.order.addressSnapshot)}
+                </p>
               </div>
-            ) : delivery.order.deliveryType === 'HOME_DELIVERY' ? (
-              <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">Bu sipariş için harita konumu bulunmuyor.</p>
-            ) : null}
-          </DetailSection>
+              {delivery.order.deliveryType === 'HOME_DELIVERY' && navCoords ? (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <a
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${navCoords.lat},${navCoords.lng}`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
+                    </svg>
+                    Google Maps
+                  </a>
+                  <a
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
+                    href={`https://yandex.com/maps/?rtext=~${navCoords.lat},${navCoords.lng}&rtt=auto`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
+                    </svg>
+                    Yandex Navi
+                  </a>
+                </div>
+              ) : delivery.order.deliveryType === 'HOME_DELIVERY' ? (
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Bu sipariş için harita konumu bulunmuyor.
+                </p>
+              ) : null}
+            </div>
+          </SectionCard>
 
-          <DetailSection title="Ürünler">
-            <div className="divide-y divide-stone-100">
+          {/* Ürünler */}
+          <SectionCard>
+            <SectionHeader
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />}
+              title="Sipariş Ürünleri"
+              subtitle={`${delivery.order.items.length} kalem`}
+            />
+            <div className="divide-y divide-stone-100 px-4 sm:px-5">
               {delivery.order.items.map((item) => {
                 const line = orderLineTotalTry(item);
                 const lineLabel = formatTryAmount(String(line));
                 const unitLabel = formatTryAmount(item.unitPriceSnapshot);
                 return (
-                  <article className="py-4 first:pt-0 last:pb-0" key={item.id}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold leading-6 text-stone-950">{item.productNameSnapshot}</h3>
-                        <p className="mt-1 text-sm text-stone-600">
+                  <article className="py-3 first:pt-0 last:pb-0" key={item.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-semibold text-stone-900">{item.productNameSnapshot}</h4>
+                        <p className="mt-0.5 text-xs text-stone-500">
                           {item.quantity} adet{unitLabel ? ` · Birim ${unitLabel}` : ''}
                         </p>
                       </div>
-                      {lineLabel ? <p className="shrink-0 text-sm font-semibold text-stone-950">{lineLabel}</p> : null}
+                      {lineLabel ? <p className="shrink-0 text-sm font-bold text-stone-900">{lineLabel}</p> : null}
                     </div>
-                    {item.customNote ? <p className="mt-3 rounded-xl bg-stone-50 px-3 py-2 text-sm text-stone-700">Not: {item.customNote}</p> : null}
+                    {item.customNote ? (
+                      <div className="mt-2 flex items-start gap-1.5 rounded-md bg-stone-50 px-2.5 py-1.5">
+                        <svg className="mt-0.5 h-3 w-3 shrink-0 text-stone-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                        </svg>
+                        <p className="text-xs text-stone-600">{item.customNote}</p>
+                      </div>
+                    ) : null}
                     {item.options.length > 0 ? (
-                      <ul className="mt-3 flex flex-wrap gap-2 text-xs text-stone-700">
+                      <div className="mt-2 flex flex-wrap gap-1">
                         {item.options.map((option) => (
-                          <li className="rounded-full bg-stone-100 px-3 py-1" key={orderItemOptionKey(option)}>
+                          <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600" key={orderItemOptionKey(option)}>
                             {option.optionNameSnapshot}
                             {formatTryAmount(option.priceModifierSnapshot) ? ` +${formatTryAmount(option.priceModifierSnapshot)}` : ''}
-                          </li>
+                          </span>
                         ))}
-                      </ul>
+                      </div>
                     ) : null}
                   </article>
                 );
               })}
             </div>
-          </DetailSection>
+          </SectionCard>
         </div>
 
-        <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-stone-950 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Sıradaki işlem</p>
-            <div className="mt-4">
+        {/* Sağ Kolon */}
+        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+          {/* Sıradaki İşlem */}
+          <SectionCard className={isTerminal ? '' : 'border-amber-200'}>
+            <SectionHeader
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />}
+              title="Sıradaki İşlem"
+              subtitle={isTerminal ? 'İşlem kalmadı' : 'Teslimat aksiyonu'}
+            />
+            <div className="p-4 sm:p-5">
               <DeliveryActions delivery={delivery} onChanged={load} onError={setError} />
-              {delivery.status === 'DELIVERED' || delivery.status === 'FAILED' ? (
-                <p className="rounded-2xl bg-white px-4 py-3 text-sm text-stone-600">Bu teslimat için aktif işlem kalmadı.</p>
+              {isTerminal ? (
+                <p className="rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500">
+                  Bu teslimat için aktif işlem kalmadı.
+                </p>
               ) : null}
             </div>
-          </section>
+          </SectionCard>
 
-          <DetailSection title="Müşteri">
-            <dl className="space-y-3 text-sm">
-              <div>
-                <dt className="text-stone-500">Ad soyad</dt>
-                <dd className="mt-1 font-semibold text-stone-950">{customerName}</dd>
-              </div>
-              <div>
-                <dt className="text-stone-500">Telefon</dt>
-                <dd className="mt-1">
-                  <a className="font-semibold text-green-800 underline-offset-4 hover:underline" href={`tel:${phoneClean}`}>
+          {/* Müşteri Bilgisi */}
+          <SectionCard>
+            <SectionHeader
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />}
+              title="Müşteri Bilgisi"
+            />
+            <div className="space-y-0 px-4 pb-3 pt-1 sm:px-5">
+              <InfoRow label="Ad soyad" value={customerName} />
+              <InfoRow
+                label="Telefon"
+                value={
+                  <a className="font-medium text-emerald-700 underline-offset-2 hover:underline" href={`tel:${phoneClean}`}>
                     {delivery.order.user.phone}
                   </a>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-stone-500">Sipariş tipi</dt>
-                <dd className="mt-1 font-semibold text-stone-950">{deliveryTypeLabel(delivery.order.deliveryType)}</dd>
-              </div>
-            </dl>
-          </DetailSection>
+                }
+              />
+              <InfoRow label="Sipariş tipi" value={deliveryTypeLabel(delivery.order.deliveryType)} />
+            </div>
+          </SectionCard>
 
-          {(subtotalLabel || grandTotalLabel || (delivery.order.loyaltyPointsUsed ?? 0) > 0) && (
-            <DetailSection title="Tutar özeti">
-              <dl className="space-y-2 text-sm">
-                {subtotalLabel ? (
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-stone-500">Ara toplam</dt>
-                    <dd className="font-medium text-stone-950">{subtotalLabel}</dd>
-                  </div>
-                ) : null}
+          {/* Tutar Özeti */}
+          {(subtotalLabel || grandTotalLabel) && (
+            <SectionCard>
+              <SectionHeader
+                icon={<path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
+                title="Tutar Özeti"
+              />
+              <div className="space-y-0 px-4 pb-3 pt-1 sm:px-5">
+                {subtotalLabel ? <InfoRow label="Ara toplam" value={subtotalLabel} /> : null}
                 {deliveryFeeLabel && Number(delivery.order.deliveryFee) > 0 ? (
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-stone-500">Teslimat</dt>
-                    <dd className="font-medium text-stone-950">{deliveryFeeLabel}</dd>
-                  </div>
+                  <InfoRow label="Teslimat" value={deliveryFeeLabel} />
                 ) : null}
                 {serviceFeeLabel && Number(delivery.order.serviceFee ?? 0) > 0 ? (
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-stone-500">Hizmet</dt>
-                    <dd className="font-medium text-stone-950">{serviceFeeLabel}</dd>
-                  </div>
+                  <InfoRow label="Hizmet" value={serviceFeeLabel} />
                 ) : null}
                 {loyaltyDiscountLabel && Number(delivery.order.loyaltyDiscount) > 0 ? (
-                  <div className="flex justify-between gap-4 text-green-800">
-                    <dt>Sadakat indirimi</dt>
-                    <dd className="font-medium">-{loyaltyDiscountLabel}</dd>
-                  </div>
+                  <InfoRow label="Sadakat indirimi" value={<span className="text-emerald-700">-{loyaltyDiscountLabel}</span>} />
                 ) : null}
                 {(delivery.order.loyaltyPointsUsed ?? 0) > 0 ? (
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-stone-500">Kullanılan puan</dt>
-                    <dd className="font-medium text-stone-950">{delivery.order.loyaltyPointsUsed}</dd>
-                  </div>
+                  <InfoRow label="Kullanılan puan" value={String(delivery.order.loyaltyPointsUsed)} />
                 ) : null}
                 {grandTotalLabel ? (
-                  <div className="flex justify-between gap-4 border-t border-stone-100 pt-3 text-base font-semibold text-stone-950">
-                    <dt>Genel toplam</dt>
-                    <dd>{grandTotalLabel}</dd>
+                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-stone-100 pt-2">
+                    <span className="text-sm font-semibold text-stone-900">Genel toplam</span>
+                    <span className="text-lg font-bold text-stone-900">{grandTotalLabel}</span>
                   </div>
                 ) : null}
-              </dl>
-              <p className="mt-3 text-xs leading-5 text-stone-500">Kart bilgisi gösterilmez.</p>
-            </DetailSection>
+                <p className="mt-2 text-[10px] text-stone-400">Kart bilgisi gösterilmez.</p>
+              </div>
+            </SectionCard>
           )}
 
-          <DetailSection title="Zamanlar">
-            <dl className="space-y-3 text-sm">
-              {orderCreated ? (
-                <div>
-                  <dt className="text-stone-500">Sipariş oluşturuldu</dt>
-                  <dd className="mt-1 font-medium text-stone-950">{orderCreated}</dd>
-                </div>
-              ) : null}
-              {pickedUp ? (
-                <div>
-                  <dt className="text-stone-500">Teslim alındı</dt>
-                  <dd className="mt-1 font-medium text-stone-950">{pickedUp}</dd>
-                </div>
-              ) : null}
-              {delivered ? (
-                <div>
-                  <dt className="text-stone-500">Teslim edildi</dt>
-                  <dd className="mt-1 font-medium text-stone-950">{delivered}</dd>
-                </div>
-              ) : null}
-              {orderUpdated ? (
-                <div>
-                  <dt className="text-stone-500">Sipariş güncellendi</dt>
-                  <dd className="mt-1 font-medium text-stone-950">{orderUpdated}</dd>
-                </div>
-              ) : null}
-              {deliveryUpdated ? (
-                <div>
-                  <dt className="text-stone-500">Teslimat güncellendi</dt>
-                  <dd className="mt-1 font-medium text-stone-950">{deliveryUpdated}</dd>
-                </div>
-              ) : null}
-            </dl>
-          </DetailSection>
+          {/* Zamanlar */}
+          <SectionCard>
+            <SectionHeader
+              icon={<path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />}
+              title="Zamanlar"
+            />
+            <div className="space-y-0 px-4 pb-3 pt-1 sm:px-5">
+              {orderCreated ? <InfoRow label="Sipariş oluşturuldu" value={orderCreated} /> : null}
+              {pickedUp ? <InfoRow label="Teslim alındı" value={pickedUp} /> : null}
+              {delivered ? <InfoRow label="Teslim edildi" value={delivered} /> : null}
+              {orderUpdated ? <InfoRow label="Sipariş güncellendi" value={orderUpdated} /> : null}
+              {deliveryUpdated ? <InfoRow label="Teslimat güncellendi" value={deliveryUpdated} /> : null}
+            </div>
+          </SectionCard>
 
+          {/* Zaman Çizelgesi */}
           {history.length > 0 ? (
-            <DetailSection title="Zaman çizelgesi">
-              <ol className="max-h-72 space-y-3 overflow-y-auto text-sm">
-                {history.map((row) => (
-                  <li className="border-l-2 border-stone-200 pl-3" key={row.id}>
-                    <p className="font-semibold text-stone-950">{orderStatusLabel(row.status)}</p>
-                    <p className="mt-1 text-xs text-stone-500">{formatDateTimeTurkish(row.createdAt) ?? row.createdAt}</p>
-                    {row.note ? <p className="mt-1 text-stone-600">{row.note}</p> : null}
-                  </li>
-                ))}
-              </ol>
-            </DetailSection>
+            <SectionCard>
+              <SectionHeader
+                icon={<path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />}
+                title="Zaman Çizelgesi"
+                subtitle={`${history.length} kayıt`}
+              />
+              <div className="max-h-80 overflow-y-auto px-4 pb-3 pt-1 sm:px-5">
+                <ol className="relative ml-2 border-l-2 border-stone-200">
+                  {history.map((row, index) => (
+                    <li className="ml-4 pb-3 last:pb-0" key={row.id}>
+                      <div className={`absolute -left-[9px] mt-1 h-3.5 w-3.5 rounded-full border-2 border-white ${
+                        index === 0 ? 'bg-amber-500' : 'bg-stone-300'
+                      }`} />
+                      <p className="text-sm font-medium text-stone-900">{orderStatusLabel(row.status)}</p>
+                      <p className="text-xs text-stone-500">{formatDateTimeTurkish(row.createdAt) ?? row.createdAt}</p>
+                      {row.note ? <p className="mt-0.5 text-xs text-stone-600">{row.note}</p> : null}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </SectionCard>
           ) : null}
         </aside>
       </div>
 
-      {error ? <ErrorState message={error} /> : null}
+      {error ? (
+        <div className="mt-2">
+          <ErrorState message={error} />
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -197,6 +197,19 @@ export class OrdersService {
       if (dto.status === OrderStatus.CANCELLED && noteTrimmed.length < cancelNoteMin) {
         throw new AppException(ERROR_CODES.VALIDATION_FAILED, `İptal için en az ${cancelNoteMin} karakter nedeni yazın`, HttpStatus.BAD_REQUEST);
       }
+      const homeDeliveryCourierOwnedTargets = new Set<OrderStatus>([
+        OrderStatus.ASSIGNED_TO_COURIER,
+        OrderStatus.OUT_FOR_DELIVERY,
+        OrderStatus.DELIVERED,
+        OrderStatus.DELIVERY_FAILED,
+      ]);
+      if (o.deliveryType === DeliveryType.HOME_DELIVERY && homeDeliveryCourierOwnedTargets.has(dto.status)) {
+        const message =
+          dto.status === OrderStatus.ASSIGNED_TO_COURIER
+            ? 'Adrese teslim siparişlerde kurye ataması durum güncellemesiyle değil, kurye atama işlemiyle yapılır.'
+            : 'Kurye atandıktan sonraki teslimat durumları yalnızca kurye uygulamasından ilerletilebilir.';
+        throw new AppException(ERROR_CODES.ORDER_STATUS_TRANSITION_INVALID, message, HttpStatus.BAD_REQUEST);
+      }
       const unpaidPendingCancel = o.status === OrderStatus.PAYMENT_PENDING && dto.status === OrderStatus.CANCELLED;
       const paidCount = await tx.payment.count({ where: { orderId: id, status: PaymentStatus.SUCCESS } });
       if (!unpaidPendingCancel && !paidCount) {
@@ -205,12 +218,6 @@ export class OrdersService {
       this.statuses.assert(o.status, dto.status);
       if (o.status === OrderStatus.DELIVERED && dto.status === OrderStatus.CANCELLED) {
         await this.loyalty.reverseEarnForDeliveredOrderIfAny(id, tx, actor?.sub, noteTrimmed);
-      }
-      if (o.status === OrderStatus.DELIVERY_FAILED && dto.status === OrderStatus.READY) {
-        await tx.delivery.updateMany({
-          where: { orderId: id },
-          data: { status: DeliveryStatus.ASSIGNED, failedReason: null },
-        });
       }
       const updated = await tx.order.update({ where: { id }, data: { status: dto.status } });
       await tx.orderStatusHistory.create({ data: { orderId: id, status: dto.status, note: noteTrimmed.length ? noteTrimmed : null } });
@@ -226,7 +233,18 @@ export class OrdersService {
       const order = await tx.order.findFirst({ where: { id, deletedAt: null }, include: { delivery: true } });
       if (!order) throw new AppException(ERROR_CODES.ORDER_NOT_FOUND, 'Order not found', HttpStatus.NOT_FOUND);
       if (order.deliveryType !== DeliveryType.HOME_DELIVERY) throw new AppException(ERROR_CODES.ORDER_NOT_ASSIGNABLE, 'Pickup orders cannot be assigned', HttpStatus.BAD_REQUEST);
-      if (order.status !== OrderStatus.READY && order.status !== OrderStatus.ASSIGNED_TO_COURIER) throw new AppException(ERROR_CODES.ORDER_NOT_ASSIGNABLE, 'Order is not ready for courier assignment', HttpStatus.BAD_REQUEST);
+      if (
+        order.status !== OrderStatus.PREPARING &&
+        order.status !== OrderStatus.READY &&
+        order.status !== OrderStatus.ASSIGNED_TO_COURIER &&
+        order.status !== OrderStatus.DELIVERY_FAILED
+      ) {
+        throw new AppException(
+          ERROR_CODES.ORDER_NOT_ASSIGNABLE,
+          'Order is not in an assignable state for courier assignment',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
       const courier = await tx.courier.findFirst({ where: { id: dto.courierId, deletedAt: null, status: CourierStatus.ACTIVE } });
       if (!courier) throw new AppException(ERROR_CODES.COURIER_NOT_FOUND, 'Courier not found', HttpStatus.NOT_FOUND);
       if (order.status === OrderStatus.ASSIGNED_TO_COURIER) {

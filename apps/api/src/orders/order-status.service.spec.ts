@@ -19,9 +19,14 @@ describe('OrderStatusService', () => {
   it('allows out for delivery to delivery failed', () => {
     expect(() => service.assert(OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERY_FAILED)).not.toThrow();
   });
-  it('allows delivery failed to ready or cancelled', () => {
-    expect(() => service.assert(OrderStatus.DELIVERY_FAILED, OrderStatus.READY)).not.toThrow();
+  it('allows delivery failed to reassignment or cancellation', () => {
+    expect(() => service.assert(OrderStatus.DELIVERY_FAILED, OrderStatus.ASSIGNED_TO_COURIER)).not.toThrow();
     expect(() => service.assert(OrderStatus.DELIVERY_FAILED, OrderStatus.CANCELLED)).not.toThrow();
     expect(() => service.assert(OrderStatus.DELIVERY_FAILED, OrderStatus.DELIVERED)).toThrow();
+  });
+  it('skips ready and allows preparing to move straight into handoff or pickup completion', () => {
+    expect(() => service.assert(OrderStatus.PREPARING, OrderStatus.ASSIGNED_TO_COURIER)).not.toThrow();
+    expect(() => service.assert(OrderStatus.PREPARING, OrderStatus.DELIVERED)).not.toThrow();
+    expect(() => service.assert(OrderStatus.PREPARING, OrderStatus.READY)).toThrow();
   });
 });

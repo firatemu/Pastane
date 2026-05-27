@@ -21,6 +21,8 @@ export interface AuditLogRow {
   entityType: string;
   entityId: string | null;
   actorId: string | null;
+  oldValues?: unknown;
+  newValues?: unknown;
 }
 
 export interface SettingRow {
@@ -62,7 +64,15 @@ export interface AdminUserRow {
   email: string | null;
   status: string;
   isPhoneVerified: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   role: { name: string };
+  courier?: {
+    id: string;
+    status: string;
+    deletedAt?: string | null;
+    _count?: { deliveries: number };
+  } | null;
 }
 
 export interface AdminRoleRow {
@@ -75,4 +85,163 @@ export interface AdminRoleRow {
 export interface AdminPermissionRow {
   id: string;
   code: string;
+  description: string | null;
+}
+
+export interface ManagementRoleRow {
+  id: string;
+  name: string;
+  description: string | null;
+  editable: boolean;
+  permissionIds: string[];
+}
+
+export interface PermissionsManagementResponse {
+  permissions: AdminPermissionRow[];
+  roles: ManagementRoleRow[];
+}
+
+export interface CustomerListRow {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string | null;
+  status: string;
+  isPhoneVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+  defaultAddress: {
+    id: string;
+    title: string;
+    city: string;
+    district: string;
+  } | null;
+  loyalty: {
+    id: string;
+    points: number;
+    qrCode: string;
+  } | null;
+  metrics: {
+    orderCount: number;
+    lifetimeSpent: string;
+    lastOrderAt: string | null;
+  };
+}
+
+export interface CustomersListMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  summary: {
+    activeCount: number;
+    inactiveCount: number;
+    bannedCount: number;
+    withOrdersCount: number;
+    loyaltyCount: number;
+  };
+}
+
+export interface CustomerDetailAddress {
+  id: string;
+  title: string;
+  city: string;
+  district: string;
+  neighborhood: string | null;
+  fullAddress: string;
+  building: string | null;
+  floor: string | null;
+  apartment: string | null;
+  directions: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerDetailNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  metadata: unknown;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface CustomerDetailReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  status: string;
+  rejectedReason: string | null;
+  createdAt: string;
+  product: { id: string; name: string };
+  orderItem: { orderId: string; productNameSnapshot: string };
+}
+
+export interface CustomerDetailOrder {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  scheduledAt: string | null;
+  deliveryType: string;
+  status: string;
+  grandTotal: string;
+  note: string | null;
+  _count: { items: number };
+  payments: Array<{
+    id: string;
+    status: string;
+    amount: string;
+    providerStatus: string | null;
+    createdAt: string;
+  }>;
+  delivery: null | {
+    status: string;
+    courier: null | { user: { firstName: string; lastName: string } };
+  };
+}
+
+export interface CustomerDetail {
+  profile: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string | null;
+    status: string;
+    isPhoneVerified: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  summary: {
+    totalOrders: number;
+    deliveredOrders: number;
+    lifetimeSpent: string;
+    lastOrderAt: string | null;
+    loyaltyPoints: number;
+    addressCount: number;
+    reviewCount: number;
+    unreadNotificationsCount: number;
+  };
+  addresses: CustomerDetailAddress[];
+  loyaltyAccount: null | {
+    id: string;
+    points: number;
+    qrCode: string;
+    createdAt: string;
+    updatedAt: string;
+    movements: Array<{
+      id: string;
+      type: string;
+      points: number;
+      balanceAfter: number;
+      note: string | null;
+      createdAt: string;
+    }>;
+  };
+  notifications: CustomerDetailNotification[];
+  reviews: CustomerDetailReview[];
+  recentOrders: CustomerDetailOrder[];
 }

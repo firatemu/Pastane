@@ -1,6 +1,6 @@
 import { messageFromAdminApiPayload, type ParsedAdminApiPayload } from '../messages/admin-facing-errors';
 
-type CatalogPayload<T = unknown> = ParsedAdminApiPayload & { data?: T; meta?: unknown };
+type CatalogPayload<T = unknown, M = unknown> = ParsedAdminApiPayload & { data?: T; meta?: M };
 
 function throwParseError(status: number, ok: boolean): never {
   if (ok) {
@@ -30,12 +30,14 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   return (payload.data ?? payload) as T;
 }
 
-export async function adminFetchEnvelope<T>(path: string): Promise<{ data: T; meta?: unknown }> {
+export async function adminFetchEnvelope<T, M = unknown>(path: string): Promise<{ data: T; meta?: M }> {
   const response = await fetch(`/api/catalog${path}`);
   const text = await response.text();
-  let payload: CatalogPayload<T> & { data: T };
+  let payload: CatalogPayload<T, M> & { data: T };
   try {
-    payload = text ? (JSON.parse(text) as CatalogPayload<T> & { data: T }) : ({} as CatalogPayload<T> & { data: T });
+    payload = text
+      ? (JSON.parse(text) as CatalogPayload<T, M> & { data: T })
+      : ({} as CatalogPayload<T, M> & { data: T });
   } catch {
     throw new Error(`İstek yanıtı işlenemedi (HTTP ${response.status}).`);
   }

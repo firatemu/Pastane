@@ -4,7 +4,7 @@ const LABELS: Record<string, string> = {
   PAYMENT_PENDING: 'Ödeme bekliyor',
   CONFIRMED: 'Onaylandı',
   PREPARING: 'Hazırlanıyor',
-  READY: 'Hazır',
+  READY: 'Hazırlık tamamlandı',
   ASSIGNED_TO_COURIER: 'Kuryeye atandı',
   OUT_FOR_DELIVERY: 'Yolda',
   DELIVERED: 'Teslim edildi',

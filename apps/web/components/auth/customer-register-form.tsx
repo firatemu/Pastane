@@ -48,26 +48,26 @@ export function CustomerRegisterForm(): React.JSX.Element {
   }
 
   return (
-    <form className="mt-10 grid gap-6 sm:grid-cols-2" noValidate onSubmit={submit}>
+    <form className="mt-8 grid gap-5 sm:grid-cols-2" noValidate onSubmit={submit}>
       <label className="block space-y-2 text-sm font-medium">
         <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Ad</span>
-        <input className="stitch-input" value={firstName} onChange={(event) => setFirstName(event.target.value)} required />
+        <input className="w-full rounded-2xl border border-outline-soft/60 bg-surface-lowest px-4 py-3.5 text-primary outline-none transition focus:border-primary" value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" required />
       </label>
       <label className="block space-y-2 text-sm font-medium">
         <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Soyad</span>
-        <input className="stitch-input" value={lastName} onChange={(event) => setLastName(event.target.value)} required />
+        <input className="w-full rounded-2xl border border-outline-soft/60 bg-surface-lowest px-4 py-3.5 text-primary outline-none transition focus:border-primary" value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" required />
       </label>
       <label className="block space-y-2 text-sm font-medium sm:col-span-2">
         <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Telefon</span>
-        <input className="stitch-input" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="905550000099" required />
+        <input className="w-full rounded-2xl border border-outline-soft/60 bg-surface-lowest px-4 py-3.5 text-primary outline-none transition placeholder:text-muted/60 focus:border-primary" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="905550000099" inputMode="numeric" autoComplete="tel" required />
       </label>
       <label className="block space-y-2 text-sm font-medium sm:col-span-2">
         <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">E-posta (opsiyonel)</span>
-        <input className="stitch-input" value={email} onChange={(event) => setEmail(event.target.value)} type="text" inputMode="email" autoComplete="email" />
+        <input className="w-full rounded-2xl border border-outline-soft/60 bg-surface-lowest px-4 py-3.5 text-primary outline-none transition focus:border-primary" value={email} onChange={(event) => setEmail(event.target.value)} type="text" inputMode="email" autoComplete="email" />
       </label>
       <label className="block space-y-2 text-sm font-medium sm:col-span-2">
         <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Şifre</span>
-        <input className="stitch-input" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} type="password" required />
+        <input className="w-full rounded-2xl border border-outline-soft/60 bg-surface-lowest px-4 py-3.5 text-primary outline-none transition focus:border-primary" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} type="password" autoComplete="new-password" required />
       </label>
       {error ? <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2">{error}</p> : null}
       <button className="stitch-button min-h-14 disabled:cursor-not-allowed disabled:bg-muted sm:col-span-2" disabled={submitting} type="submit">

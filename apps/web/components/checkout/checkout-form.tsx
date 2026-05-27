@@ -19,6 +19,45 @@ function cartEstimate(cart: Cart): string {
   return cart.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0).toFixed(2);
 }
 
+type CheckoutAddressForm = {
+  title: string;
+  city: string;
+  district: string;
+  neighborhood: string;
+  fullAddress: string;
+  building: string;
+  floor: string;
+  apartment: string;
+  directions: string;
+};
+
+const emptyAddressForm: CheckoutAddressForm = {
+  title: '',
+  city: 'Mersin',
+  district: '',
+  neighborhood: '',
+  fullAddress: '',
+  building: '',
+  floor: '',
+  apartment: '',
+  directions: '',
+};
+
+function addressPayload(form: CheckoutAddressForm): Record<string, unknown> {
+  return {
+    title: form.title.trim(),
+    city: form.city.trim(),
+    district: form.district.trim(),
+    neighborhood: form.neighborhood.trim() || undefined,
+    fullAddress: form.fullAddress.trim(),
+    building: form.building.trim() || undefined,
+    floor: form.floor.trim() || undefined,
+    apartment: form.apartment.trim() || undefined,
+    directions: form.directions.trim() || undefined,
+    isDefault: true,
+  };
+}
+
 export function CheckoutForm(): React.JSX.Element {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
@@ -26,7 +65,10 @@ export function CheckoutForm(): React.JSX.Element {
   const [order, setOrder] = useState<Order | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [busy, setBusy] = useState(false);
+  const [addressBusy, setAddressBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addressMessage, setAddressMessage] = useState<string | null>(null);
+  const [addressForm, setAddressForm] = useState<CheckoutAddressForm>(emptyAddressForm);
   const [iyCheckoutHtml, setIyCheckoutHtml] = useState<string | null>(null);
   const iyRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
@@ -34,6 +76,8 @@ export function CheckoutForm(): React.JSX.Element {
   const {
     register,
     handleSubmit,
+    setValue,
+    clearErrors,
     watch,
     formState: { errors },
   } = useForm<CheckoutDeliveryOnlyValues>({
@@ -41,6 +85,10 @@ export function CheckoutForm(): React.JSX.Element {
     defaultValues: { deliveryType: 'HOME_DELIVERY' },
   });
   const deliveryType = watch('deliveryType');
+
+  function updateAddressField(field: keyof CheckoutAddressForm, value: string): void {
+    setAddressForm((current) => ({ ...current, [field]: value }));
+  }
 
   useEffect(() => {
     async function loadCheckout(): Promise<void> {
@@ -114,6 +162,37 @@ export function CheckoutForm(): React.JSX.Element {
     window.dispatchEvent(new Event('cart:changed'));
   }
 
+  async function createCheckoutAddress(): Promise<void> {
+    const requiredFields: Array<keyof CheckoutAddressForm> = ['title', 'city', 'district', 'fullAddress'];
+    const missingRequiredField = requiredFields.some((field) => !addressForm[field].trim());
+    setAddressMessage(null);
+    if (missingRequiredField) {
+      setAddressMessage('Adres başlığı, il, ilçe ve açık adres alanlarını doldurun.');
+      return;
+    }
+    setAddressBusy(true);
+    try {
+      const response = await fetch('/api/addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addressPayload(addressForm)),
+      });
+      const body = (await response.json()) as ParsedCustomerApiPayload & { data?: Address };
+      if (!response.ok || !body.data) {
+        throw new Error(messageFromCustomerApiPayload(response.status, body, 'Adres eklenemedi.'));
+      }
+      setAddresses((current) => [body.data as Address, ...current]);
+      setValue('addressId', body.data.id, { shouldValidate: true });
+      clearErrors('addressId');
+      setAddressForm(emptyAddressForm);
+      setAddressMessage('Adres eklendi ve teslimat adresi olarak seçildi.');
+    } catch (e) {
+      setAddressMessage(customerFacingMessageFromUnknownError(e, 'Adres eklenemedi.'));
+    } finally {
+      setAddressBusy(false);
+    }
+  }
+
   async function payWithIyzico(values: CheckoutDeliveryOnlyValues): Promise<void> {
     setBusy(true);
     setError(null);
@@ -165,8 +244,9 @@ export function CheckoutForm(): React.JSX.Element {
   }, [iyCheckoutHtml]);
 
   const checkoutComplete = order?.status === 'CONFIRMED' || payment?.status === 'SUCCESS';
-  const payLocked = busy || checkoutComplete;
-  const payLabel = busy ? 'Yükleniyor…' : checkoutComplete ? 'Ödeme tamamlandı' : 'İyzico ile öde';
+  const needsDeliveryAddress = deliveryType === 'HOME_DELIVERY' && addresses.length === 0;
+  const payLocked = busy || checkoutComplete || needsDeliveryAddress;
+  const payLabel = busy ? 'Yükleniyor…' : checkoutComplete ? 'Ödeme tamamlandı' : needsDeliveryAddress ? 'Önce adres ekleyin' : 'İyzico ile öde';
 
   if (!cart) return <p className="stitch-panel rounded-3xl p-4">Ödeme sayfası yükleniyor...</p>;
 
@@ -216,21 +296,138 @@ export function CheckoutForm(): React.JSX.Element {
 
           <div className="mt-5">
             {deliveryType === 'HOME_DELIVERY' ? (
-              <label className="block space-y-2">
-                <span className="text-sm font-semibold text-ink">Teslimat adresi</span>
-                <select
-                  className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
-                  {...register('addressId')}
-                >
-                  <option value="">Adres seçin</option>
-                  {addresses.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.title} - {a.district}
-                    </option>
-                  ))}
-                </select>
-                {errors.addressId ? <span className="text-sm text-red-700">{errors.addressId.message}</span> : null}
-              </label>
+              addresses.length ? (
+                <label className="block space-y-2">
+                  <span className="text-sm font-semibold text-ink">Teslimat adresi</span>
+                  <select
+                    className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                    {...register('addressId')}
+                  >
+                    <option value="">Adres seçin</option>
+                    {addresses.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.title} - {a.district}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.addressId ? <span className="text-sm text-red-700">{errors.addressId.message}</span> : null}
+                </label>
+              ) : (
+                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-primary">Teslimat adresi gerekli</p>
+                      <p className="mt-1 text-sm leading-6 text-muted">
+                        Adrese teslim seçeneği için ödeme başlatmadan önce bir teslimat adresi eklemelisiniz.
+                      </p>
+                    </div>
+                    <a className="text-sm font-semibold text-secondary hover:text-primary" href="/adresler">
+                      Adreslerime git
+                    </a>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-sm font-semibold text-ink">Adres başlığı</span>
+                      <input
+                        className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                        onChange={(event) => updateAddressField('title', event.target.value)}
+                        placeholder="Ev, iş, ofis"
+                        value={addressForm.title}
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-semibold text-ink">İl</span>
+                      <input
+                        className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                        onChange={(event) => updateAddressField('city', event.target.value)}
+                        value={addressForm.city}
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-semibold text-ink">İlçe</span>
+                      <input
+                        className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                        onChange={(event) => updateAddressField('district', event.target.value)}
+                        placeholder="Yenişehir"
+                        value={addressForm.district}
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-semibold text-ink">Mahalle</span>
+                      <input
+                        className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                        onChange={(event) => updateAddressField('neighborhood', event.target.value)}
+                        placeholder="Opsiyonel"
+                        value={addressForm.neighborhood}
+                      />
+                    </label>
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-sm font-semibold text-ink">Açık adres</span>
+                      <textarea
+                        className="min-h-24 w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                        onChange={(event) => updateAddressField('fullAddress', event.target.value)}
+                        placeholder="Cadde, sokak, bina ve daire bilgisi"
+                        value={addressForm.fullAddress}
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-semibold text-ink">Bina</span>
+                      <input
+                        className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                        onChange={(event) => updateAddressField('building', event.target.value)}
+                        placeholder="Opsiyonel"
+                        value={addressForm.building}
+                      />
+                    </label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="space-y-2">
+                        <span className="text-sm font-semibold text-ink">Kat</span>
+                        <input
+                          className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                          onChange={(event) => updateAddressField('floor', event.target.value)}
+                          placeholder="Opsiyonel"
+                          value={addressForm.floor}
+                        />
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-sm font-semibold text-ink">Daire</span>
+                        <input
+                          className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                          onChange={(event) => updateAddressField('apartment', event.target.value)}
+                          placeholder="Opsiyonel"
+                          value={addressForm.apartment}
+                        />
+                      </label>
+                    </div>
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-sm font-semibold text-ink">Teslimat notu</span>
+                      <input
+                        className="w-full rounded-2xl border border-outline-soft/60 bg-white px-4 py-3 outline-none focus:border-primary"
+                        onChange={(event) => updateAddressField('directions', event.target.value)}
+                        placeholder="Kapı kodu, tarif veya güvenlik notu"
+                        value={addressForm.directions}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <button
+                      className="stitch-button disabled:opacity-60"
+                      disabled={addressBusy}
+                      onClick={() => void createCheckoutAddress()}
+                      type="button"
+                    >
+                      {addressBusy ? 'Adres ekleniyor...' : 'Adresi ekle ve seç'}
+                    </button>
+                    {addressMessage ? (
+                      <p className={`text-sm ${addressMessage.includes('eklendi') ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {addressMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              )
             ) : (
               <label className="block space-y-2">
                 <span className="text-sm font-semibold text-ink">Teslim alınacak mağaza</span>

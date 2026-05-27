@@ -29,7 +29,7 @@ export function CourierAssignmentManager({
       setError(null);
       const [o, c] = await Promise.all([
         adminFetchEnvelope<OrderListItem[]>(
-          '/orders?status=READY&deliveryType=HOME_DELIVERY&assigned=false&limit=100',
+          '/orders?status=PREPARING&deliveryType=HOME_DELIVERY&assigned=false&limit=100',
         ),
         adminFetchEnvelope<Courier[]>('/couriers?status=ACTIVE&limit=100'),
       ]);
@@ -112,7 +112,7 @@ export function CourierAssignmentManager({
   return (
     <PageSection
       title="Kurye Atama"
-      description="Hazır durumdaki teslimat siparişlerini uygun aktif kuryelere atayın."
+      description="Kurye ataması yapılacak ev teslimatı siparişlerini uygun aktif kuryelere atayın."
     >
       {loading ? (
         <LoadingState label="Kurye atama kuyruğu yükleniyor…" />
@@ -130,7 +130,7 @@ export function CourierAssignmentManager({
             <div>
               <h2 className="text-lg font-semibold text-on-surface">Atama kuyruğu</h2>
               <p className="mt-1 text-sm text-on-surface-variant">
-                Yalnızca ev teslimatı, hazır ve henüz kurye atanmamış siparişler listelenir.
+                Yalnızca ev teslimatı, hazırlık aşamasında olup henüz kurye atanmamış siparişler listelenir.
               </p>
             </div>
             <PollingNote seconds={15} />

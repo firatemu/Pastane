@@ -1,5 +1,33 @@
 export interface ApiEnvelope<T> { data: T; meta?: PaginationMeta; }
 export interface PaginationMeta { page: number; limit: number; total: number; totalPages: number; }
+export type MediaAssetKind = 'IMAGE' | 'VIDEO';
+export type MediaAssetSource = 'PRODUCT_UPLOAD' | 'BANNER_UPLOAD' | 'GALLERY_UPLOAD';
+export interface MediaAssetUsageSummary {
+  productImageCount: number;
+  bannerCount: number;
+  bannerSlotCount: number;
+  totalUsageCount: number;
+  isUsed: boolean;
+}
+export interface MediaAssetRow {
+  id: string;
+  kind: MediaAssetKind;
+  source: MediaAssetSource;
+  bucket: string;
+  objectKey: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  title: string;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  usage: MediaAssetUsageSummary;
+}
+export interface MediaAssetListResponse {
+  items: MediaAssetRow[];
+  meta: PaginationMeta;
+}
 export interface Category { id:string; name:string; slug:string; description:string|null; imageUrl:string|null; parentId:string|null; sortOrder:number; isActive:boolean; children?:Category[]; }
 export interface Allergen { id:string; name:string; }
 export interface ProductUnit {

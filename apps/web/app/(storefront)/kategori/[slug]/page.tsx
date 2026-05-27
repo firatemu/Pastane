@@ -28,14 +28,14 @@ export default async function CategoryPage({ params }: Readonly<{ params: Promis
     <main className="stitch-container py-10">
       <script dangerouslySetInnerHTML={{ __html: JSON.stringify(categoryBreadcrumbs(category)) }} type="application/ld+json" />
       <Breadcrumbs items={[{ label: 'Ana sayfa', href: '/' }, { label: category.name }]} />
-      <header className="mb-12 mt-6 grid gap-8 border-b border-outline-soft/30 pb-12 lg:grid-cols-[1fr_360px] lg:items-end">
+      <header className="mb-10 mt-6 grid gap-8 overflow-hidden rounded-[2rem] bg-white p-6 shadow-soft lg:grid-cols-[1fr_360px] lg:items-center sm:p-8">
         <div>
           <p className="stitch-eyebrow">Kategori</p>
           <h1 className="stitch-title mt-3">{category.name}</h1>
           {category.description ? <p className="mt-5 max-w-2xl text-base leading-7 text-muted">{category.description}</p> : null}
           {category.children?.length ? <div className="mt-6 flex flex-wrap gap-2">{category.children.map((child) => <a className="rounded-full border border-outline-soft/60 bg-surface-lowest px-4 py-2 text-sm font-semibold text-primary hover:bg-surface-low" href={`/kategori/${child.slug}`} key={child.id}>{child.name}</a>)}</div> : null}
         </div>
-        {category.imageUrl ? <img alt={`${category.name} kategori görseli`} className="aspect-[4/3] w-full rounded-3xl border border-outline-soft/40 object-cover shadow-soft" src={category.imageUrl} /> : null}
+        {category.imageUrl ? <img alt={`${category.name} kategori görseli`} className="aspect-[4/3] w-full rounded-3xl border border-outline-soft/40 object-cover shadow-ambient" src={category.imageUrl} /> : null}
       </header>
       <ProductGrid products={products.items} />
     </main>

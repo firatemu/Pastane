@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,14 +6,17 @@
 
 :root {
   color-scheme: light;
-  --font-display: 'Playfair Display';
-  --font-body: 'DM Sans';
+  --font-brand: 'DM Sans';
+  --font-body: var(--font-brand);
+  --font-heading: var(--font-brand);
+  --font-display: var(--font-heading);
+  --font-fallback: Arial, sans-serif;
 }
 
 body {
   background: #faf9f6;
   color: #1a1c1a;
-  font-family: var(--font-body), Arial, sans-serif;
+  font-family: var(--font-body), var(--font-fallback);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -42,7 +45,7 @@ a {
 
   .stitch-title {
     color: #334537;
-    font-family: var(--font-display), Georgia, serif;
+    font-family: var(--font-heading), var(--font-fallback);
     font-size: 2.25rem;
     font-weight: 700;
     line-height: 1.15;
@@ -114,8 +117,8 @@ a {
 }
 
 @layer utilities {
-  .font-display { font-family: var(--font-display), Georgia, serif; }
-  .font-body { font-family: var(--font-body), Arial, sans-serif; }
+  .font-display { font-family: var(--font-display), var(--font-fallback); }
+  .font-body { font-family: var(--font-body), var(--font-fallback); }
   .text-ink { color: #1a1c1a; }
   .text-muted { color: #434843; }
   .text-primary { color: #334537; }
