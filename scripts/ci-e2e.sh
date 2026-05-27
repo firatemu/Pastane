@@ -71,6 +71,12 @@ run_prisma_bootstrap() {
     'cd /app && pnpm --filter @pastane/database prisma:seed'
 }
 
+dump_service_logs() {
+  local service="${1:?service required}"
+  echo "[e2e] --- ${service} logs (tail 120) ---" >&2
+  "${COMPOSE[@]}" logs --tail=120 "${service}" >&2 || true
+}
+
 if [[ "${CI_MODE}" -eq 1 ]]; then
   echo "[e2e] resetting CI volumes"
   "${COMPOSE[@]}" down -v --remove-orphans 2>/dev/null || true
@@ -90,10 +96,17 @@ if [[ "${CI_MODE}" -eq 1 ]]; then
   run_prisma_bootstrap
 
   echo "[e2e] starting application services (wait for healthchecks)"
+  compose_up_app=(up -d --wait --wait-timeout 1200)
   if [[ "${E2E_COMPOSE_BUILD:-1}" != "0" ]]; then
-    "${COMPOSE[@]}" up -d --build --wait api web admin courier
-  else
-    "${COMPOSE[@]}" up -d --wait api web admin courier
+    compose_up_app+=(--build)
+  fi
+  compose_up_app+=(api web admin courier)
+  if ! "${COMPOSE[@]}" "${compose_up_app[@]}"; then
+    echo "::error::application services did not become healthy in time" >&2
+    for svc in api web admin courier; do
+      dump_service_logs "${svc}"
+    done
+    exit 1
   fi
 else
   if [[ "${E2E_COMPOSE_BUILD:-1}" != "0" ]]; then
@@ -105,19 +118,13 @@ else
   fi
 fi
 
-dump_service_logs() {
-  local service="${1:?service required}"
-  echo "[e2e] --- ${service} logs (tail 120) ---" >&2
-  "${COMPOSE[@]}" logs --tail=120 "${service}" >&2 || true
-}
-
 echo "[e2e] waiting for HTTP readiness"
 if [[ "${CI_MODE}" -eq 1 ]]; then
   # Compose --wait uses container healthchecks; confirm host ports for Playwright.
   wait_for_host_http() {
     local url="${1:?url required}"
     local label="${2:-${url}}"
-    if bash scripts/wait-for-http.sh "${url}" 120; then
+    if bash scripts/wait-for-http.sh "${url}" 180; then
       echo "healthy(host): ${label}"
       return 0
     fi
@@ -157,6 +164,11 @@ if [[ "${CI_MODE}" -eq 0 ]]; then
 fi
 
 echo "[e2e] turbo playwright"
-pnpm turbo run e2e
+if [[ "${CI_MODE}" -eq 1 ]]; then
+  # Serial suites reduce CPU contention on GitHub-hosted runners (2 vCPU).
+  pnpm turbo run e2e --concurrency=1
+else
+  pnpm turbo run e2e
+fi
 
 echo "[e2e] suites finished OK"

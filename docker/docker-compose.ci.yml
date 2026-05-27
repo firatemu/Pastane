@@ -14,6 +14,11 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    # Avoid clashing with any host service on :5432 (GitHub-hosted runners).
+    ports: !reset []
+
+  redis:
+    ports: !reset []
 
   api:
     environment:
@@ -35,6 +40,8 @@ services:
       start_period: 180s
 
   web:
+    build:
+      dockerfile: apps/web/Dockerfile.ci
     healthcheck:
       <<: *node_http_health
       test:
@@ -44,6 +51,8 @@ services:
         ]
 
   admin:
+    build:
+      dockerfile: apps/admin/Dockerfile.ci
     healthcheck:
       <<: *node_http_health
       test:
@@ -53,6 +62,8 @@ services:
         ]
 
   courier:
+    build:
+      dockerfile: apps/courier/Dockerfile.ci
     healthcheck:
       <<: *node_http_health
       test:
