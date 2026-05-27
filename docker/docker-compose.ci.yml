@@ -2,6 +2,12 @@
 # Used with `--profile legacy-db` (see scripts/ci-e2e.sh).
 # VPS production uses Supabase (`supabase-db`); CI E2E uses ephemeral Compose postgres.
 
+x-node-http-health: &node_http_health
+  interval: 10s
+  timeout: 10s
+  retries: 36
+  start_period: 600s
+
 services:
   postgres:
     environment:
@@ -19,3 +25,38 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      <<: *node_http_health
+      test:
+        [
+          'CMD-SHELL',
+          "node -e \"fetch('http://127.0.0.1:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      start_period: 180s
+
+  web:
+    healthcheck:
+      <<: *node_http_health
+      test:
+        [
+          'CMD-SHELL',
+          "node -e \"fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+
+  admin:
+    healthcheck:
+      <<: *node_http_health
+      test:
+        [
+          'CMD-SHELL',
+          "node -e \"fetch('http://127.0.0.1:3001/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+
+  courier:
+    healthcheck:
+      <<: *node_http_health
+      test:
+        [
+          'CMD-SHELL',
+          "node -e \"fetch('http://127.0.0.1:3002/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]

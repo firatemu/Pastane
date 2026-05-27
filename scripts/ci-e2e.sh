@@ -89,11 +89,11 @@ if [[ "${CI_MODE}" -eq 1 ]]; then
 
   run_prisma_bootstrap
 
-  echo "[e2e] starting application services"
+  echo "[e2e] starting application services (wait for healthchecks)"
   if [[ "${E2E_COMPOSE_BUILD:-1}" != "0" ]]; then
-    "${COMPOSE[@]}" up -d --build api web admin courier
+    "${COMPOSE[@]}" up -d --build --wait api web admin courier
   else
-    "${COMPOSE[@]}" up -d api web admin courier
+    "${COMPOSE[@]}" up -d --wait api web admin courier
   fi
 else
   if [[ "${E2E_COMPOSE_BUILD:-1}" != "0" ]]; then
@@ -105,34 +105,42 @@ else
   fi
 fi
 
+dump_service_logs() {
+  local service="${1:?service required}"
+  echo "[e2e] --- ${service} logs (tail 120) ---" >&2
+  "${COMPOSE[@]}" logs --tail=120 "${service}" >&2 || true
+}
+
 echo "[e2e] waiting for HTTP readiness"
 if [[ "${CI_MODE}" -eq 1 ]]; then
-  # In CI prefer container-side readiness checks (runner networking can be flaky).
-  wait_for_node_fetch() {
-    local service="${1:?service required}"
-    local url="${2:?url required}"
-    local attempt=1
-    local max_attempts=90
-    while (( attempt <= max_attempts )); do
-      if "${COMPOSE[@]}" exec -T "${service}" node -e "
-        fetch('${url}', { redirect: 'follow' })
-          .then(r => { if (r.ok) process.exit(0); console.error('HTTP', r.status); process.exit(1); })
-          .catch(err => { console.error(String(err)); process.exit(1); });
-      " >/dev/null 2>&1; then
-        echo \"healthy(${service}): ${url}\"
-        return 0
-      fi
-      sleep 2
-      attempt=$((attempt + 1))
-    done
-    echo \"::error::timeout waiting for ${service} ${url}\" >&2
+  # Compose --wait uses container healthchecks; confirm host ports for Playwright.
+  wait_for_host_http() {
+    local url="${1:?url required}"
+    local label="${2:-${url}}"
+    if bash scripts/wait-for-http.sh "${url}" 120; then
+      echo "healthy(host): ${label}"
+      return 0
+    fi
+    echo "::error::host could not reach ${label}" >&2
     return 1
   }
 
-  wait_for_node_fetch api "http://localhost:3003/health"
-  wait_for_node_fetch web "http://localhost:3000/"
-  wait_for_node_fetch admin "http://localhost:3001/login"
-  wait_for_node_fetch courier "http://localhost:3002/login"
+  if ! wait_for_host_http "http://127.0.0.1:3003/health" "api"; then
+    dump_service_logs api
+    exit 1
+  fi
+  if ! wait_for_host_http "http://127.0.0.1:3000/" "web"; then
+    dump_service_logs web
+    exit 1
+  fi
+  if ! wait_for_host_http "http://127.0.0.1:3001/login" "admin"; then
+    dump_service_logs admin
+    exit 1
+  fi
+  if ! wait_for_host_http "http://127.0.0.1:3002/login" "courier"; then
+    dump_service_logs courier
+    exit 1
+  fi
 else
   bash scripts/wait-for-http.sh "http://127.0.0.1:3003/health" 180
   bash scripts/wait-for-http.sh "http://127.0.0.1:3000/" 180

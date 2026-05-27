@@ -6,11 +6,11 @@ test.describe('smoke', () => {
     const { phone, password } = adminCredential();
     await page.goto('/login');
 
-    await page.getByPlaceholder('905550000001').fill(phone);
+    await page.getByLabel(/telefon/i).fill(phone);
     await page.locator('input[type="password"]').fill(password);
-    await page.getByRole('button', { name: /^Giriş yap$/ }).click();
+    await page.getByRole('button', { name: /giriş yap/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: /^Özet$/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /operasyon özeti/i })).toBeVisible();
   });
 });
