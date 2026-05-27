@@ -15,6 +15,15 @@ fi
 
 COMPOSE=(docker compose --env-file .env -f docker/docker-compose.dev.yml)
 
+# In CI (or when explicitly requested) layer the CI override that activates
+# the Compose-managed postgres container and re-wires DATABASE_URL for the api.
+if [[ "${CI:-}" == "true" || "${E2E_USE_CI_COMPOSE:-}" == "1" ]]; then
+  echo "[e2e] CI mode: including docker-compose.ci.yml override"
+  COMPOSE=(docker compose --env-file .env \
+    -f docker/docker-compose.dev.yml \
+    -f docker/docker-compose.ci.yml)
+fi
+
 if [[ "${E2E_COMPOSE_BUILD:-1}" != "0" ]]; then
   echo "[e2e] compose up (--build)"
   "${COMPOSE[@]}" up -d --build

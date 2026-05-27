@@ -1,0 +1,27 @@
+# CI override for docker-compose.dev.yml.
+# Aktivates the Compose-managed postgres container and wires the api service
+# to use it — replacing the Supabase-CLI DATABASE_URL from .env.example.
+#
+# Usage (ci-e2e.sh):
+#   docker compose --env-file .env \
+#     -f docker/docker-compose.dev.yml \
+#     -f docker/docker-compose.ci.yml \
+#     up -d --build
+
+services:
+  postgres:
+    # Remove the legacy-db profile restriction so postgres starts in CI.
+    profiles: []
+
+  api:
+    environment:
+      # Override Supabase-CLI addresses from .env.example with the Compose
+      # postgres container hostname so the API can connect in CI.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+      DIRECT_URL: postgresql://postgres:postgres@postgres:5432/postgres
+      PUBLIC_API_URL: http://localhost:3003
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
